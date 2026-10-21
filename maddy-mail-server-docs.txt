@@ -1,0 +1,340 @@
+================================================================================
+  MADDY MAIL SERVER - FULL DOCKER SETUP DOCUMENTATION
+  Domain: rsalehin24.me | Server: mail.rsalehin24.me
+================================================================================
+
+OVERVIEW
+--------
+- Everything runs in Docker (Maddy + Certbot) - nothing installed on the host
+- Maddy handles inbound SMTP (receiving) and IMAP (storing/serving mail)
+- Brevo handles outbound SMTP (sending) - already configured
+- Gmail and Nextcloud connect via IMAP to fetch mail
+- Gmail and Nextcloud send outbound via Brevo SMTP relay
+
+SENDERS ALREADY CONFIGURED IN BREVO
+-------------------------------------
+  mail@rsalehin24.me      (Reyanus Salehin)
+  cloud@rsalehin24.me     (RSalehin24 Cloud)
+  library@rsalehin24.me   (RSalehin24 Library)
+
+
+================================================================================
+  SECTION 1: DIRECTORY STRUCTURE
+================================================================================
+
+  /opt/maddy/
+  ├── docker-compose.yml
+  ├── config/
+  │   └── maddy.conf
+  ├── data/               <-- mailboxes + credentials (persisted)
+  └── tls/                <-- certs written here by Certbot container
+
+Create it:
+
+  mkdir -p /opt/maddy/config /opt/maddy/data /opt/maddy/tls
+
+
+================================================================================
+  SECTION 2: DOCKER COMPOSE FILE
+================================================================================
+
+File: /opt/maddy/docker-compose.yml
+-------------------------------------
+
+  services:
+
+    certbot:
+      image: certbot/certbot:latest
+      container_name: certbot
+      volumes:
+        - ./tls:/etc/letsencrypt/live/mail.rsalehin24.me
+        - certbot-data:/etc/letsencrypt
+      entrypoint: >
+        certbot certonly
+        --standalone
+        --agree-tos
+        --no-eff-email
+        --email mail@rsalehin24.me
+        -d mail.rsalehin24.me
+        --cert-path /etc/letsencrypt/live/mail.rsalehin24.me/cert.pem
+        --key-path  /etc/letsencrypt/live/mail.rsalehin24.me/key.pem
+        --fullchain-path /etc/letsencrypt/live/mail.rsalehin24.me/fullchain.pem
+      ports:
+        - "80:80"
+
+    maddy:
+      image: foxcpp/maddy:latest
+      container_name: maddy
+      restart: unless-stopped
+      ports:
+        - "25:25"       # SMTP inbound
+        - "587:587"     # SMTP submission
+        - "993:993"     # IMAP TLS
+      volumes:
+        - ./config/maddy.conf:/data/maddy.conf:ro
+        - ./data:/data
+        - ./tls:/tls:ro
+      environment:
+        - MADDY_HOSTNAME=mail.rsalehin24.me
+        - MADDY_DOMAIN=rsalehin24.me
+
+    certbot-renew:
+      image: certbot/certbot:latest
+      container_name: certbot-renew
+      restart: unless-stopped
+      volumes:
+        - ./tls:/etc/letsencrypt/live/mail.rsalehin24.me
+        - certbot-data:/etc/letsencrypt
+      network_mode: host
+      entrypoint: >
+        sh -c "trap exit TERM;
+               while :; do
+                 certbot renew --standalone;
+                 docker restart maddy;
+                 sleep 12h & wait $${!};
+               done"
+
+  volumes:
+    certbot-data:
+
+NOTE: Run certbot first (one-time) before starting maddy. See Section 5.
+
+
+================================================================================
+  SECTION 3: MADDY CONFIGURATION FILE
+================================================================================
+
+File: /opt/maddy/config/maddy.conf
+------------------------------------
+
+  $(hostname) = mail.rsalehin24.me
+  $(primary_domain) = rsalehin24.me
+  $(local_domains) = $(primary_domain)
+
+  tls file /tls/fullchain.pem /tls/key.pem
+
+  smtp tcp://0.0.0.0:25 {
+      limits { all rate 20/1s }
+      dmarc yes
+      check { require_mx_record; dkim; spf }
+      deliver_to &local_routing
+  }
+
+  submission tls+smtp://0.0.0.0:587 {
+      auth &local_authdb
+      deliver_to &remote_mxes
+  }
+
+  imap tls+imap://0.0.0.0:993 {
+      auth &local_authdb
+      storage &local_mailboxes
+  }
+
+  target.local_routing local_routing {
+      local_mailboxes: &local_mailboxes
+  }
+
+  storage.imapsql local_mailboxes {
+      driver sqlite3
+      dsn /data/imapsql.db
+  }
+
+  auth.pass_table local_authdb {
+      table file:/data/credentials
+  }
+
+  target.remote remote_mxes {
+      tls_starttls_level encrypted
+      mx_auth {
+          dane
+          mtasts
+          local_policy level authenticated
+      }
+  }
+
+
+================================================================================
+  SECTION 4: DNS RECORDS
+================================================================================
+
+Add these at your DNS provider BEFORE running anything.
+Wait for propagation before issuing the TLS cert (check: dnschecker.org).
+
+  Type    Name                Value                        Priority
+  ------  ------------------  ---------------------------  --------
+  A       mail                <your server IP>             -
+  MX      rsalehin24.me       mail.rsalehin24.me           10
+
+Verify propagation:
+
+  dig A mail.rsalehin24.me
+  dig MX rsalehin24.me
+
+Note: SPF, DKIM, and DMARC are already configured via Brevo. No changes needed.
+
+
+================================================================================
+  SECTION 5: FIRST-TIME STARTUP (ORDER MATTERS)
+================================================================================
+
+Step 1 - Confirm port 80 is free (Certbot needs it for the HTTP challenge):
+
+  ss -tlnp | grep :80
+
+Step 2 - Issue TLS certificate (one-time only):
+
+  cd /opt/maddy
+  docker compose run --rm certbot
+
+  This starts a temporary Certbot container, completes the HTTP-01 challenge,
+  writes fullchain.pem, cert.pem, and key.pem into ./tls/, then exits.
+
+Step 3 - Verify certs were written:
+  # Expected: fullchain.pem  cert.pem  key.pem
+
+Step 4 - Start Maddy and the auto-renewal watcher:
+
+  docker compose up -d maddy
+
+Step 5 - Create login credentials for each mail account:
+
+  docker exec -it maddy maddy creds create mail@rsalehin24.me : r1124.S@gobi#
+  docker exec -it maddy maddy creds create cloud@rsalehin24.me : r1124.S@gobi#
+  docker exec -it maddy maddy creds create library@rsalehin24.me :  r1124.S@gobi#
+  docker exec -it maddy maddy creds create reyan@rsalehin24.me : r1124.S@gobi#
+  docker exec -it maddy maddy creds create salehin@rsalehin24.me : r1124.S@gobi#
+  docker exec -it maddy maddy creds create dev_01@rsalehin24.me : r1124.S@gobi#
+  docker exec -it maddy maddy creds create dev_02@rsalehin24.me : r1124.S@gobi#
+  docker exec -it maddy maddy creds create demo_user.library@rsalehin24.me : r1124.S@gobi#
+
+Step 6 - Create IMAP mailboxes for each account:
+
+  docker exec -it maddy maddy imap-acct create mail@rsalehin24.me
+  docker exec -it maddy maddy imap-acct create cloud@rsalehin24.me
+  docker exec -it maddy maddy imap-acct create library@rsalehin24.me
+  docker exec -it maddy maddy imap-acct create reyan@rsalehin24.me
+  docker exec -it maddy maddy imap-acct create salehin@rsalehin24.me
+  docker exec -it maddy maddy imap-acct create dev_01@rsalehin24.me
+  docker exec -it maddy maddy imap-acct create dev_02@rsalehin24.me
+  docker exec -it maddy maddy imap-acct create demo_user.library@rsalehin24.me
+
+
+================================================================================
+  SECTION 6: CLIENT CONFIGURATION
+================================================================================
+
+-- GMAIL APP --
+
+  Settings > Accounts > Add another email address > Other
+
+  Incoming (IMAP):
+    Host:       mail.rsalehin24.me
+    Port:       993
+    Security:   SSL/TLS
+    Username:   full email (e.g. mail@rsalehin24.me)
+    Password:   password set in Section 5, Step 5
+
+  Outgoing (SMTP) - via Brevo:
+    Host:       smtp-relay.brevo.com
+    Port:       587
+    Security:   STARTTLS
+    Username:   your Brevo login email
+    Password:   your Brevo SMTP key
+
+
+-- NEXTCLOUD MAIL --
+
+  Nextcloud > Mail > Add account > Manual configuration
+
+  Incoming (IMAP):
+    Host:       mail.rsalehin24.me
+    Port:       993
+    Security:   SSL/TLS
+    Username:   full email address
+    Password:   password set in Section 5, Step 5
+
+  Outgoing (SMTP) - via Brevo:
+    Host:       smtp-relay.brevo.com
+    Port:       587
+    Security:   STARTTLS
+    Username:   your Brevo login email
+    Password:   your Brevo SMTP key
+
+
+================================================================================
+  SECTION 7: DAY-TO-DAY COMMANDS
+================================================================================
+
+  View live logs:
+    docker compose -f /opt/maddy/docker-compose.yml logs -f maddy
+
+  Restart Maddy:
+    docker restart maddy
+
+  Stop / Start:
+    docker compose -f /opt/maddy/docker-compose.yml stop maddy
+    docker compose -f /opt/maddy/docker-compose.yml start maddy
+
+  Upgrade Maddy to latest image:
+    docker compose -f /opt/maddy/docker-compose.yml pull maddy
+    docker compose -f /opt/maddy/docker-compose.yml up -d maddy
+
+  List all mail accounts:
+    docker exec -it maddy maddy creds list
+
+  Change a password:
+    docker exec -it maddy maddy creds password mail@rsalehin24.me
+
+  Delete an account:
+    docker exec -it maddy maddy creds remove mail@rsalehin24.me
+    docker exec -it maddy maddy imap-acct remove mail@rsalehin24.me
+
+  Manually force cert renewal:
+    docker compose -f /opt/maddy/docker-compose.yml run --rm certbot renew
+
+
+================================================================================
+  SECTION 8: QUICK TROUBLESHOOTING
+================================================================================
+
+  Problem: Certbot fails - "Could not bind to port 80"
+  Fix:     Something is already using port 80. Find and stop it:
+           ss -tlnp | grep :80
+           Then retry: docker compose run --rm certbot
+
+  Problem: Certbot fails - "DNS problem: NXDOMAIN"
+  Fix:     The A record for mail.rsalehin24.me hasn't propagated yet.
+           Check: dig A mail.rsalehin24.me
+           Wait a few minutes and retry.
+
+  Problem: Port 25 not accepting connections
+  Fix:     Check your VPS firewall / security group allows TCP 25 inbound.
+           AWS and GCP block port 25 by default - use Hetzner, Vultr, or
+           Contabo which allow it without restrictions.
+
+  Problem: TLS errors on IMAP connect
+  Fix:     Verify certs exist and are valid:
+           ls -la /opt/maddy/tls/
+           docker exec -it maddy openssl x509 -in /tls/fullchain.pem \
+             -noout -dates
+
+  Problem: IMAP login failing
+  Fix:     Check account exists: docker exec -it maddy maddy creds list
+           Reset password:
+           docker exec -it maddy maddy creds password mail@rsalehin24.me
+
+  Problem: Mail not arriving
+  Fix:     Check MX record is correct:
+           dig MX rsalehin24.me
+           Should return: mail.rsalehin24.me at priority 10.
+           Also check Maddy logs: docker compose logs -f maddy
+
+  Problem: Sent mail landing in spam
+  Fix:     You are routing outbound through Brevo - deliverability should
+           be fine. Verify Brevo SMTP credentials in your client settings.
+
+
+================================================================================
+  END OF DOCUMENT
+  Last updated: March 2026
+================================================================================
