@@ -1,0 +1,635 @@
+{
+  "schema_version": 1,
+  "source_plan_sha256": "15ac65280aaca10040a0c0024a4e058657d6f7e44f019e4646643858fb7dab10",
+  "evidence_max_age_seconds": 86400,
+  "required_artifacts": [
+    "dashboard_image",
+    "host_bundle",
+    "deployment_config",
+    "qualification_suite"
+  ],
+  "constants": {
+    "admin_email": "rsalehin24@gmail.com",
+    "domain": "rsalehin24.me",
+    "mail_host": "mail.rsalehin24.me",
+    "otp_sender": "mail@rsalehin24.me",
+    "http_json_limit_bytes": 65536,
+    "master_password_min_characters": 16,
+    "master_password_max_utf8_bytes": 1024,
+    "mailbox_password_min_characters": 16,
+    "mailbox_password_max_utf8_bytes": 72,
+    "generated_mailbox_password_ascii_characters": 24,
+    "bootstrap_entropy_bits": 128,
+    "bootstrap_expiry_seconds": 1800,
+    "challenge_expiry_seconds": 300,
+    "otp_expiry_seconds": 300,
+    "otp_attempts": 5,
+    "otp_resend_seconds": 60,
+    "recent_auth_seconds": 300,
+    "session_idle_seconds": 900,
+    "session_absolute_seconds": 43200,
+    "replacement_expiry_seconds": 600,
+    "recovery_code_count": 5,
+    "recovery_code_entropy_bits": 128,
+    "renewal_calendar": "*-*-* 03:00:00 UTC"
+  },
+  "requirements": [
+    {
+      "id": "R01",
+      "title": "Certificate generation and activation",
+      "source_gap": 1,
+      "document": "operations/certificates.md",
+      "tests": [
+        "T15",
+        "T16"
+      ],
+      "gates": [
+        "G06",
+        "G08"
+      ]
+    },
+    {
+      "id": "R02",
+      "title": "Bounded VM resource usage",
+      "source_gap": 2,
+      "document": "design/architecture.md",
+      "tests": [
+        "T21",
+        "P02"
+      ],
+      "gates": [
+        "G01",
+        "G08"
+      ]
+    },
+    {
+      "id": "R03",
+      "title": "Protected setup and factor fallback",
+      "source_gap": 3,
+      "document": "design/security.md",
+      "tests": [
+        "T02",
+        "T03",
+        "T04"
+      ],
+      "gates": [
+        "G01",
+        "G07"
+      ]
+    },
+    {
+      "id": "R04",
+      "title": "Consistent accounts and partial outcomes",
+      "source_gap": 4,
+      "document": "design/mailboxes.md",
+      "tests": [
+        "T10",
+        "T12"
+      ],
+      "gates": [
+        "G01",
+        "G07"
+      ]
+    },
+    {
+      "id": "R05",
+      "title": "Correct dual-credential client configuration",
+      "source_gap": 5,
+      "document": "design/frontend.md",
+      "tests": [
+        "T03",
+        "T14",
+        "P03"
+      ],
+      "gates": [
+        "G01",
+        "G08"
+      ]
+    },
+    {
+      "id": "R06",
+      "title": "Accurate routing and optional MX migration",
+      "source_gap": 6,
+      "document": "operations/relay-routing.md",
+      "tests": [
+        "T17",
+        "P08"
+      ],
+      "gates": [
+        "G02",
+        "G08"
+      ]
+    },
+    {
+      "id": "R07",
+      "title": "Restricted helper and no web Docker control",
+      "source_gap": 7,
+      "document": "design/helper.md",
+      "tests": [
+        "T07",
+        "T08"
+      ],
+      "gates": [
+        "G01",
+        "G05"
+      ]
+    },
+    {
+      "id": "R08",
+      "title": "Persistent secrets and authentication lifecycle",
+      "source_gap": 8,
+      "document": "design/security.md",
+      "tests": [
+        "T04",
+        "T06"
+      ],
+      "gates": [
+        "G01",
+        "G07"
+      ]
+    },
+    {
+      "id": "R09",
+      "title": "Negative acceptance and trusted deployment checks",
+      "source_gap": 9,
+      "document": "verification/production-checks.md",
+      "tests": [
+        "T01",
+        "T03",
+        "P01"
+      ],
+      "gates": [
+        "G01",
+        "G08"
+      ]
+    },
+    {
+      "id": "R10",
+      "title": "Restrictive existing and future mail permissions",
+      "source_gap": 10,
+      "document": "design/runtime.md",
+      "tests": [
+        "T09"
+      ],
+      "gates": [
+        "G01",
+        "G05"
+      ]
+    },
+    {
+      "id": "R11",
+      "title": "Post-restore authentication invalidation",
+      "source_gap": 11,
+      "document": "operations/backup-recovery.md",
+      "tests": [
+        "T18"
+      ],
+      "gates": [
+        "G01",
+        "G04",
+        "G08"
+      ]
+    },
+    {
+      "id": "R12",
+      "title": "Stable helper socket and boot lifecycle",
+      "source_gap": 12,
+      "document": "design/helper.md",
+      "tests": [
+        "T08",
+        "P04"
+      ],
+      "gates": [
+        "G01",
+        "G08"
+      ]
+    },
+    {
+      "id": "R13",
+      "title": "Factor recovery and actual IMAP revocation semantics",
+      "source_gap": 13,
+      "document": "design/security.md",
+      "tests": [
+        "T05",
+        "T13"
+      ],
+      "gates": [
+        "G01",
+        "G07"
+      ]
+    },
+    {
+      "id": "R14",
+      "title": "Explicit Brevo sender onboarding",
+      "source_gap": 14,
+      "document": "operations/relay-routing.md",
+      "tests": [
+        "T14"
+      ],
+      "gates": [
+        "G01",
+        "G07"
+      ]
+    },
+    {
+      "id": "R15",
+      "title": "Trusted deletion backup coverage",
+      "source_gap": 15,
+      "document": "operations/backup-recovery.md",
+      "tests": [
+        "T17",
+        "T18",
+        "P07"
+      ],
+      "gates": [
+        "G04",
+        "G08"
+      ]
+    },
+    {
+      "id": "R16",
+      "title": "Existing-account-only password reset",
+      "source_gap": 16,
+      "document": "design/mailboxes.md",
+      "tests": [
+        "T11"
+      ],
+      "gates": [
+        "G01",
+        "G07"
+      ]
+    },
+    {
+      "id": "R17",
+      "title": "No old-revision session issuance",
+      "source_gap": 17,
+      "document": "design/security.md",
+      "tests": [
+        "T06"
+      ],
+      "gates": [
+        "G01",
+        "G07"
+      ]
+    },
+    {
+      "id": "R18",
+      "title": "Protected operational recipients",
+      "source_gap": 18,
+      "document": "operations/relay-routing.md",
+      "tests": [
+        "T17",
+        "P08"
+      ],
+      "gates": [
+        "G02",
+        "G08"
+      ]
+    },
+    {
+      "id": "R19",
+      "title": "Revision-bound observed relay readiness",
+      "source_gap": 19,
+      "document": "design/api.md",
+      "tests": [
+        "T14",
+        "P06"
+      ],
+      "gates": [
+        "G01",
+        "G07"
+      ]
+    },
+    {
+      "id": "R20",
+      "title": "Image, schema, mount and protocol identity",
+      "source_gap": 20,
+      "document": "design/storage.md",
+      "tests": [
+        "T20"
+      ],
+      "gates": [
+        "G01",
+        "G05"
+      ]
+    },
+    {
+      "id": "R21",
+      "title": "Bounded requests, storage and independent monitoring",
+      "source_gap": 21,
+      "document": "design/api.md",
+      "tests": [
+        "T20",
+        "T21",
+        "T22",
+        "P05"
+      ],
+      "gates": [
+        "G01",
+        "G08"
+      ]
+    },
+    {
+      "id": "R22",
+      "title": "Serialized maintenance and unknown-completion safety",
+      "source_gap": 22,
+      "document": "design/helper.md",
+      "tests": [
+        "T16",
+        "T19"
+      ],
+      "gates": [
+        "G01",
+        "G03",
+        "G06"
+      ]
+    }
+  ],
+  "input_fields": {
+    "backup_destination": {
+      "type": "string"
+    },
+    "backup_encryption_mechanism": {
+      "type": "string"
+    },
+    "backup_key_reference": {
+      "type": "string"
+    },
+    "backup_schedule": {
+      "type": "string"
+    },
+    "backup_retention": {
+      "type": "string"
+    },
+    "alert_channel": {
+      "type": "string"
+    },
+    "alert_recipient": {
+      "type": "string"
+    },
+    "external_monitor": {
+      "type": "string"
+    },
+    "maintenance_window": {
+      "type": "string"
+    },
+    "protected_policy_sha256": {
+      "type": "string"
+    },
+    "maddy_image_id": {
+      "type": "string"
+    },
+    "maddy_security_assessment": {
+      "type": "string"
+    },
+    "recovery_point_seconds": {
+      "type": "positive_integer"
+    },
+    "recovery_time_seconds": {
+      "type": "positive_integer"
+    },
+    "deletion_backup_max_age_seconds": {
+      "type": "positive_integer"
+    },
+    "service_uid": {
+      "type": "positive_integer"
+    },
+    "service_gid": {
+      "type": "positive_integer"
+    },
+    "memory_limit_bytes": {
+      "type": "positive_integer"
+    },
+    "tmpfs_limit_bytes": {
+      "type": "positive_integer"
+    },
+    "host_memory_bytes": {
+      "type": "positive_integer"
+    },
+    "reserved_host_mail_bytes": {
+      "type": "positive_integer"
+    },
+    "hash_memory_kib": {
+      "type": "positive_integer"
+    },
+    "hash_parallelism": {
+      "type": "positive_integer"
+    },
+    "http_concurrency": {
+      "type": "positive_integer"
+    },
+    "operation_timeout_seconds": {
+      "type": "positive_integer"
+    },
+    "lock_wait_seconds": {
+      "type": "positive_integer"
+    },
+    "disk_free_minimum_bytes": {
+      "type": "positive_integer"
+    },
+    "inode_free_minimum": {
+      "type": "positive_integer"
+    },
+    "email_otp_enabled": {
+      "type": "boolean"
+    },
+    "permanent_deletion_enabled": {
+      "type": "boolean"
+    },
+    "mx_cutover_approved": {
+      "type": "boolean"
+    },
+    "mx_mode": {
+      "type": "choice",
+      "values": [
+        "cloudflare",
+        "direct"
+      ]
+    }
+  },
+  "gates": [
+    {
+      "id": "G01",
+      "depends_on": [],
+      "environment": "isolated-linux-amd64",
+      "cases": [
+        {
+          "id": "G01.01",
+          "expected": "candidate_qualified"
+        }
+      ]
+    },
+    {
+      "id": "G02",
+      "depends_on": [
+        "G01"
+      ],
+      "environment": "operator-preflight",
+      "cases": [
+        {
+          "id": "G02.01",
+          "expected": "inputs_complete"
+        }
+      ]
+    },
+    {
+      "id": "G03",
+      "depends_on": [
+        "G02"
+      ],
+      "environment": "target-production",
+      "cases": [
+        {
+          "id": "G03.01",
+          "expected": "legacy_drained"
+        },
+        {
+          "id": "G03.02",
+          "expected": "locks_validated"
+        }
+      ]
+    },
+    {
+      "id": "G04",
+      "depends_on": [
+        "G03"
+      ],
+      "environment": "target-production",
+      "cases": [
+        {
+          "id": "G04.01",
+          "expected": "baseline_captured"
+        },
+        {
+          "id": "G04.02",
+          "expected": "baseline_restore_passed"
+        }
+      ]
+    },
+    {
+      "id": "G05",
+      "depends_on": [
+        "G04"
+      ],
+      "environment": "target-production",
+      "cases": [
+        {
+          "id": "G05.01",
+          "expected": "hardening_verified"
+        },
+        {
+          "id": "G05.02",
+          "expected": "legacy_pair_preserved"
+        }
+      ]
+    },
+    {
+      "id": "G06",
+      "depends_on": [
+        "G05"
+      ],
+      "environment": "target-production",
+      "cases": [
+        {
+          "id": "G06.01",
+          "expected": "renewal_cutover_verified"
+        },
+        {
+          "id": "G06.02",
+          "expected": "served_tls_verified"
+        }
+      ]
+    },
+    {
+      "id": "G07",
+      "depends_on": [
+        "G06"
+      ],
+      "environment": "target-production",
+      "cases": [
+        {
+          "id": "G07.01",
+          "expected": "bootstrap_closed"
+        },
+        {
+          "id": "G07.02",
+          "expected": "auth_verified"
+        },
+        {
+          "id": "G07.03",
+          "expected": "original_accounts_preserved"
+        }
+      ]
+    },
+    {
+      "id": "G08",
+      "depends_on": [
+        "G07"
+      ],
+      "environment": "target-production",
+      "cases": [
+        {
+          "id": "G08.01",
+          "expected": "production_backup_verified"
+        },
+        {
+          "id": "G08.02",
+          "expected": "resources_verified"
+        },
+        {
+          "id": "G08.03",
+          "expected": "restart_verified"
+        },
+        {
+          "id": "G08.04",
+          "expected": "alerts_delivered"
+        }
+      ]
+    }
+  ],
+  "conditional_tests": {
+    "P06": {
+      "field": "email_otp_enabled",
+      "equals": true
+    },
+    "P07": {
+      "field": "permanent_deletion_enabled",
+      "equals": true
+    },
+    "P08": {
+      "field": "mx_mode",
+      "equals": "direct"
+    }
+  },
+  "work_packages": {
+    "W01": [],
+    "W02": [
+      "W01"
+    ],
+    "W03": [
+      "W02"
+    ],
+    "W04": [
+      "W01"
+    ],
+    "W05": [
+      "W03",
+      "W04"
+    ],
+    "W06": [
+      "W05"
+    ],
+    "W07": [
+      "W02",
+      "W03",
+      "W04"
+    ],
+    "W08": [
+      "W06",
+      "W07"
+    ],
+    "W09": [
+      "W08"
+    ]
+  }
+}

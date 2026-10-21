@@ -1,0 +1,28 @@
+{
+  "result": "pass",
+  "scope": "documentation, Python syntax and finite specifications",
+  "requirements": 22,
+  "test_groups": 30,
+  "case_contracts": 122,
+  "markdown_documents": 21,
+  "model_states": {
+    "authentication_revision": 19,
+    "creation_preservation": 12,
+    "maintenance_exclusion": 23
+  },
+  "specification_sha256": "70024407fcffe0d590204b6e15c460ce8665028f6cc65d5780d8057e0f1bd376",
+  "application_runtime": "not_run",
+  "production_qualification": "blocked",
+  "verification_tools": {
+    "result": "pass",
+    "test_count": 40,
+    "scope": "verification tools and model counterexamples; not application tests"
+  },
+  "command_examples": {
+    "result": "pass",
+    "shell_syntax_checks": 9,
+    "compose_missing_variable_rejections": 6,
+    "scope": "documentation fixtures; no containers started or bind sources provisioned"
+  },
+  "generated_at_utc": "2026-10-21T21:39:43.206014+00:00"
+}

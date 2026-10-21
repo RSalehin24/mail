@@ -1,0 +1,258 @@
+{
+  "schema_version": 1,
+  "release_id": null,
+  "specification_sha256": null,
+  "runner_revision": null,
+  "artifact_set_sha256": null,
+  "artifacts": [
+    {
+      "id": "dashboard_image",
+      "path": null,
+      "sha256": null
+    },
+    {
+      "id": "host_bundle",
+      "path": null,
+      "sha256": null
+    },
+    {
+      "id": "deployment_config",
+      "path": null,
+      "sha256": null
+    },
+    {
+      "id": "qualification_suite",
+      "path": null,
+      "sha256": null
+    }
+  ],
+  "inputs": {
+    "backup_destination": null,
+    "backup_encryption_mechanism": null,
+    "backup_key_reference": null,
+    "backup_schedule": null,
+    "backup_retention": null,
+    "alert_channel": null,
+    "alert_recipient": null,
+    "external_monitor": null,
+    "maintenance_window": null,
+    "protected_policy_sha256": null,
+    "maddy_image_id": null,
+    "maddy_security_assessment": null,
+    "recovery_point_seconds": null,
+    "recovery_time_seconds": null,
+    "deletion_backup_max_age_seconds": null,
+    "service_uid": null,
+    "service_gid": null,
+    "memory_limit_bytes": null,
+    "tmpfs_limit_bytes": null,
+    "host_memory_bytes": null,
+    "reserved_host_mail_bytes": null,
+    "hash_memory_kib": null,
+    "hash_parallelism": null,
+    "http_concurrency": null,
+    "operation_timeout_seconds": null,
+    "lock_wait_seconds": null,
+    "disk_free_minimum_bytes": null,
+    "inode_free_minimum": null,
+    "email_otp_enabled": false,
+    "permanent_deletion_enabled": false,
+    "mx_cutover_approved": false,
+    "mx_mode": "cloudflare"
+  },
+  "tests": [
+    {
+      "id": "T01",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T02",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T03",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T04",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T05",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T06",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T07",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T08",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T09",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T10",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T11",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T12",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T13",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T14",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T15",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T16",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T17",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T18",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T19",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T20",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T21",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "T22",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "P01",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "P02",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "P03",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "P04",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "P05",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "P06",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "P07",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "P08",
+      "report": null,
+      "report_sha256": null
+    }
+  ],
+  "gates": [
+    {
+      "id": "G01",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "G02",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "G03",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "G04",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "G05",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "G06",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "G07",
+      "report": null,
+      "report_sha256": null
+    },
+    {
+      "id": "G08",
+      "report": null,
+      "report_sha256": null
+    }
+  ],
+  "approval": null
+}

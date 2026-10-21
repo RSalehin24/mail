@@ -1,0 +1,733 @@
+{
+  "schema_version": 1,
+  "groups": [
+    {
+      "id": "T01",
+      "title": "Rollout prerequisites",
+      "environment": "isolated-linux-amd64",
+      "contract": "Fail the release build, recovery fixtures, or required deployment-record input: production maintenance never starts. Prove candidate/dashboard recovery tests run after the image exists, and the real baseline restore passes before hardening/recreation. Initial installation requires no nonexistent production dashboard state; upgrades restore the existing state. Reject skipped/failed phase gates, and verify bootstrap provisioning immediately precedes startup with the API/helper checks outside the deployment lock.",
+      "cases": [
+        {
+          "id": "T01.01",
+          "expected": "Failed build or recovery fixture prevents production maintenance."
+        },
+        {
+          "id": "T01.02",
+          "expected": "Missing deployment input prevents maintenance entry."
+        },
+        {
+          "id": "T01.03",
+          "expected": "Initial install needs no nonexistent dashboard restore; upgrades restore actual state."
+        },
+        {
+          "id": "T01.04",
+          "expected": "All phase gates, late bootstrap and lock-release-before-API ordering hold."
+        }
+      ]
+    },
+    {
+      "id": "T02",
+      "title": "Protected setup",
+      "environment": "isolated-linux-amd64",
+      "contract": "Missing, wrong, expired, and reused bootstrap tokens fail; invalid TOTP cannot initialize the admin; competing setup requests yield exactly one initialized admin. An empty/missing data mount after initialization fails closed.",
+      "cases": [
+        {
+          "id": "T02.01",
+          "expected": "Missing, wrong, expired and reused bootstrap tokens fail."
+        },
+        {
+          "id": "T02.02",
+          "expected": "Invalid TOTP cannot initialize an admin."
+        },
+        {
+          "id": "T02.03",
+          "expected": "Competing enrollments initialize exactly one admin."
+        },
+        {
+          "id": "T02.04",
+          "expected": "Missing/mismatched initialized database or marker fails closed."
+        }
+      ]
+    },
+    {
+      "id": "T03",
+      "title": "Authorization and browser handling",
+      "environment": "isolated-linux-amd64",
+      "contract": "Anonymous, password-only, expired, and revoked sessions cannot access diagnostics, accounts, relay settings, or helper mutations. Mutations reject invalid CSRF/Origin context; secrets remain masked without recent reauthentication. Verify the session-bound reauthentication flow, grant expiry, rejection of cross-session/wrong-purpose challenges, and unchanged absolute session expiry. Check configured Host validation, API no-store headers, safe rendering of names/notes, no secret browser persistence, and API errors rather than SPA HTML for unknown API routes.",
+      "cases": [
+        {
+          "id": "T03.01",
+          "expected": "Anonymous, password-only, expired and revoked sessions cannot use protected routes."
+        },
+        {
+          "id": "T03.02",
+          "expected": "Host, Origin and CSRF violations fail without side effects."
+        },
+        {
+          "id": "T03.03",
+          "expected": "Recent authentication is purpose/session bound, expires and preserves absolute expiry."
+        },
+        {
+          "id": "T03.04",
+          "expected": "Secrets stay masked/no-store and leave no browser or log persistence."
+        },
+        {
+          "id": "T03.05",
+          "expected": "Untrusted names/notes render as text and errors disclose only safe outcome IDs."
+        },
+        {
+          "id": "T03.06",
+          "expected": "Unknown API paths return API errors rather than SPA HTML."
+        }
+      ]
+    },
+    {
+      "id": "T04",
+      "title": "TOTP, Email OTP, and recovery",
+      "environment": "isolated-linux-amd64",
+      "contract": "Reject expired, incorrect, replayed, cross-challenge, and superseded codes. Consume codes atomically under concurrent verification. Recovery codes work once, and regeneration invalidates the previous set. Attempt/resend limits persist across restarts and new challenges; spoofed forwarded headers cannot bypass peer/admin limits. Test master-password bounds without trimming accepted Unicode/whitespace.",
+      "cases": [
+        {
+          "id": "T04.01",
+          "expected": "Wrong, expired, replayed, cross-challenge and superseded factor values fail."
+        },
+        {
+          "id": "T04.02",
+          "expected": "Concurrent verification consumes a value exactly once."
+        },
+        {
+          "id": "T04.03",
+          "expected": "Recovery generation uses high entropy and replacement invalidates all old codes."
+        },
+        {
+          "id": "T04.04",
+          "expected": "Admin/peer limits survive new challenges, addresses and restarts; spoofed headers fail."
+        },
+        {
+          "id": "T04.05",
+          "expected": "Master password bounds preserve accepted spaces and Unicode exactly."
+        },
+        {
+          "id": "T04.06",
+          "expected": "Accepted TOTP steps cannot be reused, including enrollment/replacement transitions."
+        }
+      ]
+    },
+    {
+      "id": "T05",
+      "title": "Factor replacement and operator recovery",
+      "environment": "isolated-linux-amd64",
+      "contract": "Reject TOTP replacement without recent password + an existing factor. Invalid/expired new enrollment preserves the old seed; successful confirmation disables the old seed and revokes prior sessions/challenges/codes. Verify offline SSH recovery, interrupted-recovery lockout, and absence of a public reset bypass.",
+      "cases": [
+        {
+          "id": "T05.01",
+          "expected": "Replacement requires password plus an existing factor."
+        },
+        {
+          "id": "T05.02",
+          "expected": "Invalid or expired replacement keeps the active factor."
+        },
+        {
+          "id": "T05.03",
+          "expected": "Successful replacement atomically revokes old factors/sessions/challenges/codes."
+        },
+        {
+          "id": "T05.04",
+          "expected": "SSH-only recovery reuses the recorded image with protected input and no network/helper mounts."
+        },
+        {
+          "id": "T05.05",
+          "expected": "Interrupted recovery remains closed and renewal/reboot cannot restart a recovering consumer."
+        }
+      ]
+    },
+    {
+      "id": "T06",
+      "title": "Session lifecycle and keys",
+      "environment": "isolated-linux-amd64",
+      "contract": "Verify Secure/HttpOnly/SameSite/host-only cookie attributes, idle/absolute expiry, and logout revocation. Start login/Email OTP and replacement challenges, change the master password, then verify all old sessions/challenges/codes/grants fail, including concurrent verification; fresh login with the new password succeeds. Keys survive recreation of the container; missing or incorrect keys cause explicit failure rather than new initialization or secret replacement.",
+      "cases": [
+        {
+          "id": "T06.01",
+          "expected": "Cookie attributes and idle/absolute expiry match the contract."
+        },
+        {
+          "id": "T06.02",
+          "expected": "Logout and sensitive changes revoke sessions."
+        },
+        {
+          "id": "T06.03",
+          "expected": "Password change invalidates all pending authentication state atomically."
+        },
+        {
+          "id": "T06.04",
+          "expected": "Concurrent old-revision verification cannot issue a valid session after password commit."
+        },
+        {
+          "id": "T06.05",
+          "expected": "Keys persist across recreation; missing, wrong and unreadable keys fail explicitly."
+        }
+      ]
+    },
+    {
+      "id": "T07",
+      "title": "Helper isolation and inputs",
+      "environment": "isolated-linux-amd64",
+      "contract": "Reject unknown operations, arbitrary command/container/path fields, wrong domains, malformed/overlength addresses, oversized requests, and shell/option injection. Existing dot/underscore addresses remain valid. Check stdin-only password input through the fixed launcher, timeouts, bounded queues/output, safe logs, conflicting reuse of request identifiers, and socket access denial for unauthorized users. Host summaries expose only fixed allowlisted fields and distinguish stale/host/container observations.",
+      "cases": [
+        {
+          "id": "T07.01",
+          "expected": "Unknown operations, arbitrary container/path/command fields and malformed input fail."
+        },
+        {
+          "id": "T07.02",
+          "expected": "Address and stdin-only password validation hold independently at both boundaries."
+        },
+        {
+          "id": "T07.03",
+          "expected": "Command arguments never become shell text, options or logged secrets."
+        },
+        {
+          "id": "T07.04",
+          "expected": "Queue, request, output and execution bounds fail explicitly."
+        },
+        {
+          "id": "T07.05",
+          "expected": "Request-ID conflicts, unauthorized socket peers and unallowlisted diagnostics fail."
+        }
+      ]
+    },
+    {
+      "id": "T08",
+      "title": "Helper lifecycle",
+      "environment": "isolated-linux-amd64",
+      "contract": "Start the dashboard before the helper is ready, restart the helper/socket and Docker, and reboot the isolated host. Verify directory inode preservation during helper restarts, correct boot-time directory ownership/mode, bounded reconnect behavior, and no duplicate mutations after a lost response.",
+      "cases": [
+        {
+          "id": "T08.01",
+          "expected": "Helper starts late without bypassing authorization or losing mutation outcomes."
+        },
+        {
+          "id": "T08.02",
+          "expected": "Helper restart preserves the mounted directory inode and replaces only its socket."
+        },
+        {
+          "id": "T08.03",
+          "expected": "Docker restart reconnects without repeating completed operations."
+        },
+        {
+          "id": "T08.04",
+          "expected": "Full reboot recreates restricted paths before consumer autostart and preserves outcomes."
+        }
+      ]
+    },
+    {
+      "id": "T09",
+      "title": "Existing mail permissions",
+      "environment": "isolated-linux-amd64",
+      "contract": "Confirm `nobody` and the dashboard host UID cannot traverse/read existing Maddy databases or messages. Demonstrate that host-only umask does not enforce container exec modes, then verify `0077` for daemon startup and CLI launcher paths. Create accounts, deliver/read/write test mail, and recreate SQLite companion files to verify restrictive future modes while required daemon/operator/backup access still works.",
+      "cases": [
+        {
+          "id": "T09.01",
+          "expected": "Existing databases/messages deny nobody and the dashboard host UID."
+        },
+        {
+          "id": "T09.02",
+          "expected": "Host-only umask does not replace the container launcher."
+        },
+        {
+          "id": "T09.03",
+          "expected": "Daemon and every CLI path enforce 0077 for future files."
+        },
+        {
+          "id": "T09.04",
+          "expected": "New account, delivery, IMAP writes and WAL recreation retain safe modes while normal operations work."
+        }
+      ]
+    },
+    {
+      "id": "T10",
+      "title": "Account discovery and retries",
+      "environment": "isolated-linux-amd64",
+      "contract": "Discover all eight fixture account pairs; report credential-only/storage-only cases; preserve metadata. Fresh creation rejects an address present in either store without adding credentials or granting access to orphaned messages. Duplicate requests and retries never reset existing passwords or remove existing messages. Reconcile both stores after errors, exceptions, timeouts, or interrupted responses before deciding on rollback.",
+      "cases": [
+        {
+          "id": "T10.01",
+          "expected": "Eight matching fixtures and partial inventories are accurately reconciled."
+        },
+        {
+          "id": "T10.02",
+          "expected": "A fresh create conflicts if either store already contains the address."
+        },
+        {
+          "id": "T10.03",
+          "expected": "Duplicate/retried creation preserves passwords, mail and metadata."
+        },
+        {
+          "id": "T10.04",
+          "expected": "Lost response or metadata failure preserves functional storage and reports reconciliation."
+        }
+      ]
+    },
+    {
+      "id": "T11",
+      "title": "Password reset preconditions and input",
+      "environment": "isolated-linux-amd64",
+      "contract": "In the isolated 0.9.5 fixture, establish the CLI's missing-credential insertion behavior, then prove the helper rejects nonexistent/deleted/partial accounts and a stale reset racing with deletion without recreating credentials. Test 72/73 UTF-8-byte boundaries, multibyte passwords, CR/LF/NUL/empty input, and exact preservation of accepted spaces/Unicode; rejected input causes no writes.",
+      "cases": [
+        {
+          "id": "T11.01",
+          "expected": "The real baseline CLI upsert behavior is established in isolation."
+        },
+        {
+          "id": "T11.02",
+          "expected": "Missing, deleted, partial and stale-racing-reset accounts cannot gain credentials."
+        },
+        {
+          "id": "T11.03",
+          "expected": "72/73-byte and multibyte boundaries are tested."
+        },
+        {
+          "id": "T11.04",
+          "expected": "CR/LF/NUL/empty/overlong values fail before writes and accepted spaces remain exact."
+        }
+      ]
+    },
+    {
+      "id": "T12",
+      "title": "Partial provisioning/deletion and crashes",
+      "environment": "isolated-linux-amd64",
+      "contract": "Fail each credential/storage/metadata step, including an IMAP error after storage creation and successful exit with folder warnings. Force helper/API termination between steps and recover from the journal. Keep credentials when storage exists during creation; roll back new credentials only with proven ownership, completed execution, and absent storage. Inject deletion failure after some message files are removed and SQL commit failure after file removal: an account may remain listed with missing bodies. Persist a reconciliation-required warning, block conflicting writes, and perform no automatic deletion retry/access restoration. Test the explicitly authorized completion/recovery procedure and all deletion preconditions.",
+      "cases": [
+        {
+          "id": "T12.01",
+          "expected": "Storage inserted before a later provisioning error keeps access and journal evidence."
+        },
+        {
+          "id": "T12.02",
+          "expected": "Successful exit with folder warnings does not claim complete provisioning."
+        },
+        {
+          "id": "T12.03",
+          "expected": "Intent/progress survives termination at every mutation boundary."
+        },
+        {
+          "id": "T12.04",
+          "expected": "Credential rollback requires ownership, known completion and absent storage."
+        },
+        {
+          "id": "T12.05",
+          "expected": "Partial filesystem deletion leaves a durable reconciliation warning and blocks blind retries."
+        },
+        {
+          "id": "T12.06",
+          "expected": "SQL commit failure after body removal cannot be mistaken for intact messages or successful recovery."
+        }
+      ]
+    },
+    {
+      "id": "T13",
+      "title": "Mailbox access revocation",
+      "environment": "isolated-linux-amd64",
+      "contract": "Keep an authenticated IMAP connection open while changing the password or removing credentials. Verify old credentials fail new login, document whether the existing session remains usable, and test the separately selected forced-disconnect procedure. Never use storage deletion as a password-reset side effect.",
+      "cases": [
+        {
+          "id": "T13.01",
+          "expected": "Reset credentials fail old-password new logins."
+        },
+        {
+          "id": "T13.02",
+          "expected": "Established IMAP sessions have their actual retained-access behavior documented and tested."
+        },
+        {
+          "id": "T13.03",
+          "expected": "Immediate disconnect is an explicit tested operator action and never a storage-deletion shortcut."
+        }
+      ]
+    },
+    {
+      "id": "T14",
+      "title": "Relay and sender readiness",
+      "environment": "isolated-linux-amd64",
+      "contract": "Test valid/invalid credentials, unavailable relay, rejected/unconfigured sender, TLS validation failure, and send failure without enabling Email OTP prematurely. Verify test identifiers, authenticated receipt confirmation, and rejection of failed/unknown/wrong-revision tests. Only the confirmed fixed-sender test enables OTP; a per-mailbox test or connection-only result cannot. Relay edits/restoration invalidate readiness. Restrict host/port/recipient, throttle sends, and verify health polling sends no mail and logs contain no credentials/codes.",
+      "cases": [
+        {
+          "id": "T14.01",
+          "expected": "TLS/authentication/sender/send failures and connection-only tests cannot enable OTP."
+        },
+        {
+          "id": "T14.02",
+          "expected": "Receipt IDs and confirmation reject unknown, failed or wrong-revision tests."
+        },
+        {
+          "id": "T14.03",
+          "expected": "Only confirmed current fixed-sender delivery enables OTP."
+        },
+        {
+          "id": "T14.04",
+          "expected": "Per-mailbox onboarding/readiness remains separate from inbound and global OTP status."
+        },
+        {
+          "id": "T14.05",
+          "expected": "Credential/domain changes and restore invalidate prior readiness."
+        },
+        {
+          "id": "T14.06",
+          "expected": "Polling sends no mail; explicit sends are throttled and SMTP secrets never appear in logs."
+        }
+      ]
+    },
+    {
+      "id": "T15",
+      "title": "Renewal and activation",
+      "environment": "isolated-linux-amd64",
+      "contract": "Test no-op, successful renewal, ACME failure, invalid/mismatched/wrong-hostname/expired/untrusted pair, staging failure, absent dashboard, and each consumer recreation failure. Force termination between staging the certificate/key, before/after durable desired-generation publication, and between consumer activations; reboot the isolated host at those boundaries. Each surviving/started consumer uses one complete old or new generation, never a mixed pair. Reject incomplete generations, recover pending activation with no new issuance, and preserve referenced rollback generations. Verify key/pair integrity even when the certificate fingerprint is unchanged and check the explicit UTC schedule.",
+      "cases": [
+        {
+          "id": "T15.01",
+          "expected": "No-op and pending activation are distinguished without forced issuance."
+        },
+        {
+          "id": "T15.02",
+          "expected": "Mismatched, wrong-host, expired or untrusted pairs are rejected."
+        },
+        {
+          "id": "T15.03",
+          "expected": "Termination at each staging/publication boundary leaves one complete generation."
+        },
+        {
+          "id": "T15.04",
+          "expected": "Each consumer is activated independently and pending state survives restart with no new issuance."
+        },
+        {
+          "id": "T15.05",
+          "expected": "First deployment absence is allowed; missing existing consumers stay pending."
+        },
+        {
+          "id": "T15.06",
+          "expected": "Referenced/rollback generations survive retention and reboot serves the verified pair."
+        }
+      ]
+    },
+    {
+      "id": "T16",
+      "title": "Legacy renewal cutover",
+      "environment": "isolated-linux-amd64",
+      "contract": "Start a legacy renewal before maintenance entry; neither baseline capture, data-permission changes, nor launcher/container recreation may begin until the timer is disabled and service/manual completion is known and verified. Make the schedule fall due and reboot before and during TLS migration: scheduling remains paused, no legacy invocation runs against generation mounts, and missed-run activation after re-enabling uses the new implementation. Fail each forward phase and cutover transition, verify checkpoint-appropriate matched rollback and served checks before scheduling resumes. Release both locks before invoking the new service; cover the Maddy-only state and first dashboard registration racing renewal.",
+      "cases": [
+        {
+          "id": "T16.01",
+          "expected": "Active legacy/manual renewal drains before baseline backup, permissions or recreation."
+        },
+        {
+          "id": "T16.02",
+          "expected": "Timer disable survives interruption/reboot before and during cutover."
+        },
+        {
+          "id": "T16.03",
+          "expected": "Every failed transition restores a matched mount/script/unit/timer set."
+        },
+        {
+          "id": "T16.04",
+          "expected": "The loaded new service handles missed runs only after served-TLS validation."
+        },
+        {
+          "id": "T16.05",
+          "expected": "Both locks are released before service verification and first consumer registration cannot race activation."
+        }
+      ]
+    },
+    {
+      "id": "T17",
+      "title": "Deletion backup coverage and recipients",
+      "environment": "isolated-linux-amd64",
+      "contract": "Reject an otherwise recent backup predating mailbox creation/recreation, missing a store or message path, unavailable/unverified archives, stale/missing recipient policy, and deletion of protected alias targets. Require an authentic manifest and acknowledged cutoff; forged browser claims fail. Verify both inventories and metadata after success. Test direct delivery for configured postmaster and representative alias recipients before approving MX cutover.",
+      "cases": [
+        {
+          "id": "T17.01",
+          "expected": "Backup age, account incarnation, both stores and message coverage are required."
+        },
+        {
+          "id": "T17.02",
+          "expected": "Unavailable/unverified archives and forged browser coverage fail."
+        },
+        {
+          "id": "T17.03",
+          "expected": "Missing/stale root dependency policy and protected recipients block deletion."
+        },
+        {
+          "id": "T17.04",
+          "expected": "Operational postmaster and alias delivery is tested before direct MX."
+        }
+      ]
+    },
+    {
+      "id": "T18",
+      "title": "Backup and restore",
+      "environment": "isolated-linux-amd64",
+      "contract": "Restore both Maddy stores, fixture messages, dashboard metadata, installation marker, deployment record, helper journal/policy, launcher, boot configuration, TLS generations/activation records/ACME state, and matching keys in isolation. Prove all writers stop during capture, only previously running services resume, off-VM transfer uses an immutable staging copy, and the trusted manifest is published only after verification. Capture real dashboard/key state after enrollment. Recover message bodies/references after partial deletion while preserving unrelated/newer mail. Verify restrictive permissions, relay-secret decryption, archive-key recovery, intended password/TOTP, and measured restore time. Old cookies/codes/challenges remain unusable, old mutations are not replayed, and relay readiness is unverified. Test schedule, retention, and age enforcement.",
+      "cases": [
+        {
+          "id": "T18.01",
+          "expected": "All writers stop during capture; only previously running services resume."
+        },
+        {
+          "id": "T18.02",
+          "expected": "Immutable staging transfer and manifest publication follow verified off-VM copying."
+        },
+        {
+          "id": "T18.03",
+          "expected": "Full restore includes real keys, marker, deployment record, journal, boot and TLS/ACME state."
+        },
+        {
+          "id": "T18.04",
+          "expected": "Archive-key recovery and measured recovery-point/time objectives pass."
+        },
+        {
+          "id": "T18.05",
+          "expected": "Restored sessions/challenges/codes/readiness are invalidated and intended factors established."
+        },
+        {
+          "id": "T18.06",
+          "expected": "Selected-account body/reference recovery preserves unrelated and newer mail."
+        }
+      ]
+    },
+    {
+      "id": "T19",
+      "title": "Maintenance coordination",
+      "environment": "isolated-linux-amd64",
+      "contract": "Race fixture inventory reads/mutations with ACME acquisition, activation, backup, and container recreation. Acquisition may coexist with CLI work; backups exclude ACME writes using renewal-run then Maddy maintenance. Kill the host renewal process while its fixture Certbot container survives: released locks cannot authorize backup/conflicting renewal until durable run-state reconciliation establishes completion. Verify fixed ordering, bounded waits, stable root-owned lock files, no nested service/helper invocation under its own lock, and no CLI writes during quiesced capture. Unknown helper completion blocks automatic maintenance and alerts; retries do not duplicate mutations.",
+      "cases": [
+        {
+          "id": "T19.01",
+          "expected": "ACME acquisition may coexist with mailbox CLI work."
+        },
+        {
+          "id": "T19.02",
+          "expected": "Backup excludes ACME and CLI writes with renewal-run before maintenance."
+        },
+        {
+          "id": "T19.03",
+          "expected": "Fixed lock ordering, bounded waits and stable root-owned lock files hold."
+        },
+        {
+          "id": "T19.04",
+          "expected": "Surviving Certbot/helper children block conflicting work despite released parent locks."
+        },
+        {
+          "id": "T19.05",
+          "expected": "Reconciliation, offline recovery and service invocation preserve exclusion without duplicate mutations or self-deadlock."
+        }
+      ]
+    },
+    {
+      "id": "T20",
+      "title": "Startup, migrations, and storage failure",
+      "environment": "isolated-linux-amd64",
+      "contract": "Reject missing/wrong-type bind sources without creating them, wrong image architecture/identity, incompatible helper protocol/schema, and interrupted migrations. The helper rejects wrong Maddy versions/mounts and missing databases without initializing replacement storage. Test SQLite busy/read-only/full/corrupt states and helper-journal I/O failure: no auth bypass, false committed result, or unjournaled mutation. Prove rollback with the recorded compatible artifact set in isolation.",
+      "cases": [
+        {
+          "id": "T20.01",
+          "expected": "Missing/wrong-type binds fail without automatic creation."
+        },
+        {
+          "id": "T20.02",
+          "expected": "Wrong image identity, architecture, mounts or missing Maddy databases fail closed."
+        },
+        {
+          "id": "T20.03",
+          "expected": "Incompatible protocol/schema and interrupted migrations cannot start accepting writes."
+        },
+        {
+          "id": "T20.04",
+          "expected": "Busy, full, read-only and corrupt storage cannot bypass auth or report false commits."
+        },
+        {
+          "id": "T20.05",
+          "expected": "Journal I/O failures prevent unrecorded mutations and compatible rollback restores service."
+        }
+      ]
+    },
+    {
+      "id": "T21",
+      "title": "Resource bounds",
+      "environment": "isolated-linux-amd64",
+      "contract": "Test oversized and streamed bodies without Content-Length, slow/unavailable SMTP/DNS/helper calls, concurrent hashing, queue exhaustion, and cancelled hash requests. Verify responsive bounded behavior and retained hash-work permits until completion; measure peak memory including bounded tmpfs and helper/transient work.",
+      "cases": [
+        {
+          "id": "T21.01",
+          "expected": "Streamed/oversized bodies enforce 64 KiB without trusting Content-Length."
+        },
+        {
+          "id": "T21.02",
+          "expected": "Slow SMTP/DNS/helper calls, bounded queues and overload remain responsive."
+        },
+        {
+          "id": "T21.03",
+          "expected": "Cancelled hashing retains its permit until the actual work ends."
+        },
+        {
+          "id": "T21.04",
+          "expected": "Peak memory includes tmpfs/helper/transient work and fits the measured host budget."
+        }
+      ]
+    },
+    {
+      "id": "T22",
+      "title": "Retention and independent alerts",
+      "environment": "isolated-linux-amd64",
+      "contract": "Advance the test clock through cleanup/retention windows, preserving active rate limits, factor replay protection, current readiness evidence, and unresolved operations. Verify audit/log rotation limits. Deliver renewal/activation/expiry, missed/failed backup, deferred-maintenance, and low disk/inode alerts while the dashboard is stopped or its TLS is invalid; retry notifications and test external host-outage/recovery notification.",
+      "cases": [
+        {
+          "id": "T22.01",
+          "expected": "Clock-driven cleanup preserves active rate windows, replay and recovery consumption."
+        },
+        {
+          "id": "T22.02",
+          "expected": "Audit, relay and host/container logs have finite tested retention."
+        },
+        {
+          "id": "T22.03",
+          "expected": "Current readiness and unresolved journal records are not pruned unsafely."
+        },
+        {
+          "id": "T22.04",
+          "expected": "Backup/capacity/deferred-maintenance/expiry alerts work while the dashboard is unavailable."
+        },
+        {
+          "id": "T22.05",
+          "expected": "External host-outage and recovery notifications are delivered, retried and deduplicated."
+        }
+      ]
+    },
+    {
+      "id": "P01",
+      "title": "Trusted HTTPS and protected API",
+      "environment": "target-production",
+      "contract": "Operator-approved evidence against the exact release; destructive failures remain isolated.",
+      "cases": [
+        {
+          "id": "P01.01",
+          "expected": "Normal DNS and pinned-IP hostname/CA verification pass."
+        },
+        {
+          "id": "P01.02",
+          "expected": "Public liveness is minimal and protected APIs reject anonymous/password-only access."
+        }
+      ]
+    },
+    {
+      "id": "P02",
+      "title": "Target resource and normal operation budget",
+      "environment": "target-production",
+      "contract": "Operator-approved evidence against the exact release; destructive failures remain isolated.",
+      "cases": [
+        {
+          "id": "P02.01",
+          "expected": "Bounded measured peak fits container and reserved host/mail capacity without OOM."
+        },
+        {
+          "id": "P02.02",
+          "expected": "Actual HTTP/hash/tmpfs/queue limits match the qualified configuration."
+        }
+      ]
+    },
+    {
+      "id": "P03",
+      "title": "Existing mail and client compatibility",
+      "environment": "target-production",
+      "contract": "Operator-approved evidence against the exact release; destructive failures remain isolated.",
+      "cases": [
+        {
+          "id": "P03.01",
+          "expected": "All eight original account pairs remain and required normal mail operations work."
+        },
+        {
+          "id": "P03.02",
+          "expected": "A dedicated authorized test account proves IMAP and applicable client configuration without resetting existing accounts."
+        }
+      ]
+    },
+    {
+      "id": "P04",
+      "title": "Approved restart and reboot",
+      "environment": "target-production",
+      "contract": "Operator-approved evidence against the exact release; destructive failures remain isolated.",
+      "cases": [
+        {
+          "id": "P04.01",
+          "expected": "Helper/Docker/host restart preserves restricted paths, journals, generation and service recovery."
+        },
+        {
+          "id": "P04.02",
+          "expected": "Clock, swap if selected, timer and stopped-consumer intent survive the approved reboot."
+        }
+      ]
+    },
+    {
+      "id": "P05",
+      "title": "Production recovery and independent notifications",
+      "environment": "target-production",
+      "contract": "Operator-approved evidence against the exact release; destructive failures remain isolated.",
+      "cases": [
+        {
+          "id": "P05.01",
+          "expected": "The post-enrollment encrypted off-VM archive and matching keys/manifest restore within recorded objectives."
+        },
+        {
+          "id": "P05.02",
+          "expected": "Independent backup/expiry/capacity/outage/failure/recovery notifications reach the operator."
+        }
+      ]
+    },
+    {
+      "id": "P06",
+      "title": "Enable Email OTP",
+      "environment": "target-production",
+      "contract": "Operator-approved evidence against the exact release; destructive failures remain isolated.",
+      "cases": [
+        {
+          "id": "P06.01",
+          "expected": "Current fixed-sender authentication and actual receipt are confirmed with the matching test ID."
+        },
+        {
+          "id": "P06.02",
+          "expected": "End-to-end OTP works and relay change/restore invalidates readiness."
+        }
+      ]
+    },
+    {
+      "id": "P07",
+      "title": "Enable permanent deletion",
+      "environment": "target-production",
+      "contract": "Operator-approved evidence against the exact release; destructive failures remain isolated.",
+      "cases": [
+        {
+          "id": "P07.01",
+          "expected": "Trusted backup/incarnation/cutoff and protected-recipient gates pass for an explicitly approved test account."
+        },
+        {
+          "id": "P07.02",
+          "expected": "Only that test account is deleted and both stores/journal/metadata reconcile without altering existing mail."
+        }
+      ]
+    },
+    {
+      "id": "P08",
+      "title": "Optional direct MX cutover",
+      "environment": "target-production",
+      "contract": "Operator-approved evidence against the exact release; destructive failures remain isolated.",
+      "cases": [
+        {
+          "id": "P08.01",
+          "expected": "Postmaster/aliases, direct 25 delivery, trusted 993 and authorized outbound replies pass."
+        },
+        {
+          "id": "P08.02",
+          "expected": "Approved DNS cutover, propagation/forwarding checks and rollback evidence cover both receiving systems."
+        }
+      ]
+    }
+  ]
+}

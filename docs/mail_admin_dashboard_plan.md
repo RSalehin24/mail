@@ -1,5 +1,7 @@
 # Implementation Plan: Self-Hosted Mail Admin Dashboard (React + Material UI)
 
+The [structured implementation and verification package](mail-admin-implementation/README.md) is the authoritative guide for implementation, acceptance evidence and rollout. This overview is retained as the consolidated review background.
+
 Build, secure, and deploy a self-hosted **Mail Admin Dashboard** for `rsalehin24.me` on the existing GCP mail server (`35.237.68.175`, accessible with `ssh deployer@35.237.68.175` or [mail.sh](/Users/rsalehin24/mail.sh)).
 
 The system pairs a **FastAPI backend** with a **minimalist React + Material UI (MUI)** frontend compiled to static assets. It is fully responsive across **Android phones, laptops, and desktops**. Build the Linux runtime image outside the mail VM and measure resource usage before deployment; the earlier 50 MB runtime estimate is not verified.

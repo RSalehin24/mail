@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "generated_by": "read-only SSH and external TLS/DNS/STARTTLS probes in this session",
+  "server": {
+    "observed_at_utc": "2026-10-21T21:12:59.549044+00:00",
+    "observation_mode": "read_only_ssh",
+    "host": "35.237.68.175",
+    "maddy_version": "0.9.5 linux/amd64 go1.23.12",
+    "maddy_image_id": "sha256:de42151adff6388edb5e4ee88f60334fa1ab85e309485193ecb1c2db20203315",
+    "maddy_image_reference": "foxcpp/maddy:latest",
+    "mounts": [
+      {
+        "source": "/opt/maddy/tls",
+        "target": "/data/tls",
+        "writable": false
+      },
+      {
+        "source": "/opt/maddy/config/maddy.conf",
+        "target": "/data/maddy.conf",
+        "writable": false
+      },
+      {
+        "source": "/opt/maddy/data",
+        "target": "/data",
+        "writable": true
+      }
+    ],
+    "credential_accounts": 8,
+    "storage_accounts": 8,
+    "inventories_match": true,
+    "postmaster_present": false,
+    "renewal_script_sha256": "638dfd7338d3b7d7c518089cfe631847568f4e9862ec9c02c8415c5352acdfc2",
+    "renewal_uses_flock": false,
+    "renewal_timer": "ActiveState=active\nUnitFileState=enabled\nNextElapseUSecRealtime=Sun 2026-11-01 03:00:00 UTC",
+    "clock": "NTPSynchronized=yes",
+    "compose_version": "5.1.4",
+    "restart_required": true,
+    "credentials_mode": "0o644",
+    "data_directory_mode": "0o755",
+    "memory_kib": {
+      "MemTotal": 975592,
+      "MemAvailable": 551820,
+      "SwapTotal": 0
+    },
+    "disk_free_gib": 22.4,
+    "dashboard_present": false,
+    "helper_present": false,
+    "scope_exclusions": [
+      "no_password_authentication",
+      "no_mail_sent",
+      "no_mail_read",
+      "no_configuration_changes"
+    ]
+  },
+  "external": {
+    "observed_at_utc": "2026-10-21T21:26:30.691379+00:00",
+    "observation_mode": "external_read_only",
+    "imaps": {
+      "hostname_and_ca_verified": true,
+      "not_after": "Dec 26 16:35:44 2026 GMT",
+      "sha256": "e72837ce74839ac2241f9f5dcec25bce16851f72a6905c6ca40fc6970b5102a2"
+    },
+    "A": [
+      "35.237.68.175"
+    ],
+    "MX": [
+      "46 route2.mx.cloudflare.net.",
+      "64 route3.mx.cloudflare.net.",
+      "52 route1.mx.cloudflare.net."
+    ],
+    "brevo": {
+      "verified_starttls": true,
+      "smtp_authentication": "not_run",
+      "message_delivery": "not_run",
+      "messages_sent": 0
+    }
+  },
+  "application_runtime": "not_run",
+  "production_qualification": "blocked"
+}
