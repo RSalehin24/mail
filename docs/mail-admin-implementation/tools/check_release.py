@@ -62,7 +62,8 @@ def validate_artifacts(context):
             'Runner revision does not match the qualification suite artifact')
     configuration = read_json(files['deployment_config'])
     require(isinstance(configuration, dict), 'Invalid deployment configuration artifact')
-    require(configuration.get('inputs') == evidence['inputs'], 'Configuration/input mismatch')
+    require(canonical_digest(configuration.get('inputs')) == canonical_digest(evidence['inputs']),
+            'Configuration/input mismatch')
 
 
 def validate_input_value(value, rule):
@@ -84,6 +85,7 @@ def validate_resources(inputs):
     hash_peak = inputs['hash_memory_kib'] * 1024 * inputs['hash_parallelism']
     require(hash_peak <= inputs['memory_limit_bytes'], 'Hash work exceeds container budget')
     require(valid_digest(inputs['protected_policy_sha256']), 'Invalid recipient-policy digest')
+    require(valid_digest(inputs['target_ssh_host_key_sha256']), 'Invalid target host-key digest')
     image = inputs['maddy_image_id']
     require(image.startswith('sha256:') and valid_digest(image[7:]), 'Invalid Maddy image ID')
     require(inputs['mx_mode'] != 'direct' or inputs['mx_cutover_approved'],
@@ -118,6 +120,26 @@ def validate_report_identity(context, report, group):
     for field in ('artifact_set_sha256', 'specification_sha256', 'runner_revision'):
         require(report.get(field) == context['evidence'][field], 'Report binding mismatch: ' + field)
     require(report.get('result') == 'pass', 'A report did not pass')
+    validate_target_binding(context, report, group)
+
+
+def validate_target_binding(context, report, group):
+    if group['environment'] not in {'target-production', 'operator-preflight'}:
+        return
+    inputs = context['evidence']['inputs']
+    expected = {name: inputs[name] for name in ('target_instance_id', 'target_ssh_host_key_sha256')}
+    require(report.get('observed_target') == expected, 'Missing or mismatched observed target')
+    if group['id'].startswith('P'):
+        validate_deployed_binding(context, report)
+
+
+def validate_deployed_binding(context, report):
+    records = indexed(context['evidence']['artifacts'])
+    expected = {name: records[name]['sha256']
+                for name in ('dashboard_image', 'host_bundle', 'deployment_config')}
+    expected['maddy_image_id'] = context['evidence']['inputs']['maddy_image_id']
+    require(report.get('observed_deployment') == expected,
+            'Missing or mismatched observed deployment')
 
 
 def validate_report(context, record, group):

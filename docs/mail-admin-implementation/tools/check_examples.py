@@ -57,6 +57,9 @@ def validate_service(service):
             'Missing privilege restrictions')
     require(int(service['mem_limit']) == 256 * 1024 ** 2, 'Missing memory cap')
     require(service['logging']['options'] == {'max-size': '10m', 'max-file': '3'}, 'Missing log bounds')
+    require(service['environment']['EMAIL_OTP_ENABLED'] == 'false' and
+            service['environment']['PERMANENT_DELETION_ENABLED'] == 'false',
+            'Capabilities must default to disabled')
     require(service['ports'][0]['published'] == '443' and service['ports'][0]['target'] == 8443,
             'Unexpected port mapping')
     validate_mounts(service)

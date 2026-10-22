@@ -58,7 +58,9 @@
     "email_otp_enabled": false,
     "permanent_deletion_enabled": false,
     "mx_cutover_approved": false,
-    "mx_mode": "cloudflare"
+    "mx_mode": "cloudflare",
+    "target_instance_id": null,
+    "target_ssh_host_key_sha256": null
   },
   "tests": [
     {

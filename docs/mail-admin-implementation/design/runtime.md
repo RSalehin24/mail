@@ -77,11 +77,15 @@ services:
       - PRIMARY_DOMAIN=rsalehin24.me
       - MAIL_HOST=mail.rsalehin24.me
       - OTP_FROM_EMAIL=mail@rsalehin24.me
+      - EMAIL_OTP_ENABLED=${MAIL_ADMIN_EMAIL_OTP_ENABLED:-false}
+      - PERMANENT_DELETION_ENABLED=${MAIL_ADMIN_PERMANENT_DELETION_ENABLED:-false}
 ```
 
 Prepare the data directory for the service UID/GID. Keep helper code, its socket directory, secret files, and `/etc/mail-admin/installation.json` root-owned; grant the dedicated group only the access it needs. The socket must be `0660` in a `0750` directory, and secret files/installation marker must be `0640` or stricter. Match the socket group to the container GID and verify unauthorized local users cannot connect. Provision the marker and its expected database identity before startup. The Compose example caps the dashboard's rotated logs at three 10 MB files using the [Docker local logging driver](https://docs.docker.com/engine/logging/drivers/local/).
 
 Provision every bind source deliberately and verify its expected type, ownership, and contents. Long syntax with `create_host_path: false` rejects missing sources rather than creating directories; application checks still reject a missing database, incorrect marker, unreadable key, or empty certificate mount. Keep the helper directory inode stable across restarts as specified in the [helper contract](helper.md).
+
+Render capability flags from the reviewed deployment inputs and compare them with the effective container environment. Missing flags default to disabled; parse only literal `true`/`false` and fail startup for other values. The root helper independently reads deletion enablement from the root-owned deployment record; never trust web-supplied enablement. Email OTP enablement also requires current relay readiness, so enabling its deployment flag alone never authorizes sending.
 
 The existing TLS private key is `0640`; grant the dedicated group read access without making it world-readable. Preserve that ownership/group and mode in every certificate generation, including directory traversal access for the dedicated group. Verify the non-root container can read the certificate and key, write only its data/temporary paths, and use only the helper's permitted protocol. Confirm host and GCP firewall ingress for HTTPS before external rollout; the absence of a current 443 listener does not establish the firewall policy.
 

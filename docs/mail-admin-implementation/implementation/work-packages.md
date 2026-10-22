@@ -20,7 +20,9 @@ The T-group references below identify owned acceptance coverage. Local completio
 
 Keep compiled frontend, backend domain logic, data access and the host helper separate. The implementation may choose small idiomatic modules under `frontend/`, `backend/`, `helper/`, `host/` and `tests/`; record the final paths in its README. Reuse pure validation, authentication invalidation and relay-sending logic. The helper and recovery tools use the tested versions/protocol rather than a second drifting implementation.
 
-W01 defines real application commands and test runner adapters. Each adapter emits case-level reports in the assurance format from actual test results; it cannot fabricate a passing group or treat skipped cases as passing. An implementation/API/state-machine change invalidates affected evidence. Freeze the final artifacts/configuration, rerun the complete qualification suite, and bind reports to that artifact set before preflight.
+W01 defines real application commands and test runner adapters. W03 implements the exact persistent authentication/send budgets in the security contract. W09 records the trusted target identity; W08/W09 runner adapters collect target and installed-artifact observations under the assurance contract, including negative mismatch tests.
+
+Each adapter emits case-level reports in the assurance format from actual test results; it cannot fabricate a passing group or treat skipped cases as passing. An implementation/API/state-machine change invalidates affected evidence. Freeze the final artifacts/configuration, rerun the complete qualification suite, and bind reports to that artifact set before preflight.
 
 ## Implementation review rules
 

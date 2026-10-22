@@ -29,6 +29,7 @@ This package is the implementation contract for the existing mail server. It pre
 | Brevo and optional DNS change | [Relay and routing](operations/relay-routing.md) |
 | Operator acceptance | [Production checks](verification/production-checks.md) |
 | External semantics | [Primary sources](verification/sources.md) |
+| Review scope and outcomes | [Two-pass review](verification/review.md) |
 | Verification results | [Current checks](verification/current-checks.json) |
 
 ## Verification commands available now

@@ -115,6 +115,59 @@ class EvidenceTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             self.verify()
 
+    def test_target_binding_is_required_for_every_host_checkpoint(self):
+        for identifier in ('G02', 'G03', 'G04', 'G05', 'G06', 'G07', 'G08', 'P01'):
+            with self.subTest(identifier=identifier):
+                self.bundle.refresh()
+                report = self.bundle.report(identifier)
+                report.pop('observed_target')
+                self.bundle.save_report(identifier, report)
+                with self.assertRaisesRegex(ValidationError, 'observed target'):
+                    self.verify()
+
+    def test_other_server_and_host_key_are_rejected(self):
+        for field in ('target_instance_id', 'target_ssh_host_key_sha256'):
+            with self.subTest(field=field):
+                self.bundle.refresh()
+                report = self.bundle.report('P01')
+                report['observed_target'][field] = 'different-target'
+                self.bundle.save_report('P01', report)
+                with self.assertRaisesRegex(ValidationError, 'observed target'):
+                    self.verify()
+
+    def test_missing_or_different_deployed_artifacts_are_rejected(self):
+        for field in ('dashboard_image', 'host_bundle', 'deployment_config', 'maddy_image_id'):
+            with self.subTest(field=field):
+                self.bundle.refresh()
+                report = self.bundle.report('P01')
+                report['observed_deployment'].pop(field)
+                self.bundle.save_report('P01', report)
+                with self.assertRaisesRegex(ValidationError, 'observed deployment'):
+                    self.verify()
+
+    def test_invalid_expected_host_key_is_rejected(self):
+        self.bundle.inputs['target_ssh_host_key_sha256'] = 'not-a-digest'
+        self.bundle.refresh()
+        with self.assertRaisesRegex(ValidationError, 'host-key digest'):
+            self.verify()
+
+    def test_changed_deployed_artifact_digest_is_rejected(self):
+        for field in ('dashboard_image', 'host_bundle', 'deployment_config', 'maddy_image_id'):
+            with self.subTest(field=field):
+                self.bundle.refresh()
+                report = self.bundle.report('P01')
+                report['observed_deployment'][field] = 'f' * 64
+                self.bundle.save_report('P01', report)
+                with self.assertRaisesRegex(ValidationError, 'observed deployment'):
+                    self.verify()
+
+    def test_missing_deployment_observation_is_rejected(self):
+        report = self.bundle.report('P01')
+        report.pop('observed_deployment')
+        self.bundle.save_report('P01', report)
+        with self.assertRaisesRegex(ValidationError, 'observed deployment'):
+            self.verify()
+
     def test_stale_evidence_blocks(self):
         report = self.bundle.report('T01')
         report['started_at_utc'] = (self.now - timedelta(days=2)).isoformat()
@@ -215,6 +268,39 @@ class EvidenceTests(unittest.TestCase):
         self.bundle.document['inputs']['service_uid'] += 1
         with self.assertRaises(ValidationError):
             self.verify()
+
+    def assert_configuration_type_rejected(self, case):
+        phase, field, value = case
+        self.bundle.refresh()
+        inputs = copy.deepcopy(self.bundle.inputs)
+        inputs[field] = value
+        self.bundle.replace_configuration_inputs(inputs)
+        with self.assertRaisesRegex(ValidationError, 'Configuration/input mismatch'):
+            self.verify(phase)
+
+    def test_configuration_types_must_match_in_every_phase(self):
+        changes = [('hash_parallelism', True), ('hash_parallelism', 1.0),
+                   ('email_otp_enabled', 0), ('email_otp_enabled', 0.0),
+                   ('hash_parallelism', '1'), ('hash_parallelism', None),
+                   ('hash_parallelism', [1]), ('hash_parallelism', {'value': 1})]
+        for phase in ('candidate', 'preflight', 'release'):
+            for field, value in changes:
+                self.assert_configuration_type_rejected((phase, field, value))
+
+    def test_configuration_key_order_does_not_change_binding(self):
+        inputs = dict(reversed(list(self.bundle.inputs.items())))
+        self.bundle.replace_configuration_inputs(inputs)
+        self.assertEqual(self.verify()['result'], 'pass')
+
+    def test_matching_invalid_types_still_fail_input_schema(self):
+        inputs = copy.deepcopy(self.bundle.inputs)
+        for field, value in [('hash_parallelism', True), ('hash_parallelism', 1.0),
+                             ('email_otp_enabled', 0)]:
+            self.bundle.inputs = copy.deepcopy(inputs)
+            self.bundle.inputs[field] = value
+            self.bundle.refresh()
+            with self.assertRaisesRegex(ValidationError, 'Invalid deployment input'):
+                self.verify('preflight')
 
     def test_missing_baseline_gate_blocks(self):
         self.bundle.document['gates'] = [record for record in self.bundle.document['gates']

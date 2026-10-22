@@ -31,7 +31,17 @@
     "replacement_expiry_seconds": 600,
     "recovery_code_count": 5,
     "recovery_code_entropy_bits": 128,
-    "renewal_calendar": "*-*-* 03:00:00 UTC"
+    "renewal_calendar": "*-*-* 03:00:00 UTC",
+    "authentication_limits": {
+      "window_seconds": 900,
+      "admin_attempts": 30,
+      "peer_attempts": 15,
+      "send_admin_attempts": 5,
+      "send_peer_attempts": 3,
+      "totp_digits": 6,
+      "totp_period_seconds": 30,
+      "totp_window_steps": 1
+    }
   },
   "requirements": [
     {
@@ -445,6 +455,12 @@
         "cloudflare",
         "direct"
       ]
+    },
+    "target_instance_id": {
+      "type": "string"
+    },
+    "target_ssh_host_key_sha256": {
+      "type": "string"
     }
   },
   "gates": [

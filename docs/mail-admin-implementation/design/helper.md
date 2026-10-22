@@ -17,6 +17,8 @@ The verified Maddy CLI operations used internally by the helper are:
 
 Execute these commands through the fixed in-container umask launcher in the [runtime contract](runtime.md), including read operations that can initialize SQLite companion files. The helper's status operation returns only an allowlisted host summary: Maddy availability/version, host memory/disk, renewal outcome/served-certificate state, and backup/protected-recipient readiness with observation timestamps. Read only fixed operator-configured sources; expose no arbitrary paths, Docker inspection payloads, credential hashes, or message data. Container memory/filesystem statistics must not be mislabeled as host-wide metrics. An unavailable or stale observation is unknown/degraded, not healthy.
 
+Read `permanent_deletion_enabled` from the root-owned deployment record on each deletion precondition check. When false or unavailable, refuse deletion before launching any CLI, regardless of browser/API claims or backup readiness. Only an operator-reviewed configuration change and renewed qualification can enable it.
+
 Keep reviewed recipient dependencies in root-owned `/etc/mail-admin/helper-policy.json`, outside web-writable mounts, including identities of the reviewed Maddy configuration and any referenced routing tables. Block deletion when the policy is absent/stale or the address is a protected delivery/alias target. Update this policy only through the operator procedure after validating changed routing; do not implement a second general Maddy configuration editor/parser in the dashboard.
 
 Keep backups and helper files outside dashboard-writable directories. Log operation, outcome, and safe diagnostics without credentials, OTPs, QR payloads, session tokens, or message contents.

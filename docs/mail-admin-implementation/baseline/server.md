@@ -30,3 +30,7 @@ The running Maddy version and renewal script match this plan's original assumpti
 The baseline Maddy local image ID is `sha256:de42151adff6388edb5e4ee88f60334fa1ab85e309485193ecb1c2db20203315`. The legacy renewal script SHA-256 is `638dfd7338d3b7d7c518089cfe631847568f4e9862ec9c02c8415c5352acdfc2`; it still copies the flat TLS files, restarts Maddy, and uses no `flock`. Its timer is enabled, its oneshot service was inactive at the check, and its next scheduled run was November 1 at 03:00 UTC. An inactive snapshot does not replace the required drain immediately before maintenance.
 
 ---
+
+## Limited read-only recheck — October 22, 2026
+
+At 06:11:32 UTC, SSH confirmed Maddy running on version 0.9.5 with the same recorded image ID and legacy renewal-script SHA-256. The renewal timer remained active/enabled, NTP reported synchronized, and `/opt/mail-admin` was absent. This limited recheck did not repeat account inventory, file-permission, memory, DNS, TLS, SMTP-authentication or delivery tests; their earlier observations remain dated snapshots. No server configuration or mail was changed.

@@ -30,6 +30,8 @@ FastAPI serves the compiled React assets (`dist/`) and REST API. Authentication 
 - `POST /api/relay-tests/{test_id}/confirm`: After recent reauthentication, record the operator's observed receipt for a server-created, SMTP-accepted test bound to its sender, fixed recipient, and current saved relay revision. Reject unknown, failed, or superseded tests; confirmation cannot turn a connection-only test into delivery evidence.
 - `POST /api/settings/relay/reveal`: Reveal only the configured SMTP credential after recent reauthentication and an explicit user action; set `Cache-Control: no-store`.
 
+Enforce the deployment capability flags centrally: disabled permanent deletion returns a safe forbidden response and cannot reach a mutation; disabled Email OTP cannot send or verify Email OTP even when relay readiness is confirmed. Hiding UI controls is additional feedback, not enforcement. Enablement changes require updated deployment configuration/evidence.
+
 Apply CSRF protection or strict Origin checks to cookie-authenticated mutations. Validate mailbox domain and local part before helper calls, including existing dot/underscore names. Restrict relay connections to the intended Brevo endpoint and TLS ports; do not turn connection testing into a general network proxy.
 
 Apply `Cache-Control: no-store` to API/authentication responses, including setup QR material, recovery codes, and error responses. Accept only the configured HTTPS host/origin, render names/notes as text, and keep secrets out of URLs, browser storage, and access/error logs. Serve `/api` routes before the SPA fallback; unknown API routes return API errors. Return a request identifier and a safe error/outcome for failed or pending mutations rather than exposing CLI traces.

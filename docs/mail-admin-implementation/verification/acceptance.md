@@ -16,6 +16,7 @@ Fail the release build, recovery fixtures, or required deployment-record input: 
 - **T01.02**: Missing deployment input prevents maintenance entry.
 - **T01.03**: Initial install needs no nonexistent dashboard restore; upgrades restore actual state.
 - **T01.04**: All phase gates, late bootstrap and lock-release-before-API ordering hold.
+- **T01.05**: Trusted runner adapters reject another target/key, changed running image, changed installed helper/unit files and effective configuration drift; final deployment evidence is observed rather than copied from expectations.
 
 ## T02
 
@@ -59,6 +60,9 @@ Reject expired, incorrect, replayed, cross-challenge, and superseded codes. Cons
 - **T04.04**: Admin/peer limits survive new challenges, addresses and restarts; spoofed headers fail.
 - **T04.05**: Master password bounds preserve accepted spaces and Unicode exactly.
 - **T04.06**: Accepted TOTP steps cannot be reused, including enrollment/replacement transitions.
+- **T04.07**: Rolling 900-second shared authentication budgets admit exactly 30 admin/15 peer attempts, reserve atomically before work, reject excess with 429/Retry-After, and expire at the boundary without reset by restart, success or new challenge.
+- **T04.08**: Email OTP and explicit relay-test sends share rolling 900-second budgets of 5 per admin/3 per peer, additionally honor OTP resend delay, and cannot send when their reserved budgets are exhausted.
+- **T04.09**: TOTP uses six digits, a 30-second step and a plus/minus one-step window; accepted steps cannot be reused or move the replay watermark backward.
 
 ## T05
 
@@ -101,6 +105,7 @@ Reject unknown operations, arbitrary command/container/path fields, wrong domain
 - **T07.03**: Command arguments never become shell text, options or logged secrets.
 - **T07.04**: Queue, request, output and execution bounds fail explicitly.
 - **T07.05**: Request-ID conflicts, unauthorized socket peers and unallowlisted diagnostics fail.
+- **T07.06**: Disabled or missing deletion capability refuses API/helper deletion before CLI execution; caller flags cannot enable it. Disabled Email OTP refuses send/verification despite confirmed relay readiness.
 
 ## T08
 

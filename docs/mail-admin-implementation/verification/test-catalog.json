@@ -22,6 +22,10 @@
         {
           "id": "T01.04",
           "expected": "All phase gates, late bootstrap and lock-release-before-API ordering hold."
+        },
+        {
+          "id": "T01.05",
+          "expected": "Trusted runner adapters reject another target/key, changed running image, changed installed helper/unit files and effective configuration drift; final deployment evidence is observed rather than copied from expectations."
         }
       ]
     },
@@ -110,6 +114,18 @@
         {
           "id": "T04.06",
           "expected": "Accepted TOTP steps cannot be reused, including enrollment/replacement transitions."
+        },
+        {
+          "id": "T04.07",
+          "expected": "Rolling 900-second shared authentication budgets admit exactly 30 admin/15 peer attempts, reserve atomically before work, reject excess with 429/Retry-After, and expire at the boundary without reset by restart, success or new challenge."
+        },
+        {
+          "id": "T04.08",
+          "expected": "Email OTP and explicit relay-test sends share rolling 900-second budgets of 5 per admin/3 per peer, additionally honor OTP resend delay, and cannot send when their reserved budgets are exhausted."
+        },
+        {
+          "id": "T04.09",
+          "expected": "TOTP uses six digits, a 30-second step and a plus/minus one-step window; accepted steps cannot be reused or move the replay watermark backward."
         }
       ]
     },
@@ -194,6 +210,10 @@
         {
           "id": "T07.05",
           "expected": "Request-ID conflicts, unauthorized socket peers and unallowlisted diagnostics fail."
+        },
+        {
+          "id": "T07.06",
+          "expected": "Disabled or missing deletion capability refuses API/helper deletion before CLI execution; caller flags cannot enable it. Disabled Email OTP refuses send/verification despite confirmed relay readiness."
         }
       ]
     },

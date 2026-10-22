@@ -3,19 +3,19 @@
   "scope": "documentation, Python syntax and finite specifications",
   "requirements": 22,
   "test_groups": 30,
-  "case_contracts": 122,
-  "markdown_documents": 21,
+  "case_contracts": 127,
+  "markdown_documents": 22,
   "model_states": {
     "authentication_revision": 19,
     "creation_preservation": 12,
     "maintenance_exclusion": 23
   },
-  "specification_sha256": "70024407fcffe0d590204b6e15c460ce8665028f6cc65d5780d8057e0f1bd376",
+  "specification_sha256": "3f7835bb9fdbbb6da23b87eaf8f3e30f005d5a4d9f954c1de2e2755495d6d2d6",
   "application_runtime": "not_run",
   "production_qualification": "blocked",
   "verification_tools": {
     "result": "pass",
-    "test_count": 40,
+    "test_count": 49,
     "scope": "verification tools and model counterexamples; not application tests"
   },
   "command_examples": {
@@ -24,5 +24,5 @@
     "compose_missing_variable_rejections": 6,
     "scope": "documentation fixtures; no containers started or bind sources provisioned"
   },
-  "generated_at_utc": "2026-10-21T21:39:43.206014+00:00"
+  "generated_at_utc": "2026-10-22T06:37:00.132546+00:00"
 }
