@@ -1,0 +1,10 @@
+[Unit]
+Description=Check public IMAPS and HTTPS independently of the mail host
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Unit=mail-admin-external-monitor.service
+
+[Install]
+WantedBy=timers.target

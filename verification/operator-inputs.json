@@ -1,0 +1,10 @@
+{
+  "alert_recipient": "rsalehin24@gmail.com",
+  "backup_schedule": "*-*-* 03:00:00 Asia/Dhaka",
+  "backup_retention": "Rolling seven days of daily restore points with shared unchanged data",
+  "recovery_point_seconds": 93600,
+  "recovery_time_seconds": 14400,
+  "backup_destination": "s3://rsalehin24-mail-backup/mail-admin/production/rsalehin24-me/",
+  "backup_encryption_mechanism": "Restic 0.19.1 encrypted deduplicated R2 repository",
+  "backup_key_reference": "/Users/rsalehin24/Documents/Others/mail/local-state/production-restic-password.key"
+}

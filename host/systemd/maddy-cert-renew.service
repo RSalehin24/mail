@@ -1,0 +1,12 @@
+[Unit]
+Description=Generation-aware Maddy and Mail Admin certificate renewal
+After=docker.service mail-admin-paths.service network-online.target
+Requires=docker.service mail-admin-paths.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/usr/local/lib/mail-admin
+ExecStart=/usr/bin/python3 -m host.cli renew
+UMask=0077
+TimeoutStartSec=20min
+LogNamespace=mail-admin

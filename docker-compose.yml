@@ -1,0 +1,53 @@
+services:
+  mail-admin:
+    image: ${MAIL_ADMIN_IMAGE:?Set tested runtime image}
+    pull_policy: never
+    platform: linux/amd64
+    container_name: mail-admin
+    user: "${MAIL_ADMIN_UID:?Set service UID}:${MAIL_ADMIN_GID:?Set service GID}"
+    mem_limit: ${MAIL_ADMIN_MEMORY_LIMIT:?Set measured memory limit}
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    logging:
+      driver: local
+      options: {max-size: "10m", max-file: "3"}
+    ports: ["443:8443"]
+    volumes:
+      - type: bind
+        source: ./data
+        target: /app/data
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${MAIL_ADMIN_TLS_DIRECTORY:?Set validated immutable certificate generation}
+        target: /tls
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: /run/mail-admin-helper
+        target: /run/mail-admin-helper
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: /etc/mail-admin/secrets
+        target: /run/secrets/mail-admin
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: /etc/mail-admin/installation.json
+        target: /run/mail-admin-installation.json
+        read_only: true
+        bind: {create_host_path: false}
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          size: ${MAIL_ADMIN_TMPFS_LIMIT:?Set measured temporary filesystem limit}
+          mode: 01777
+    environment:
+      HASH_MEMORY_KIB: ${MAIL_ADMIN_HASH_MEMORY_KIB:?Set measured hash memory}
+      HASH_PARALLELISM: ${MAIL_ADMIN_HASH_PARALLELISM:?Set measured hash concurrency}
+      HTTP_CONCURRENCY: ${MAIL_ADMIN_HTTP_CONCURRENCY:?Set measured HTTP concurrency}
+      OPERATION_TIMEOUT_SECONDS: ${MAIL_ADMIN_OPERATION_TIMEOUT_SECONDS:?Set bounded deadline}
+      EMAIL_OTP_ENABLED: ${MAIL_ADMIN_EMAIL_OTP_ENABLED:-false}
+      PERMANENT_DELETION_ENABLED: ${MAIL_ADMIN_PERMANENT_DELETION_ENABLED:-false}

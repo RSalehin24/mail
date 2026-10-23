@@ -1,0 +1,53 @@
+"""Root-only helper service, using root-controlled operator records."""
+
+import os
+import time
+from pathlib import Path
+
+from helper.deletion import DeletionGuard, DeletionPaths
+from helper.journal import Journal
+from helper.maddy import DockerMaddy
+from helper.server import HelperServer, SocketPolicy
+from helper.service import HelperDependencies, HostHelper
+from helper.status import host_status
+from host.locks import LockPolicy
+from shared.errors import ServiceError
+from shared.files import protected_json
+from shared.validation import HELPER_PROTOCOL, SCHEMA_VERSION
+
+
+def main() -> None:
+    if os.geteuid() != 0:
+        raise ServiceError("root_required", 403)
+    deployment = protected_json(Path("/etc/mail-admin/deployment.json"))
+    if (
+        deployment.get("helper_protocol") != HELPER_PROTOCOL
+        or deployment.get("schema_version") != SCHEMA_VERSION
+    ):
+        raise ServiceError("incompatible_deployment", 503)
+    inputs = deployment["inputs"]
+    paths = DeletionPaths(
+        Path("/etc/mail-admin/deployment.json"),
+        Path("/etc/mail-admin/helper-policy.json"),
+        Path("/var/lib/mail-admin-backup/manifest.json"),
+    )
+    dependencies = HelperDependencies(
+        DockerMaddy(deployment),
+        Journal(Path("/var/lib/mail-admin-helper/journal.db")),
+        DeletionGuard(paths, time.time),
+        Path("/run/lock/mail-admin-maddy.lock"),
+        LockPolicy(inputs["lock_wait_seconds"]),
+        time.time,
+        host_status,
+    )
+    policy = SocketPolicy(
+        inputs["service_uid"], inputs["service_gid"], inputs["operation_timeout_seconds"]
+    )
+    with HelperServer(
+        Path("/run/mail-admin-helper/control.sock"), (HostHelper(dependencies), policy)
+    ) as server:
+        server.serve_forever(poll_interval=0.25)
+
+
+if __name__ == "__main__":
+    main()

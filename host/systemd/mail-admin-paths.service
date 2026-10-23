@@ -1,0 +1,12 @@
+[Unit]
+Description=Prepare stable Mail Admin socket directory and lock files
+Before=docker.service
+After=systemd-tmpfiles-setup.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemd-tmpfiles --create /etc/tmpfiles.d/mail-admin.conf
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

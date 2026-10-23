@@ -1,0 +1,15 @@
+[Unit]
+Description=Mail reachability alerts from a separate monitoring host
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/usr/local/lib/mail-admin
+StateDirectory=mail-admin-alerts
+StateDirectoryMode=0700
+ExecStartPre=/usr/bin/test -f /var/lib/mail-admin-alerts/external.json
+ExecStartPre=/usr/bin/test -f /var/lib/mail-admin-alerts/external.lock
+ExecStart=/usr/bin/python3 -m host.cli monitor-external
+UMask=0077
+LogNamespace=mail-admin

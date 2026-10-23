@@ -1,0 +1,10 @@
+[Unit]
+Description=Independent local capacity, backup and certificate monitor
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/usr/local/lib/mail-admin
+ExecStart=/usr/bin/python3 -m host.cli monitor
+UMask=0077
+LogNamespace=mail-admin

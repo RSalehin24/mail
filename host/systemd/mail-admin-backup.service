@@ -1,0 +1,14 @@
+[Unit]
+Description=Consistent encrypted off-host mail backup
+After=docker.service mail-admin-paths.service network-online.target
+Requires=docker.service mail-admin-paths.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/usr/local/lib/mail-admin
+ExecStart=/usr/bin/python3 -m host.cli backup
+UMask=0077
+MemoryMax=@BACKUP_MEMORY_LIMIT@
+CPUQuota=@BACKUP_CPU_PERCENT@%
+TimeoutStartSec=1h
+LogNamespace=mail-admin

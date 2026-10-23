@@ -1,0 +1,9 @@
+[Unit]
+Description=Operator-selected recurring mail backup
+
+[Timer]
+OnCalendar=@BACKUP_CALENDAR@
+Persistent=true
+
+[Install]
+WantedBy=timers.target

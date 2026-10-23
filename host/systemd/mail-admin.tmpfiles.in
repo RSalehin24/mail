@@ -1,0 +1,12 @@
+d /run/mail-admin-helper 0750 root @SERVICE_GID@ - -
+f /run/lock/mail-admin-renewal.lock 0600 root root - -
+f /run/lock/mail-admin-maddy.lock 0600 root root - -
+f /run/lock/mail-admin-backup.lock 0600 root root - -
+d /var/lib/mail-admin-backup/jobs 0700 root root - -
+f /var/lib/mail-admin-backup/jobs/command.lock 0600 root root - -
+f /var/lib/mail-admin-alerts/state.lock 0600 root root - -
+f /var/lib/mail-admin-backup/retention.lock 0600 root root - -
+d /var/lib/mail-admin-recovery 0700 root root - -
+f /var/lib/mail-admin-recovery/outcome.lock 0600 root root - -
+d /var/lib/mail-admin-rollout 0700 root root - -
+f /var/lib/mail-admin-rollout/operation.lock 0600 root root - -

@@ -1,0 +1,13 @@
+.git
+.venv
+**/__pycache__
+**/node_modules
+frontend/dist
+build/*
+!build/wheels/
+!build/restic/
+local-state
+.env
+*.key
+.mypy_cache
+.ruff_cache

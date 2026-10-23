@@ -1,0 +1,22 @@
+[Unit]
+Description=Restricted Mail Admin host helper
+After=docker.service mail-admin-paths.service
+Requires=docker.service mail-admin-paths.service
+
+[Service]
+Type=simple
+WorkingDirectory=/usr/local/lib/mail-admin
+ExecStart=/usr/bin/python3 -m helper
+User=root
+UMask=0077
+Restart=on-failure
+RestartSec=3s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/run/mail-admin-helper /run/lock /var/lib/mail-admin-helper
+LogNamespace=mail-admin
+
+[Install]
+WantedBy=multi-user.target docker.service
