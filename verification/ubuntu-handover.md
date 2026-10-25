@@ -1,5 +1,10 @@
 # Ubuntu testing handover
 
+This is the original Mac transfer checkpoint. The active workstation is CachyOS,
+not Ubuntu; consult the [Linux continuation](linux-continuation.md) for its actual
+setup, source changes and missing private artifacts. Identities and results below
+remain historical and must not be applied to the modified working tree.
+
 Prepared 25 October 2026. This handover covers the application and its unfinished
 qualification on a better **native Ubuntu amd64** machine. It authorizes no
 production deployment. Continue with one working candidate, focused fixes, then
@@ -94,8 +99,9 @@ are the recorded identities, not interchangeable strings to write into reports:
 The Maddy resolver accepts its recorded **index or configuration ID**, not the
 standalone platform-manifest ID. Export the full tagged image **without
 `--platform`**. A previous platform-only transfer produced an unrecognized identity
-on containerd. The bulk exporter in `tools/run_remote.py` currently uses
-`--platform`; do not rely on that export alone for the Maddy fixture.
+on containerd. At this historical checkpoint the bulk exporter in
+`tools/run_remote.py` used `--platform`. The Linux continuation corrected it to
+preserve the complete image; retain the original transfer failure as evidence.
 
 The isolated postmaster patch and hash-pinned build inputs already have user
 approval. Do not ask again. Preserve

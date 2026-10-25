@@ -108,7 +108,7 @@ retained bytes and temporary prune headroom; no paid resource has been created.
 
 ## Recovery kit and root commands
 
-An actual full 18-role R2 point has now been restored onto a different empty
+A historical prototype full 18-role R2 point was restored onto a different empty
 software-emulated guest while the source remained powered off and its disk was
 never attached. The restored dashboard passed new password/TOTP login and rejected
 the old credentials/cookie/factors; relay-key decryption, saved mailbox metadata,
@@ -119,6 +119,9 @@ at outage was 22 minutes 22 seconds; outage through verified recovery was 2 hour
 3 minutes 14 seconds, including development repairs. These meet the selected
 26-hour/4-hour synthetic targets. They do not establish a production recovery time
 or qualify the old archived host bundle without its subsequent helper-unit fix.
+They also do not qualify the later `a70f7897` bundle or this modified Linux checkout;
+matching frozen replacement evidence remains missing. Referenced private `build/`
+reports require transfer from the original workstation.
 The original 15-second emulated startup failures remain failed; native resource
 qualification is separate. Exact non-secret observations are retained under
 `build/mail-admin-local-mock-115167ae-192e-4b01-b32b-2950c8a1ad45/replacement-recovery-proof-c8b631f4-6d51-410e-ada6-42cdc043a53d/`.

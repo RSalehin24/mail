@@ -1,3 +1,10 @@
+HISTORICAL SETUP NOTES — NOT THE CURRENT DEPLOYMENT RUNBOOK
+These original notes include unverified sender-readiness claims and legacy renewal,
+permissions and account commands. Preserve them as background, not installation
+instructions. Use docs/mail-admin-implementation/README.md and
+verification/operator-handoff.md for the reviewed contract and gated procedures.
+Recheck the dated baseline before any production maintenance.
+
 ================================================================================
   MADDY MAIL SERVER - FULL DOCKER SETUP DOCUMENTATION
   Domain: rsalehin24.me | Server: mail.rsalehin24.me

@@ -37,7 +37,7 @@ def validate_browser_report(report, bundle):
                 'mail-admin:qualification': os.environ['MAIL_ADMIN_QUALIFICATION_IMAGE']}
     if (report.get('scope') != 'frozen-https-browser' or report.get('identity') != bundle.identity
             or report.get('images') != expected or report.get('source_sha256') != source_digest()
-            or report.get('runner_inputs') != pinned_inputs()
+            or report.get('runner_inputs') != pinned_inputs(report.get('browser_system', ''))
             or report.get('result') != 'pass' or report.get('browser', {}).get('result') != 'pass'):
         raise ValueError('Browser assertions do not match the frozen execution')
     completed = validate_report_time(bundle.context, report)

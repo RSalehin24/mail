@@ -1,5 +1,6 @@
 import os
 import unittest
+from datetime import UTC, datetime
 from pathlib import Path
 
 from host.release_files import file_digest
@@ -30,7 +31,9 @@ class CutoverRebootTests(unittest.TestCase):
             self.assertEqual(record[key], value)
         require_matching_source(record)
         require_reboot(record, {'instance_id': host.record['instance_id'], 'boot_id': boot_id()})
-        validate_report_time(bundle.context, {**record, 'completed_at_utc': timestamp()})
+        completed = timestamp()
+        validate_report_time({**bundle.context, 'now': datetime.now(UTC)},
+                             {**record, 'completed_at_utc': completed})
         self.assertEqual(record['paused_boundary'], ['cutover_installation', 2])
         before = load_legacy(Path(record['before_root']), record['instance_id'])
         fixture, operation = restore_fixture(record)

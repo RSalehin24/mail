@@ -43,6 +43,13 @@ for name,content in json.load(sys.stdin).items():
 """
 
 
+def native_architecture(value: str) -> str:
+    aliases = {"aarch64": "arm64", "arm64": "arm64", "x86_64": "amd64", "amd64": "amd64"}
+    if value not in aliases:
+        raise RuntimeError("The local mock requires a native ARM64 or amd64 Linux engine")
+    return aliases[value]
+
+
 def local_engine() -> dict:
     context = json.loads(docker(("context", "inspect")))[0]
     endpoint = os.environ.get("DOCKER_HOST", context["Endpoints"]["docker"]["Host"])
@@ -51,57 +58,70 @@ def local_engine() -> dict:
     ):
         raise RuntimeError("A local Unix Docker endpoint is required")
     engine = json.loads(docker(("info", "--format", "{{json .}}")))
-    if engine["OSType"] != "linux" or engine["Architecture"] not in {"aarch64", "arm64"}:
-        raise RuntimeError("The local mock requires the native ARM64 Linux engine")
+    if engine["OSType"] != "linux":
+        raise RuntimeError("The local mock requires a Linux engine")
+    native_architecture(engine["Architecture"])
     return dict(engine)
 
 
-def utility(image: str, volume: str) -> tuple[str, ...]:
+def utility(image: str, volume: str, architecture: str = "arm64") -> tuple[str, ...]:
     return (
-        "run", "--rm", "--platform", "linux/arm64", "--read-only", "--cap-drop", "ALL",
+        "run", "--rm", "--platform", "linux/" + native_architecture(architecture),
+        "--read-only", "--cap-drop", "ALL",
         "--security-opt", "no-new-privileges:true", "--memory", "128m", "--memory-swap",
         "128m", "--pids-limit", "32", "--cpus", "1", "--label", "mail-admin.fixture=true",
         "--mount", f"type=volume,src={volume},dst=/fixture", "--entrypoint", "python", image,
     )
 
 
-def require_capacity(image: str, volume: str) -> dict[str, int]:
+def require_capacity(
+    image: str, volume: str, architecture: str = "arm64",
+) -> dict[str, int]:
     host_free = shutil.disk_usage(ROOT).free
     if host_free < LOCAL_DISK_RESERVE_BYTES:
-        raise RuntimeError("The local mock needs at least 3 GiB of free Mac disk space")
-    observation = json.loads(docker(utility(image, volume) + ("-c", MEMORY_OBSERVATION)))
+        raise RuntimeError("The local mock needs at least 3 GiB of free workstation disk space")
+    observation = json.loads(docker(
+        utility(image, volume, architecture) + ("-c", MEMORY_OBSERVATION)
+    ))
     required = (LOCAL_CONTAINER_MEMORY_MIB + HOST_RESERVE_MIB) * 1024 * 1024
     if observation["available_memory_bytes"] < required:
         raise RuntimeError("Insufficient spare Linux engine memory for the local mock")
     if observation["disk_free_bytes"] < LOCAL_DISK_RESERVE_BYTES:
         raise RuntimeError("Insufficient Linux engine disk space for the local mock")
-    return {**observation, "mac_disk_free_bytes": host_free}
+    return {**observation, "workstation_disk_free_bytes": host_free}
 
 
-def create(image_reference: str) -> Path:
+def create(image_reference: str, acceleration: str = "tcg") -> Path:
     os.umask(0o077)
     engine = local_engine()
+    architecture = native_architecture(engine["Architecture"])
+    if acceleration not in {"tcg", "kvm"}:
+        raise ValueError("Unknown guest acceleration")
+    if acceleration == "kvm" and (architecture != "amd64"
+            or not os.access("/dev/kvm", os.R_OK | os.W_OK)):
+        raise RuntimeError("KVM requires an accessible native amd64 virtualization device")
     image = json.loads(docker(("image", "inspect", image_reference)))[0]
     if (image["Os"], image["Architecture"], image["Config"]["User"]) != (
-        "linux", "arm64", "10001:10001"
+        "linux", architecture, "10001:10001"
     ):
         raise RuntimeError("A native unprivileged local mock tool image is required")
     identifier = str(uuid.uuid4())
     name = "mail-admin-local-mock-" + identifier
     volume = name + "-disk"
     if shutil.disk_usage(ROOT).free < LOCAL_DISK_RESERVE_BYTES:
-        raise RuntimeError("The local mock needs at least 3 GiB of free Mac disk space")
+        raise RuntimeError("The local mock needs at least 3 GiB of free workstation disk space")
     docker(("volume", "create", "--label", "mail-admin.fixture=true", volume))
-    capacity = require_capacity(image["Id"], volume)
+    capacity = require_capacity(image["Id"], volume, architecture)
     local = ROOT / "build" / name
     local.mkdir(mode=0o700)
     command(("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(local / "identity")))
-    seed(image["Id"], (volume, local, identifier))
+    seed(image["Id"], (volume, local, identifier), architecture)
     state = local / "state.json"
     record = {
         "id": identifier, "container": name, "volume": volume, "image_id": image["Id"],
         "engine_id": engine["ID"], "engine_architecture": engine["Architecture"],
-        "guest_architecture": "amd64", "acceleration": "software-emulation",
+        "guest_architecture": "amd64",
+        "acceleration": "kvm" if acceleration == "kvm" else "software-emulation",
         "scope": "disposable mock setup; not application or native-host qualification",
         "base_url": BASE_URL, "base_sha512": BASE_SHA512, "capacity_before": capacity,
         "created_at": datetime.now(UTC).isoformat(),
@@ -111,7 +131,9 @@ def create(image_reference: str) -> Path:
     }
     state.write_text(json.dumps(record, indent=2) + "\n")
     print("Downloading the checksum-pinned public mock disk", flush=True)
-    docker(utility(image["Id"], volume) + ("-c", DOWNLOAD, "/fixture", BASE_URL, BASE_SHA512))
+    docker(utility(image["Id"], volume, architecture) + (
+        "-c", DOWNLOAD, "/fixture", BASE_URL, BASE_SHA512,
+    ))
     docker(launch_arguments(record))
     inspection = json.loads(docker(("inspect", name)))[0]
     record["container_id"] = inspection["Id"]
@@ -120,9 +142,11 @@ def create(image_reference: str) -> Path:
     return state
 
 
-def seed(image: str, values: tuple[str, Path, str]) -> None:
+def seed(
+    image: str, values: tuple[str, Path, str], architecture: str = "arm64",
+) -> None:
     volume, local, identifier = values
-    digest = docker(utility(image, volume) + (
+    digest = docker(utility(image, volume, architecture) + (
         "-c", "import hashlib; print(hashlib.file_digest(open("
         "'/opt/payload/docker-engine.tar.gz','rb'),'sha256').hexdigest())"
     )).strip()
@@ -131,7 +155,7 @@ def seed(image: str, values: tuple[str, Path, str]) -> None:
         "user-data": "#cloud-config\n" + json.dumps(configuration),
         "meta-data": json.dumps({"instance-id": identifier, "local-hostname": "mail-admin-mock"}),
     }
-    arguments = ("docker",) + utility(image, volume)
+    arguments = ("docker",) + utility(image, volume, architecture)
     arguments = arguments[:2] + ("--interactive",) + arguments[2:]
     subprocess.run(  # noqa: S603 -- public fixture seed only, written to a new private volume.
         arguments + ("-c", SEED_WRITER), input=json.dumps(contents), text=True, check=True,
@@ -141,9 +165,12 @@ def seed(image: str, values: tuple[str, Path, str]) -> None:
 
 def launch_arguments(record: dict) -> tuple[str, ...]:
     memory = str(LOCAL_CONTAINER_MEMORY_MIB) + "m"
+    accelerated = record.get("acceleration") == "kvm"
+    device = ("--device", "/dev/kvm:/dev/kvm:rw", "-e", "MOCK_ACCELERATION=kvm")
     return (
         "create", "--name", record["container"], "--label", "mail-admin.fixture=true",
-        "--label", "mail-admin.local-mock=" + record["id"], "--platform", "linux/arm64",
+        "--label", "mail-admin.local-mock=" + record["id"], "--platform",
+        "linux/" + native_architecture(record.get("engine_architecture", "arm64")),
         "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true",
         "--memory", memory, "--memory-swap", memory, "--cpus", "1", "--pids-limit", "64",
         "--log-driver", "local", "--log-opt", "max-size=5m", "--log-opt", "max-file=2",
@@ -151,8 +178,8 @@ def launch_arguments(record: dict) -> tuple[str, ...]:
         "-p", "127.0.0.1::2222", "--mount",
         "type=volume,src=" + record["volume"] + ",dst=/fixture",
         "-e", "MOCK_GUEST_MEMORY_MIB=" + str(LOCAL_GUEST_MEMORY_MIB),
-        "-e", "MOCK_LOCAL_REPLACEMENT=1", record["image_id"],
-    )
+        "-e", "MOCK_LOCAL_REPLACEMENT=1",
+    ) + (device if accelerated else ()) + (record["image_id"],)
 
 
 class LocalMock:
@@ -166,15 +193,22 @@ class LocalMock:
             raise ValueError("Invalid local mock volume")
 
     def inspect(self) -> dict:
-        if local_engine()["ID"] != self.record["engine_id"]:
+        engine = local_engine()
+        if (engine["ID"] != self.record["engine_id"]
+                or native_architecture(engine.get("Architecture", "arm64"))
+                != native_architecture(self.record.get("engine_architecture", "arm64"))):
             raise RuntimeError("The recorded local engine changed")
         inspected = json.loads(docker(("inspect", self.name)))[0]
         expected = self.record
+        devices = ([{"PathOnHost": "/dev/kvm", "PathInContainer": "/dev/kvm",
+                     "CgroupPermissions": "rw"}] if expected.get("acceleration") == "kvm"
+                   else [])
         if (
             inspected["Id"] != expected["container_id"]
             or inspected["Image"] != expected["image_id"]
             or inspected["Config"]["Labels"].get("mail-admin.local-mock") != expected["id"]
             or inspected["HostConfig"]["Privileged"]
+            or inspected["HostConfig"].get("Devices", []) != devices
             or inspected["HostConfig"]["Memory"] != LOCAL_CONTAINER_MEMORY_MIB * 1024 * 1024
             or inspected["HostConfig"]["MemorySwap"] != LOCAL_CONTAINER_MEMORY_MIB * 1024 * 1024
             or inspected["HostConfig"]["NanoCpus"] != 1_000_000_000
@@ -197,8 +231,13 @@ class LocalMock:
                 raise RuntimeError("The recorded local mock is already running")
             probe = capacity_image or self.record["image_id"]
             if capacity_image is not None:
-                verify_capacity_image(capacity_image)
-            require_capacity(probe, self.record["volume"])
+                verify_capacity_image(
+                    capacity_image, self.record.get("engine_architecture", "arm64")
+                )
+            if "engine_architecture" in self.record:
+                require_capacity(probe, self.record["volume"], self.record["engine_architecture"])
+            else:
+                require_capacity(probe, self.record["volume"])
             arguments = ("start",)
         else:
             arguments = actions[action]
@@ -226,18 +265,19 @@ class LocalMock:
         return command(self.ssh_arguments() + (shlex.join(arguments),), self.path.parent)
 
 
-def verify_capacity_image(reference: str) -> None:
+def verify_capacity_image(reference: str, architecture: str = "arm64") -> None:
     if re.fullmatch(r"sha256:[0-9a-f]{64}", reference) is None:
         raise ValueError("An immutable local capacity image is required")
     image = json.loads(docker(("image", "inspect", reference)))[0]
     if (image["Id"], image["Os"], image["Architecture"], image["Config"]["User"]) != (
-        reference, "linux", "arm64", "10001:10001"
+        reference, "linux", native_architecture(architecture), "10001:10001"
     ):
-        raise ValueError("The capacity image must be native ARM64 and non-root")
+        raise ValueError("The capacity image must match the native engine and be non-root")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--acceleration", choices=("tcg", "kvm"), default="tcg")
     parser.add_argument("--capacity-image", help="Immutable native utility for restart admission")
     parser.add_argument(
         "action", choices=("create", "inspect", "guest", "stop", "power-cut", "start-existing")
@@ -246,7 +286,7 @@ def main() -> None:
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     selected = parser.parse_args()
     if selected.action == "create":
-        print(create(selected.reference))
+        print(create(selected.reference, selected.acceleration))
         return
     mock = LocalMock(Path(selected.reference))
     if selected.action == "inspect":

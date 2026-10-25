@@ -4,6 +4,7 @@ import argparse
 import base64
 import hashlib
 import json
+import os
 import signal
 import sys
 import time
@@ -54,6 +55,17 @@ def fixture_material(web, authentication):
             'runtime_container_id': web.identifier, 'source_sha256': source_digest()}
 
 
+def publish_material(directory, material):
+    # Root inside a native Linux controller writes as root on the bind mount.
+    # Transfer only this private synthetic input to the directory's owning runner,
+    # before publishing its ready filename; never broaden the secret file's mode.
+    owner = directory.stat()
+    pending = directory / 'material.pending.json'
+    atomic_json(pending, material)
+    os.chown(pending, owner.st_uid, owner.st_gid)
+    pending.replace(directory / 'material.json')
+
+
 def execute(directory):
     web = BrowserFixture()
     try:
@@ -71,8 +83,7 @@ def execute(directory):
         sequence.append(time.monotonic())
         material = fixture_material(web, authentication)
         material['bootstrap_sequence'] = sequence
-        path = directory / 'material.json'
-        atomic_json(path, material)
+        publish_material(directory, material)
         deadline = time.monotonic() + 600
         while not (directory / 'stop').exists():
             if time.monotonic() >= deadline:

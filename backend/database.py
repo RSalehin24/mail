@@ -2,6 +2,8 @@
 
 import os
 import sqlite3
+import threading
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -20,6 +22,7 @@ class Database:
     def __init__(self, path: Path, identity: str) -> None:
         self.path = path
         self.identity = identity
+        self._writes = threading.RLock()
         require_existing_database(path)
         with self.transaction() as connection:
             version = connection.execute("PRAGMA user_version").fetchone()[0]
@@ -34,8 +37,18 @@ class Database:
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
         connection = None
+        deadline = time.monotonic() + 0.25
+        # Avoid making local writers contend through SQLite's busy polling while
+        # the owning Python thread needs CPU to commit. Keep the original total
+        # acquisition budget, including any remaining cross-process contention.
+        acquired = self._writes.acquire(timeout=0.25)
+        if not acquired:
+            raise ServiceError("storage_unavailable", 503)
         try:
-            connection = sqlite3.connect(self.path.as_uri() + "?mode=rw", uri=True, timeout=0.25)
+            connection = sqlite3.connect(
+                self.path.as_uri() + "?mode=rw", uri=True,
+                timeout=max(0, deadline - time.monotonic()),
+            )
             connection.row_factory = sqlite3.Row
             connection.execute("PRAGMA foreign_keys=ON")
             connection.execute("PRAGMA synchronous=FULL")
@@ -45,8 +58,11 @@ class Database:
         except sqlite3.Error as error:
             raise ServiceError("storage_unavailable", 503) from error
         finally:
-            if connection is not None:
-                connection.close()
+            try:
+                if connection is not None:
+                    connection.close()
+            finally:
+                self._writes.release()
 
     @classmethod
     def provision(cls, path: Path, identity: str) -> "Database":

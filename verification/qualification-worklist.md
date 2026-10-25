@@ -1,5 +1,14 @@
 # Qualification work list
 
+The latest Linux source `31fdf6af` completed its frozen catalogue at
+**95 passed / 0 failed / 16 not run / 111**. Matching complete host/recovery
+observations remain missing; the release is blocked. The
+[continuation checkpoint](linux-continuation.md) identifies its artifacts and logs.
+
+The table below is the recorded `a70f7897` acceptance snapshot, not a result for
+the modified Linux checkout. Original bundle/report paths require private transfer.
+See the [continuation checkpoint](linux-continuation.md) for active setup and checks.
+
 One working tree. Frozen source: `a70f7897f23e42914901f2ac1c293fedab07f7208ab19da8d7c10d8863a5cd0d`, in `build/release-candidate-a70f7897/`. The completed frozen catalogue records **94 passed / 1 failed / 16 not run / 111**.
 The historical `a9c00d9e` report remains **69 passed / 0 failed / 42 not run / 111**.
 No earlier-source, prototype, interrupted or development report fills final acceptance.
@@ -13,7 +22,7 @@ its failed emulated cold start remains failed.
 Focused development passes cover rollout guards, actual install/upgrade, immutable HTTPS
 transfer, actual HTTPS browser handling, combined memory including tmpfs/helper/transient
 work, real terminal maintenance coordination, and two real systemd legacy-drain assertions.
-Full current checks pass 452 unit and 72 API tests, lint/type checks and specification checks.
+Recorded checks for `a70f7897` passed 452 unit and 72 API tests, lint/type checks and specification checks.
 They remain supporting evidence. The matching frozen HTTPS browser run passes. All 63 catalogue
 controllers completed without OOM; T17.01 failed and 16 host/composite cases remain not run.
 Raw reports: `build/release-candidate-a70f7897/qualification-25c9c359-9e16-4f39-a628-3aa96342c78a/`.

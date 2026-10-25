@@ -7,7 +7,20 @@ installation, live-service restart, mailbox mutation, external mail or DNS chang
 has been performed by the implementation run. Only explicitly authorized synthetic
 fixtures have been added to the existing host.
 
-Current source `a70f7897` is frozen in `build/release-candidate-a70f7897/`.
+For the active Linux checkout, see the [continuation checkpoint](linux-continuation.md).
+The latest Linux frozen source `31fdf6af` completed all 63 catalogue modules:
+**95 passed / 0 failed / 16 not run / 111**. Local checks passed 465 unit and
+72 integration tests; frozen HTTPS browser and supporting real R2 retention checks
+passed. Full host recovery remains blocked after two capture deadline failures.
+These results do not constitute release qualification.
+
+Its source edits are not qualified by the results below. Historical `build/` paths
+refer to retained evidence on the original workstation; they are not present in
+this checkout until explicitly transferred. The sections below retain prior
+source-specific observations; words such as “current” apply to their recorded snapshot.
+
+The historical frozen source `a70f7897` is in `build/release-candidate-a70f7897/`
+on the original workstation.
 Its completed frozen catalogue records **94 passed / 1 failed / 16 not run / 111**.
 All 63 assertion controllers completed without OOM. T17.01 failed its normal HTTPS
 deletion assertion; matching host reports are still absent for 16 cases. The candidate
@@ -36,7 +49,7 @@ cutover and full replacement recovery bindings are implemented; their matching
 runtime evidence is still required. Registration alone does not qualify any case.
 
 
-Current full checks pass **452 unit and 72 API tests**, Ruff, strict mypy, frontend
+Recorded full checks for `a70f7897` passed **452 unit and 72 API tests**, Ruff, strict mypy, frontend
 lint/type checks and the specification suite
 (`build/browser-dns-fixed-source-checks-20261025.log`). The frontend also passed
 lint/type checks under pinned Node 24 (`build/frontend-node24-verification-20261025.log`).
@@ -1252,4 +1265,5 @@ four-hour recovery target, recorded in `verification/operator-inputs.json`.
 See [operator handoff](operator-handoff.md) and [Maddy assessment](maddy-security-assessment.md).
 Email OTP and permanent deletion remain disabled in pending production configuration.
 
-No commit or push has been made. No production deployment approval is requested yet.
+The earlier implementation run reported no commit or push; this checkout subsequently
+arrived at commit `ddb7876` (`handover`). No production deployment approval is requested.

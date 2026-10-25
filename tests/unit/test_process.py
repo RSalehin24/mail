@@ -8,6 +8,18 @@ from tests.support import StateFixture
 
 
 class ProcessBoundsTests(unittest.TestCase):
+    def test_protocol_stdout_is_separate_from_diagnostics_under_the_same_combined_cap(self):
+        program = "import sys;print('{\"ok\":true}');sys.stderr.write('diagnostic\\n')"
+        result = execute(Command((sys.executable, '-c', program), timeout=5,
+                                 merge_stderr=False))
+        self.assertEqual(result.output, '{"ok":true}\n')
+        self.assertEqual(result.error_output, 'diagnostic\n')
+        with self.assertRaises(ServiceError) as caught:
+            execute(Command((sys.executable, '-c',
+                             "import sys;sys.stdout.write('x'*32768);"
+                             "sys.stderr.write('y'*32769)"), timeout=5, merge_stderr=False))
+        self.assertEqual(caught.exception.__cause__.code, 'command_output_limit')
+
     def setUp(self):
         self.fixture = StateFixture()
         self.addCleanup(self.fixture.close)

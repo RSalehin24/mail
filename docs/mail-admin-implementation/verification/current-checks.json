@@ -10,7 +10,7 @@
     "creation_preservation": 12,
     "maintenance_exclusion": 23
   },
-  "specification_sha256": "3f7835bb9fdbbb6da23b87eaf8f3e30f005d5a4d9f954c1de2e2755495d6d2d6",
+  "specification_sha256": "a9f65b7bdf3270702f68f0c6a86703989145707279083d617b35acfd93b254c2",
   "application_runtime": "not_run",
   "production_qualification": "blocked",
   "verification_tools": {
@@ -24,5 +24,5 @@
     "compose_missing_variable_rejections": 6,
     "scope": "documentation fixtures; no containers started or bind sources provisioned"
   },
-  "generated_at_utc": "2026-10-22T06:37:00.132546+00:00"
+  "generated_at_utc": "2026-10-25T16:50:21.338518+00:00"
 }

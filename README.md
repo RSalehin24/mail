@@ -11,6 +11,10 @@ Paths: `frontend/` (React/MUI), `backend/` (API/domain/data), `shared/` (validat
 assertions), `tools/` (build and evidence adapters).
 
 Use Python 3.11 and Node 24 LTS. Python 3.12 on macOS is a development check only.
+For the new Linux workstation, read the [setup checkpoint](verification/linux-continuation.md).
+Image builds require Docker Engine, the Buildx plugin (BuildKit), and Docker
+Compose. Install all three before `make build`; the legacy builder cannot execute
+the Dockerfile's wheel-cache bind mounts.
 Install locked Python inputs into `.venv` and run `npm ci` in `frontend/`:
 
 ```sh
@@ -50,7 +54,8 @@ Python bytecode is generated during the image build with source-hash validation;
 the read-only runtime does not need to compile sources at each cold start.
 
 `make check` runs Ruff, strict mypy, TypeScript checks, unit and API integration checks.
-`make maddy-integration` uses real pinned Maddy 0.9.5, synthetic mail, a Linux volume,
+`make maddy-integration` uses the approved, pinned Maddy 0.9.5 postmaster fixture,
+synthetic mail, a Linux volume,
 and loopback-only temporary ports. Every fixture container has a unique name; a
 fixture-only Docker adapter maps the helper's fixed `maddy` target to that name.
 `make runtime-integration` tests the actual non-root HTTPS image, real Unix socket,
@@ -144,17 +149,23 @@ The bundle contains an exact Linux/amd64 image archive, host and suite archives,
 non-secret pending configuration, hashes, and evidence references. Its checker
 must remain blocked until every required case has a real qualifying report.
 Unspecified production inputs remain `null`; fixture budgets are not defaults.
+The checker command above is an initial gap check: freshly prepared evidence has
+no completed catalogue references and must remain blocked.
 
 Run the catalogue adapter against a frozen bundle in the isolated Linux harness:
 
 ```sh
 .venv/bin/python tools/run_linux.py --suite qualification --evidence build/release-candidate/evidence.json
+# Replace UUID with the actual generated run identifier:
+python3 docs/mail-admin-implementation/tools/check_release.py build/release-candidate/qualification-UUID-evidence.json --phase candidate
 ```
 
 This runner verifies all four artifact hashes, the executing suite sources and
 runtime image, then executes only reviewed case mappings. It writes exact case
 arrays and a separate evidence copy under the original bundle. Unimplemented
-cases stay `not_run`, and the current incomplete catalogue returns a blocked exit.
+cases stay `not_run`. All 111 cases have mappings, but missing matching runtime
+evidence still blocks qualification. Check the generated sibling evidence file,
+which contains the run's report references; the input evidence remains unchanged.
 It never converts general unit-test counts into acceptance coverage. Target and
 deployment observation adapters are delivered separately; their regressions do not
 qualify production. See [qualification tooling](verification/qualification.md).
@@ -176,10 +187,13 @@ Its server-side container is unprivileged, memory/CPU bounded, loopback-only, an
 no host Docker socket or KVM device. VM reboots and power cuts must always target
 the recorded mock identity. This is test tooling, absent from the web image.
 
-For the larger local mock on the ARM64 Mac, use `tools/run_local_mock.py` and the
-separate native ARM64 tool-image command in
+For the larger local mock on an ARM64 Mac or amd64 Linux workstation, use
+`tools/run_local_mock.py` with a tool image matching the native engine. See the commands in
 [qualification tooling](verification/qualification.md#larger-local-mock). It retains
-an amd64 guest and records software emulation; boot/crash checks remain incomplete.
+an amd64 guest. On native amd64 Linux with an accessible `/dev/kvm`, select
+`--acceleration kvm` for hardware virtualization inside Docker. The default stays
+software emulation. Both profiles retain the same CPU and memory bounds; the KVM
+profile exposes only `/dev/kvm`, without a host disk or Docker-socket mount.
 The driver refuses remote Docker endpoints and requires spare disk and memory.
 
 Read [implementation status](verification/status.md), [operator handoff](verification/operator-handoff.md),

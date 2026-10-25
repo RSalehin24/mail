@@ -4,6 +4,7 @@ import argparse
 import smtplib
 import time
 from pathlib import Path
+from unittest.mock import patch
 from urllib.parse import urlsplit
 
 from helper.maddy import DockerMaddy
@@ -28,6 +29,21 @@ class VerifiedRepository(ResticRepository):
     def verify(self, publication):
         super().verify(publication)
         self.verified_at_ns = time.time_ns()
+
+
+class ObservedManifest:
+    def __init__(self, path, repository):
+        self.path, self.repository = path, repository
+        self.published_at_ns = None
+
+    def __call__(self, path, record):
+        verified = getattr(self.repository, 'verified_at_ns', None)
+        if path != self.path or verified is None or self.published_at_ns is not None:
+            raise RuntimeError('Trusted manifest write must follow repository verification once')
+        atomic_json(path, record)
+        self.published_at_ns = time.time_ns()
+        if self.published_at_ns < verified:
+            raise RuntimeError('Publication observation clock preceded verification')
 
 
 class ObservedCapture(SnapshotCapture):
@@ -100,11 +116,13 @@ def capture(options):
     verify_mail({'captured_body': options['message_observation']['post_capture_body']})
     if snapshot_tree(snapshot).sha256 != before or paths.manifest.exists():
         raise RuntimeError('Live mail changed immutable staging or a manifest was published early')
-    manifest = operation.transfer(snapshot)
+    publication = ObservedManifest(paths.manifest, repository)
+    with patch('host.repository_backup.atomic_json', publication):
+        manifest = operation.transfer(snapshot)
     after = snapshot_tree(snapshot).sha256
     if after != before:
         raise RuntimeError('Off-server transfer changed immutable staging')
-    if paths.manifest.stat().st_mtime_ns < repository.verified_at_ns:
+    if publication.published_at_ns is None:
         raise RuntimeError('A trusted manifest preceded actual repository download verification')
     endpoint = urlsplit(profile['backup_r2']['endpoint'])
     if endpoint.scheme != 'https' or not endpoint.hostname.endswith('.r2.cloudflarestorage.com'):
@@ -116,7 +134,8 @@ def capture(options):
         'reference': manifest['reference'], 'manifest': manifest, 'snapshot': str(snapshot),
         'content_before_live_delivery': before, 'content_after_transfer': after,
         'verified_at_ns': repository.verified_at_ns,
-        'manifest_published_at_ns': paths.manifest.stat().st_mtime_ns,
+        'manifest_published_at_ns': publication.published_at_ns,
+        'manifest_mtime_ns': paths.manifest.stat().st_mtime_ns,
         'started_at_utc': started, 'completed_at_utc': timestamp(),
         'message_observation': options['message_observation'], 'r2_host': endpoint.hostname,
     })

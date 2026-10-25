@@ -1,6 +1,8 @@
 # API contract
 
-All paths here describe the application to implement. No application API is deployed yet.
+These paths define the required application API. The API is implemented locally;
+qualification and production deployment remain pending. See the
+repository-root `verification/status.md` for source-specific results.
 
 #### [NEW] `/opt/mail-admin/backend/main.py`
 

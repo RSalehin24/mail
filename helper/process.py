@@ -15,12 +15,14 @@ class Command:
     input_bytes: bytes = b""
     timeout: float = 10
     environment: dict[str, str] | None = None
+    merge_stderr: bool = True
 
 
 @dataclass(frozen=True)
 class CommandResult:
     code: int
     output: str
+    error_output: str = ""
 
 
 def execute(command: Command) -> CommandResult:
@@ -29,7 +31,7 @@ def execute(command: Command) -> CommandResult:
         command.arguments,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        stderr=subprocess.STDOUT if command.merge_stderr else subprocess.PIPE,
         env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", **(command.environment or {})},
         close_fds=True,
     )
@@ -38,7 +40,9 @@ def execute(command: Command) -> CommandResult:
             raise ServiceError("command_channel_failed", 503)
         process.stdin.write(command.input_bytes)
         process.stdin.close()
-        return _collect(process, command.timeout)
+        if command.merge_stderr:
+            return _collect(process, command.timeout)
+        return _collect(process, command.timeout, True)
     except (OSError, ServiceError, subprocess.TimeoutExpired) as error:
         process.kill()
         process.wait(timeout=2)
@@ -46,14 +50,23 @@ def execute(command: Command) -> CommandResult:
     finally:
         if process.stdout is not None:
             process.stdout.close()
+        if process.stderr is not None:
+            process.stderr.close()
 
 
-def _collect(process: subprocess.Popen[bytes], timeout: float) -> CommandResult:
+def _collect(
+    process: subprocess.Popen[bytes], timeout: float, separate_stderr: bool = False,
+) -> CommandResult:
     if process.stdout is None:
         raise ServiceError("command_channel_failed", 503)
     deadline, output = time.monotonic() + timeout, bytearray()
+    errors = bytearray()
     with selectors.DefaultSelector() as selector:
-        selector.register(process.stdout, selectors.EVENT_READ)
+        selector.register(process.stdout, selectors.EVENT_READ, output)
+        if separate_stderr:
+            if process.stderr is None:
+                raise ServiceError("command_channel_failed", 503)
+            selector.register(process.stderr, selectors.EVENT_READ, errors)
         while selector.get_map():
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -62,10 +75,11 @@ def _collect(process: subprocess.Popen[bytes], timeout: float) -> CommandResult:
                 chunk = os.read(key.fd, 4096)
                 if not chunk:
                     selector.unregister(key.fileobj)
-                output.extend(chunk)
-                if len(output) > 65536:
+                key.data.extend(chunk)
+                if len(output) + len(errors) > 65536:
                     raise ServiceError("command_output_limit", 503)
         return CommandResult(
             process.wait(timeout=max(0.01, deadline - time.monotonic())),
             output.decode("utf-8", errors="replace"),
+            errors.decode("utf-8", errors="replace"),
         )

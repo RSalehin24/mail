@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from tools.fixture_images import ACME_IMAGES  # noqa: E402
-from tools.maddy_fixture import MADDY_FIXTURE_IMAGE  # noqa: E402
+from tools.maddy_fixture import fixture_reference  # noqa: E402
 from tools.maddy_modules import MODULE_TIMEOUT_SECONDS, module_inventory  # noqa: E402
 from tools.resources import FIXTURE_DISK_RESERVE_BYTES, fixture_budget  # noqa: E402
 from tools.run_tests import source_digest  # noqa: E402
@@ -118,13 +118,11 @@ def local_archive(path: Path) -> str:
             "docker",
             "image",
             "save",
-            "--platform",
-            "linux/amd64",
             "-o",
             str(raw),
             "mail-admin:candidate",
             "mail-admin:qualification",
-            MADDY_FIXTURE_IMAGE,
+            fixture_reference(),
             *ACME_IMAGES,
         )
     )

@@ -74,7 +74,7 @@ class CertificateFixture:
         self.trust = directory / "fixture-ca.pem"
         self.trust.write_bytes(self.ca.public_bytes(serialization.Encoding.PEM))
 
-    def issue(self, name="valid", hostname="mail.rsalehin24.me", expired=False):
+    def issue(self, name="valid", hostname="mail.rsalehin24.me", expired=False, loopback=True):
         directory = self.directory / name
         directory.mkdir(mode=0o700)
         key = ec.generate_private_key(ec.SECP256R1())
@@ -93,7 +93,7 @@ class CertificateFixture:
                         x509.DNSName(hostname),
                         x509.DNSName("localhost"),
                         x509.IPAddress(ipaddress.ip_address("127.0.0.1")),
-                    ]
+                    ] if loopback else [x509.DNSName(hostname)]
                 ),
                 False,
             )

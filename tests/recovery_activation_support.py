@@ -1,10 +1,8 @@
 """Activate only installed synthetic state, then verify its real helper, mail and HTTPS."""
 
 import hashlib
-import imaplib
 import json
 import sqlite3
-import ssl
 import time
 from contextlib import closing
 from pathlib import Path
@@ -17,6 +15,7 @@ from shared.files import atomic_json, protected_json
 from shared.runtime_policy import RuntimePolicy
 from tests.fixture_values import LIFECYCLE_MAILBOX_PASSWORD
 from tests.fixture_values import REPLACEMENT_PASSWORD as LEGACY_FIXTURE_PASSWORD
+from tests.host_tls_support import LoopbackImap, recovery_context
 from tests.recovery_install_support import command
 from tests.recovery_web_support import (
     RecoveredHttps,
@@ -35,8 +34,7 @@ def credential_digest():
 
 
 def verify_mail(expected=None):
-    context = ssl.create_default_context(cafile='/opt/maddy/tls/fixture/fullchain.pem')
-    with imaplib.IMAP4_SSL('127.0.0.1', 993, ssl_context=context, timeout=5) as connection:
+    with LoopbackImap(recovery_context(), 5) as connection:
         connection.login(MAILBOX, LIFECYCLE_MAILBOX_PASSWORD)
         if connection.select('INBOX')[0] != 'OK':
             raise RuntimeError('Restored fixture inbox unavailable')

@@ -71,12 +71,14 @@ class ResticTests(unittest.TestCase):
 
     def test_progress_is_suppressed_without_losing_the_machine_readable_completion_summary(self):
         summary = json.dumps({'message_type': 'summary', 'snapshot_id': 'd' * 64})
-        with patch('host.restic_process.execute', return_value=CommandResult(0, summary)) as run:
+        with patch('host.restic_process.execute',
+                   return_value=CommandResult(0, summary, 'backend diagnostic\n')) as run:
             self.assertEqual(self.process.run(('backup', '/synthetic-snapshot')), summary)
         arguments = run.call_args.args[0].arguments
         self.assertIn('--quiet', arguments)
         self.assertIn('--json', arguments)
         self.assertEqual(run.call_args.args[0].timeout, 30)
+        self.assertFalse(run.call_args.args[0].merge_stderr)
 
     def test_publisher_uses_the_verified_restic_time_format_and_utc_environment(self):
         snapshot = self.repository.staging / str(uuid.uuid4())

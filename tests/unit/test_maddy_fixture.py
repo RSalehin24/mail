@@ -4,6 +4,8 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from tools.maddy_fixture import (
+    LINUX_MADDY_FIXTURE_CONFIGURATION,
+    LINUX_MADDY_FIXTURE_IMAGE,
     MADDY_FIXTURE_CONFIGURATION,
     MADDY_FIXTURE_IMAGE,
     fixture_reference,
@@ -17,6 +19,17 @@ def observed(identity, architecture='amd64'):
 
 
 class MaddyFixtureIdentityTests(unittest.TestCase):
+    def test_linux_rebuild_requires_its_exact_recorded_index_or_configuration(self):
+        missing = SimpleNamespace(returncode=1, stdout='')
+        with patch('tools.maddy_fixture.subprocess.run', side_effect=[
+            missing, missing, observed(LINUX_MADDY_FIXTURE_IMAGE),
+        ]):
+            self.assertEqual(fixture_reference(), LINUX_MADDY_FIXTURE_IMAGE)
+        with patch('tools.maddy_fixture.subprocess.run', side_effect=[
+            missing, missing, missing, observed(LINUX_MADDY_FIXTURE_CONFIGURATION),
+        ]):
+            self.assertEqual(fixture_reference(), LINUX_MADDY_FIXTURE_CONFIGURATION)
+
     def test_classic_store_selects_only_the_configuration_from_the_approved_oci_archive(self):
         missing = SimpleNamespace(returncode=1, stdout='')
         with patch('tools.maddy_fixture.subprocess.run', side_effect=[

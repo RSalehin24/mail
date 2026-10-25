@@ -1,7 +1,6 @@
 """Trusted local HTTPS and matched-image assertions for full-host recovery fixtures."""
 
 import json
-import ssl
 import stat
 import subprocess
 import time
@@ -10,6 +9,7 @@ from pathlib import Path
 from tests.fixture_values import REPLACEMENT_PASSWORD
 from tests.host_factor_support import totp
 from tests.host_https_support import request
+from tests.host_tls_support import recovery_context
 
 AUTHENTICATION_CHECK = """import json,sys
 from argon2.exceptions import VerifyMismatchError
@@ -54,7 +54,7 @@ def verify_closed_authentication(tools, old):
 
 class RecoveredHttps:
     def __init__(self, timeout=5, password=REPLACEMENT_PASSWORD):
-        self.context = ssl.create_default_context(cafile='/opt/maddy/tls/fixture/fullchain.pem')
+        self.context = recovery_context()
         self.cookie, self.timeout = '', timeout
         self.password = password
 

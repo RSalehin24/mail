@@ -37,7 +37,7 @@ def qualify(evidence: Path, identifier: str = 'T08') -> dict:
         "guest_instance_id": host.record["instance_id"],
         "guest_boot_id": Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
         "runtime_image_id": host.record["runtime_image_id"],
-        "acceleration": "software-emulation", **before,
+        "virtualization": host.command(('systemd-detect-virt', '--vm')), **before,
     }
     write_record(directory / (identifier + '.json'), report)
     updated = copy.deepcopy(bundle.context["evidence"])

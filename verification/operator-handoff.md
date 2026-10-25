@@ -3,6 +3,9 @@
 The application and synthetic test harness are reviewable. This is not an approval
 to deploy. Use the authoritative [G01–G08 rollout](../docs/mail-admin-implementation/operations/rollout.md).
 Do not combine its phases into an unattended install command.
+For workstation setup and retained historical evidence, see the
+[Linux continuation](linux-continuation.md). Private artifacts referenced below
+are not included in a source clone.
 
 ## Inputs still required
 
@@ -229,7 +232,8 @@ session-revocation procedure. No automatic restart action is exposed by the web 
 Remote fixture testing was explicitly authorized on the existing server through
 `deployer`. This authorization covers the isolated mock, not live rollout, host
 reboot, DNS changes, production credential resets, mailbox deletion or external mail.
-G01 remains blocked until all isolated catalogue cases are implemented and qualified.
+All 111 isolated catalogue cases have mappings; G01 remains blocked until all pass
+against matching artifacts and the candidate evidence checker passes.
 G02–G08 remain blocked until their prerequisites and operator inputs are complete.
 
 The helper unit is enabled for both `multi-user.target` and `docker.service`.

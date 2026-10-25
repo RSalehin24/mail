@@ -1,5 +1,6 @@
 import json
 import os
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -23,7 +24,14 @@ class HostAlertDeliveryTests(AlertDeliveryFixture):
         self.monitor.configuration = {'inputs': {'disk_free_minimum_bytes': 1,
             'inode_free_minimum': 1, 'recovery_point_seconds': 93600}}
         self.filesystem = os.statvfs
-        self.capacity = self.filesystem(self.state.root)
+        self.capacity_root = self.state.root
+        if self.filesystem(self.capacity_root).f_files == 0:
+            # Btrfs has dynamically allocated inodes and reports no fixed pool.
+            # Exercise thresholds on an actual bounded tmpfs inode pool instead.
+            capacity = tempfile.TemporaryDirectory(prefix='mail-admin-capacity-', dir='/dev/shm')
+            self.addCleanup(capacity.cleanup)
+            self.capacity_root = Path(capacity.name)
+        self.capacity = self.filesystem(self.capacity_root)
         validator = PairValidator(self.issuer.trust, openssl_executable())
         self.certificate = validator.validate(self.issuer.issue())
         self.write_healthy()
@@ -40,7 +48,7 @@ class HostAlertDeliveryTests(AlertDeliveryFixture):
 
     def actual_capacity(self, path):
         self.assertEqual(path, '/opt/maddy/data')
-        return self.filesystem(self.state.root)
+        return self.filesystem(self.capacity_root)
 
     def host_scope(self):
         scope = self.delivery_scope()

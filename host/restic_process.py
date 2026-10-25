@@ -147,7 +147,8 @@ class ResticProcess:
                   "executable_sha256": self.identity.executable_sha256,
                   "arguments_sha256": hashlib.sha256(json.dumps(command).encode()).hexdigest()}
         atomic_json(path, record)
-        result = execute(Command(command, timeout=self.timeout, environment=environment))
+        result = execute(Command(command, timeout=self.timeout, environment=environment,
+                                 merge_stderr=False))
         atomic_json(path, {**record, "state": "exited", "exit_code": result.code})
         self._remove_cache(cache)
         self._prune_completed()

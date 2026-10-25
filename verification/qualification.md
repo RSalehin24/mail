@@ -8,6 +8,11 @@ skip, expected failure, test-loading error or changed source cannot pass a case.
 All 111 cases now have reviewed local/host assertion mappings. G01 remains blocked
 until their actual matching execution and the candidate checker pass. A mapping is
 not an executed acceptance result. See the [111-case work list](qualification-worklist.md).
+The latest Linux frozen catalogue (`31fdf6af`) completed at 95 passed, 0 failed
+and 16 not run. Complete matching host/recovery observations are still missing.
+The historical Mac catalogue (`a70f7897`) remains at 94 passed, 1 failed and
+16 not run on its original workstation. See the
+[continuation checkpoint](linux-continuation.md) for artifact identities and setup.
 
 The isolated Maddy postmaster patch and pinned build inputs were approved. Its
 fixture image is restricted to the exact OCI/configuration identities in
@@ -17,8 +22,14 @@ parser regression and provenance are described in
 
 `tools/run_https_browser.py --evidence BUNDLE/evidence.json` exercises the actual
 HTTPS runtime with an isolated Chrome profile and a specific fixture-leaf SPKI pin.
-The source-frozen `tools/browser-fixture.json` binds the existing Node, Chrome
-launcher and Chrome framework by path, hash and version before and after execution.
+The source-frozen `tools/browser-fixture.json` (macOS) and
+`tools/browser-fixture-linux.json` (Linux) bind the existing Node and Chrome
+executables by path, hash and version before and after execution. Legacy macOS
+inputs also bind the Chrome framework hash. Linux inputs require an explicit
+`"platform": "linux"` and exactly the `node` and `chrome` entries; each entry has
+`path`, `sha256` and `version`. The Linux manifest pins this workstation’s installed Node 24.22.1 and Chrome
+156.0.8078.47. Review any replacement binaries before freezing a new candidate;
+`MAIL_ADMIN_CHROME` cannot bypass platform, path, hash or version checks.
 The catalogue rejects development, changed-runner, stale or differently bound
 browser reports. The private material remains in the bounded fixture directory.
 
@@ -71,8 +82,9 @@ in a fresh development controller (`build/fresh-restic-qualification-controller-
 Assembly requires each frozen module's exact assertions, artifact/image bindings
 and observed controller exit without OOM; shared assertions execute once and keep
 their original execution start time. Unmapped cases remain `not_run`, and a missing
-module/controller observation prevents assembly. This runner change still needs a
-complete final frozen catalogue run; its focused resource regression is not G01.
+module/controller observation prevents assembly. The later `a70f7897` catalogue
+completed all 63 modules with the incomplete qualification result recorded above;
+its focused resource regression alone does not establish G01.
 
 Host assertions can also supply part of a case: T22.02 requires both the database
 history/container-log assertions and the independent guest-journal assertion.
@@ -102,7 +114,7 @@ checks use real Unix transport and reject non-integer versions and non-boolean
 success flags without committing mailbox metadata. T20.01/T20.03 mappings require
 their own final frozen execution.
 
-Catalogue groups now execute in fresh controllers under the same 192 MiB limit.
+Historically, catalogue groups executed in fresh controllers under the same 192 MiB limit.
 The source `47dccdce` monolithic controller was OOM-killed after the separate suites
 had passed. That incomplete attempt is preserved. The driver records each group's
 container identity before starting it, observes its actual exit/OOM status, and
@@ -111,7 +123,9 @@ and missing reports stop assembly. The final assembler requires all groups, matc
 artifact/image identities and the exact assertions for each passing case. Failed,
 skipped and unmapped assertions cannot become passes. Per-group controller progress
 and outcomes remain beside the final case reports. This changes test supervision;
-it does not increase application/controller memory or application readiness deadlines.
+it did not increase application/controller memory or application readiness deadlines.
+The current driver supersedes that group-level execution with module isolation;
+group reports are assembled from the exact module assertions.
 
 The approved private ACME fixture uses pinned Certbot 5.8.0, Pebble 2.10.1 and
 its DNS helper on an internal Docker network. Actual HTTP-01 validation remains
@@ -122,8 +136,9 @@ activation of Maddy/HTTPS consumers, first deployment absence and missing deploy
 consumers. Pending activation is resumed in a new Python process from durable
 state without invoking Certbot. The corrected complete run passed at source
 `47dccdce` (`build/private-acme-clean-rebuild-complete.log`). T15.01, T15.02,
-T15.04 and T15.05 now have assertion mappings; staging/crash boundaries and
-retention/reboot cases remain unmapped. A development suite pass does not promote
+T15.04 and T15.05 had assertion mappings at that snapshot. Staging/crash boundaries
+and retention/reboot cases are now mapped but still lack matching host observations.
+A development suite pass does not promote
 those mappings to frozen acceptance passes.
 
 The Linux driver checks source and runtime file identities before creating its
@@ -209,8 +224,8 @@ Only after all comparisons succeed does the adapter return the three qualified
 archive/configuration hashes plus the observed Maddy image ID. It starts no
 services and changes no deployment state.
 
-Adapter unit regressions are development checks. T01.05 still needs its complete
-isolated execution and binding through the trusted catalogue runner. Full
+Adapter unit regressions are development checks. T01.05 passed in the recorded
+`a70f7897` catalogue and requires fresh execution for a changed candidate. Full
 boot/reboot/crash/cutover/rollback, all remaining catalogue assertions, whole-host
 resource measurements and production acceptance are separate outstanding work.
 Do not fill gaps with fixture reports, plan/model passes or copied expectations.
@@ -219,9 +234,10 @@ Do not fill gaps with fixture reports, plan/model passes or copied expectations.
 
 The shared-server mock's 256 MiB guest did not establish a usable application host.
 `tools/run_local_mock.py` prepares a separate 1024 MiB amd64 guest inside a native
-ARM64 QEMU tool container on the local ARM64 Docker engine. Its kernel, systemd and
-Docker daemon are real; its CPU is software-emulated. This cannot establish native
-production performance. The pinned guest Docker payload remains Linux/amd64 even
+ARM64 or amd64 QEMU tool container matching the local Linux Docker engine. Its kernel, systemd and
+Docker daemon are real; its default CPU profile uses software emulation. On amd64
+Linux, the optional KVM profile uses hardware virtualization inside Docker.
+Neither fixture alone establishes production performance. The pinned guest Docker payload remains Linux/amd64 even
 when QEMU itself is ARM64.
 
 ```sh
@@ -230,10 +246,28 @@ docker build --platform linux/arm64 -f tools/vm/Dockerfile --build-arg MOCK_BASE
 .venv/bin/python tools/run_local_mock.py guest build/RECORDED_LOCAL_MOCK/state.json uname -m
 ```
 
-Admission requires a Unix endpoint, the same ARM64 engine, 3 GiB free on both Mac
-and Linux disk, and 1408 MiB available Linux memory. The container has a 1280 MiB
+On amd64 Linux, build the same Dockerfile with `--platform linux/amd64` and its
+default pinned base, then pass that image to `create`. The guest remains amd64
+with software emulation and the same memory/CPU limits. Image and engine
+architecture must match; another architecture or engine cannot control an old guest.
+
+With an accessible `/dev/kvm` on native amd64 Linux, use hardware acceleration:
+
+```sh
+docker build --platform linux/amd64 -f tools/vm/Dockerfile -t mail-admin:local-mock-kvm-amd64 .
+.venv/bin/python tools/run_local_mock.py --acceleration kvm create mail-admin:local-mock-kvm-amd64
+```
+
+KVM is selected explicitly, recorded in fixture state and required by QEMU; there
+is no silent fallback to emulation. The controller exposes only `/dev/kvm` with
+read/write access. All other host devices remain unavailable, and the guest uses
+its own private disk, kernel and Docker daemon. No host Docker socket is mounted.
+
+Admission requires a Unix endpoint, the same native engine, 3 GiB free on both
+workstation and Linux engine disk, and 1408 MiB available Linux memory. The container has a 1280 MiB
 memory/swap bound, one CPU, 64 tasks, a read-only root, no capabilities, no host
-devices or Docker socket, and one private Linux volume. Only its guest SSH port is
+storage devices or Docker socket, and one private Linux volume. The default profile
+exposes no host device; KVM exposes only its virtualization device. Only its guest SSH port is
 published on loopback. Separate private SSH keys/trust and exact image/container/
 engine/volume identities scope controls. Failed setup remains available for review;
 this driver removes no disks, reports, images or caches. Offline initial preparation
@@ -251,7 +285,7 @@ Mac disk space without removing another file or changing the remote server.
 No application deadlines or shared-server resource reserves were relaxed.
 If Docker no longer retains the old tool image reference after a later tool rebuild,
 restart admission can use `--capacity-image sha256:...` before `start-existing`.
-The supplied utility must be an immutable, native ARM64 image running as
+The supplied utility must be an immutable image matching the recorded native engine, running as
 `10001:10001`; it only measures capacity with the same restricted utility container.
 The existing mock container ID, original image, volume and memory limits remain
 unchanged. Wrong-platform/root/mutable utilities are rejected. The old missing-image
@@ -366,13 +400,11 @@ The restored web fixture now closes before the original Maddy fixture resumes,
 including on failure; this prevents an unbudgeted 128 MiB/96 MiB overlap. The
 two-Maddy companion budget and the additional host reserve remain unchanged.
 
-The catalogue executes a shared assertion once per frozen group controller.
-Every dependent case still records its exact reviewed assertion set. Only a complete
-successful execution enters the in-memory run cache; failed, skipped, incomplete or
-misidentified assertions cannot be reused. Every group starts with an empty cache;
-assertions needed by different groups execute again in their separate controllers. Group
-timestamps include the actual start of the shared execution, and frozen source,
-artifact and runtime bindings are checked as before. This removes measured duplicate
-fixture work within one run; it does not import development or older-source reports.
-Runner regressions cover reuse, fresh-run isolation, failure/skip/mismatch rejection
-and accurate execution timestamps.
+The current catalogue executes each assertion module once in its own frozen
+controller. Every dependent case records its exact reviewed assertion set, and
+group reports reference those module outcomes. Shared assertions keep their actual
+execution start time. Resume reuses only verified successful module reports under
+the identity, freshness and controller checks above; it never imports development
+or older-source results. Failed, skipped, incomplete or misidentified assertions
+cannot qualify a case. Runner regressions cover reuse, fresh-run isolation,
+failure/skip/mismatch rejection and accurate execution timestamps.

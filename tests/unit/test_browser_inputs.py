@@ -31,6 +31,34 @@ class BrowserInputTests(unittest.TestCase):
         environment = patch.dict(os.environ, {'MAIL_ADMIN_CHROME': str(chrome)})
         environment.start()
         self.addCleanup(environment.stop)
+        platform = patch('tools.browser_inputs.sys.platform', 'darwin')
+        platform.start()
+        self.addCleanup(platform.stop)
+
+    def test_linux_checks_pinned_binaries_without_a_macos_framework(self):
+        self.expected.pop('chrome_framework')
+        self.expected['platform'] = 'linux'
+        inputs = self.paths['node'].parent / 'inputs.json'
+        inputs.write_text(json.dumps(self.expected))
+        with (patch('tools.browser_inputs.sys.platform', 'linux'),
+              patch('tools.browser_inputs.shutil.which', return_value=str(self.paths['node'])),
+              patch('tools.browser_inputs.version', side_effect=[
+                  'approved node', 'approved chrome'])):
+            self.assertEqual(runner_inputs(), self.expected)
+        self.paths['chrome'].write_bytes(b'unreviewed replacement')
+        with (patch('tools.browser_inputs.sys.platform', 'linux'),
+              patch('tools.browser_inputs.shutil.which', return_value=str(self.paths['node'])),
+              patch('tools.browser_inputs.version') as version,
+              self.assertRaisesRegex(RuntimeError, 'files differ')):
+            runner_inputs()
+        version.assert_not_called()
+
+    def test_foreign_platform_is_rejected_before_binary_execution(self):
+        with (patch('tools.browser_inputs.sys.platform', 'linux'),
+              patch('tools.browser_inputs.version') as version,
+              self.assertRaisesRegex(RuntimeError, 'platform')):
+            runner_inputs()
+        version.assert_not_called()
 
     def test_changed_framework_cannot_execute_or_reuse_a_previous_runner_version(self):
         self.paths['chrome_framework'].write_bytes(b'changed framework after freeze')

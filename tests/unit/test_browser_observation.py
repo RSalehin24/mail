@@ -2,6 +2,7 @@
 
 import copy
 import os
+import platform
 import unittest
 from datetime import UTC, datetime
 from types import SimpleNamespace
@@ -22,6 +23,7 @@ class BrowserObservationTests(unittest.TestCase):
             'images': {'mail-admin:candidate': 'runtime', 'mail-admin:qualification': 'suite'},
             'source_sha256': 'b' * 64, 'result': 'pass',
             'runner_inputs': pinned_inputs(),
+            'browser_system': platform.system(),
             'started_at_utc': '2026-10-24T00:00:00+00:00',
             'completed_at_utc': '2026-10-24T00:01:00+00:00',
             'browser': {'result': 'pass', 'started_at_utc': '2026-10-24T00:00:10Z',
@@ -37,6 +39,17 @@ class BrowserObservationTests(unittest.TestCase):
 
     def test_matching_completed_browser_observation_is_accepted(self):
         validate_browser_report(self.report, self.bundle)
+
+    def test_linux_controller_checks_the_browser_workstations_own_frozen_platform_pins(self):
+        for system in ('Linux', 'Darwin'):
+            report = {**self.report, 'browser_system': system,
+                      'runner_inputs': pinned_inputs(system)}
+            validate_browser_report(report, self.bundle)
+        with self.assertRaises(ValueError):
+            validate_browser_report({**self.report, 'browser_system': 'Darwin',
+                                     'runner_inputs': pinned_inputs('Linux')}, self.bundle)
+        with self.assertRaises(ValueError):
+            validate_browser_report({**self.report, 'browser_system': 'unknown'}, self.bundle)
 
     def test_development_wrong_source_images_identity_or_failed_browser_are_rejected(self):
         for change in ({'scope': 'development-https-browser'}, {'identity': {}},

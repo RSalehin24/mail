@@ -1,15 +1,15 @@
 """Local fixture transport preserves the application's actual Host and Origin policy."""
 
-import http.client
 import json
 
 from shared.validation import MAIL_HOST
+from tests.host_tls_support import LoopbackHttps
 
 
 def request(transport, message, cookie):
     context, timeout = transport
     method, path, body = message
-    connection = http.client.HTTPSConnection('127.0.0.1', 443, context=context, timeout=timeout)
+    connection = LoopbackHttps(context, timeout)
     headers = {'Host': MAIL_HOST, 'Origin': 'https://' + MAIL_HOST,
                'Content-Type': 'application/json'}
     if cookie:

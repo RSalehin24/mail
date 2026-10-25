@@ -72,14 +72,19 @@ def guest_memory() -> str:
 
 
 def qemu_arguments(memory: str) -> tuple[str, ...]:
+    acceleration = os.environ.get("MOCK_ACCELERATION", "tcg")
+    if acceleration not in {"tcg", "kvm"}:
+        raise RuntimeError("Unknown guest acceleration")
+    if acceleration == "kvm" and os.environ.get("MOCK_LOCAL_REPLACEMENT") != "1":
+        raise RuntimeError("KVM requires the explicit local replacement profile")
     return (
         "qemu-system-x86_64",
         "-machine",
         "q35",
         "-accel",
-        "tcg,thread=single,tb-size=32",
+        "kvm" if acceleration == "kvm" else "tcg,thread=single,tb-size=32",
         "-cpu",
-        "max",
+        "host" if acceleration == "kvm" else "max",
         "-smp",
         "1",
         "-m",
@@ -92,12 +97,20 @@ def qemu_arguments(memory: str) -> tuple[str, ...]:
         "none",
         "-rtc",
         "base=utc,clock=host",
+        "-object",
+        "iothread,id=fixture-io,thread-pool-min=1,thread-pool-max=2",
         "-drive",
-        "file=/fixture/disk.qcow2,if=virtio,format=qcow2,cache=writeback",
+        "file=/fixture/disk.qcow2,if=none,id=fixture-disk,format=qcow2,cache=writeback",
+        "-device",
+        "virtio-blk-pci,drive=fixture-disk,iothread=fixture-io",
         "-drive",
-        "file=/fixture/swap.raw,if=virtio,format=raw,cache=writeback",
+        "file=/fixture/swap.raw,if=none,id=fixture-swap,format=raw,cache=writeback",
+        "-device",
+        "virtio-blk-pci,drive=fixture-swap,iothread=fixture-io",
         "-drive",
-        "file=/fixture/seed.iso,if=virtio,format=raw,readonly=on",
+        "file=/fixture/seed.iso,if=none,id=fixture-seed,format=raw,readonly=on",
+        "-device",
+        "virtio-blk-pci,drive=fixture-seed,iothread=fixture-io",
         "-nic",
         "user,model=virtio-net-pci,hostfwd=tcp:0.0.0.0:2222-:22",
     )

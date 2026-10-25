@@ -2,6 +2,7 @@ import concurrent.futures
 import os
 import sqlite3
 import unittest
+from unittest.mock import Mock, patch
 
 from backend.budgets import BudgetReservation, Budgets
 from backend.database import Database
@@ -17,6 +18,46 @@ class StateTests(unittest.TestCase):
     def setUp(self):
         self.fixture = StateFixture()
         self.addCleanup(self.fixture.close)
+
+    def test_local_writer_timeout_leaves_no_partial_reservation_and_releases_the_lock(self):
+        def reserve_while_held():
+            try:
+                with self.fixture.database.transaction() as connection:
+                    connection.execute(
+                        "INSERT INTO auth_rate_limits(bucket,peer,reserved_at) "
+                        "VALUES('auth','blocked',0)"
+                    )
+            except ServiceError as error:
+                return error.code, error.status
+            return 'unexpected_success', 200
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as workers:
+            with self.fixture.database.transaction():
+                result = workers.submit(reserve_while_held).result(timeout=2)
+                self.assertEqual(result, ('storage_unavailable', 503))
+        with self.fixture.database.transaction() as connection:
+            self.assertEqual(connection.execute(
+                "SELECT COUNT(*) FROM auth_rate_limits WHERE peer='blocked'"
+            ).fetchone()[0], 0)
+            connection.execute(
+                "INSERT INTO auth_rate_limits(bucket,peer,reserved_at) "
+                "VALUES('auth','after-timeout',0)"
+            )
+
+    def test_close_failure_cannot_strand_the_next_database_writer(self):
+        connection = Mock()
+        connection.close.side_effect = sqlite3.OperationalError('synthetic close failure')
+        with (patch('backend.database.sqlite3.connect', return_value=connection),
+              self.assertRaises(sqlite3.OperationalError)):
+            with self.fixture.database.transaction():
+                pass
+
+        def next_writer():
+            with self.fixture.database.transaction() as actual:
+                return actual.execute('SELECT 1').fetchone()[0]
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as workers:
+            self.assertEqual(workers.submit(next_writer).result(timeout=2), 1)
 
     def test_missing_wrong_marker_and_wrong_schema_fail_closed(self):
         with self.assertRaises(ServiceError):

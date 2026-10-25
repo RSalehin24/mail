@@ -4,12 +4,46 @@ import unittest
 from unittest.mock import patch
 
 from tests.support import StateFixture
-from tools.run_local_mock import LocalMock, launch_arguments, local_engine, require_capacity
+from tools.run_local_mock import (
+    LocalMock,
+    create,
+    launch_arguments,
+    local_engine,
+    require_capacity,
+    verify_capacity_image,
+)
 from tools.vm.mock_profile import LOCAL_CONTAINER_MEMORY_MIB
-from tools.vm.start import guest_memory
+from tools.vm.start import guest_memory, qemu_arguments
 
 
 class LocalMockTests(unittest.TestCase):
+    def test_kvm_profile_exposes_only_virtualization_without_expanding_limits(self):
+        record = {**self.record, 'acceleration': 'kvm', 'engine_architecture': 'amd64'}
+        arguments = launch_arguments(record)
+        self.assertEqual(arguments[arguments.index('--device') + 1], '/dev/kvm:/dev/kvm:rw')
+        self.assertEqual(arguments[arguments.index('--memory') + 1], '1280m')
+        self.assertEqual(arguments[arguments.index('--cpus') + 1], '1')
+        self.assertNotIn('--privileged', arguments)
+        with patch.dict('os.environ', {'MOCK_ACCELERATION': 'kvm',
+                                     'MOCK_LOCAL_REPLACEMENT': '1'}):
+            qemu = qemu_arguments('1024')
+            self.assertEqual(qemu[qemu.index('-accel') + 1], 'kvm')
+            self.assertEqual(qemu[qemu.index('-cpu') + 1], 'host')
+        with (patch.dict('os.environ', {'MOCK_ACCELERATION': 'kvm'}, clear=True),
+              self.assertRaisesRegex(RuntimeError, 'explicit local')):
+            qemu_arguments('1024')
+
+    def test_kvm_cannot_be_selected_without_the_device_or_on_an_arm_engine(self):
+        for architecture, access in (('amd64', False), ('arm64', True)):
+            with (self.subTest(architecture=architecture),
+                  patch('tools.run_local_mock.local_engine', return_value={
+                      'Architecture': architecture}), patch('tools.run_local_mock.os.umask'),
+                  patch('tools.run_local_mock.os.access', return_value=access),
+                  patch('tools.run_local_mock.docker') as docker,
+                  self.assertRaisesRegex(RuntimeError, 'virtualization device')):
+                create('fixture', 'kvm')
+            docker.assert_not_called()
+
     def setUp(self):
         self.fixture = StateFixture()
         self.addCleanup(self.fixture.close)
@@ -48,6 +82,57 @@ class LocalMockTests(unittest.TestCase):
             local_engine()
         execute.assert_called_once_with(("context", "inspect"))
 
+    def test_native_amd64_engine_is_admitted_and_other_architectures_are_rejected(self):
+        context = [{"Endpoints": {"docker": {"Host": "unix:///var/run/docker.sock"}}}]
+        for architecture in ('x86_64', 'amd64', 'aarch64', 'arm64', 'riscv64'):
+            engine = {'ID': 'engine', 'OSType': 'linux', 'Architecture': architecture}
+            with (self.subTest(architecture=architecture),
+                  patch('tools.run_local_mock.docker', side_effect=[
+                      json.dumps(context), json.dumps(engine)])):
+                if architecture == 'riscv64':
+                    with self.assertRaisesRegex(RuntimeError, 'native'):
+                        local_engine()
+                else:
+                    self.assertEqual(local_engine(), engine)
+
+    def test_amd64_guest_cannot_use_an_arm_tool_image_or_changed_engine(self):
+        engine = {'ID': 'engine', 'OSType': 'linux', 'Architecture': 'x86_64'}
+        image = {'Os': 'linux', 'Architecture': 'arm64', 'Config': {'User': '10001:10001'}}
+        with (patch('tools.run_local_mock.local_engine', return_value=engine),
+              patch('tools.run_local_mock.os.umask'),
+              patch('tools.run_local_mock.docker', return_value=json.dumps([image])) as execute,
+              self.assertRaisesRegex(RuntimeError, 'native unprivileged')):
+            create('fixture')
+        execute.assert_called_once_with(('image', 'inspect', 'fixture'))
+        self.record['engine_architecture'] = 'x86_64'
+        self.state.write_text(json.dumps(self.record))
+        with (patch('tools.run_local_mock.local_engine', return_value={
+                  **engine, 'Architecture': 'aarch64'}),
+              patch('tools.run_local_mock.docker') as execute,
+              self.assertRaisesRegex(RuntimeError, 'engine changed')):
+            LocalMock(self.state).control('power-cut')
+        execute.assert_not_called()
+
+    def test_amd64_restart_requires_native_utility_and_keeps_resource_bounds(self):
+        selected = 'sha256:' + 'c' * 64
+        image = {'Id': selected, 'Os': 'linux', 'Architecture': 'amd64',
+                 'Config': {'User': '10001:10001'}}
+        self.record['engine_architecture'] = 'x86_64'
+        self.state.write_text(json.dumps(self.record))
+        with (patch.object(LocalMock, 'inspect', return_value=self.inspection),
+              patch('tools.run_local_mock.docker', return_value=json.dumps([image])),
+              patch('tools.run_local_mock.require_capacity') as capacity):
+            LocalMock(self.state).control('start-existing', selected)
+        capacity.assert_called_once_with(selected, self.record['volume'], 'x86_64')
+        with (patch('tools.run_local_mock.docker', return_value=json.dumps([image])),
+              self.assertRaises(ValueError)):
+            verify_capacity_image(selected, 'arm64')
+        arguments = launch_arguments(self.record)
+        self.assertEqual(arguments[arguments.index('--platform') + 1], 'linux/amd64')
+        self.assertEqual(arguments[arguments.index('--memory') + 1], '1280m')
+        self.assertEqual(arguments[arguments.index('--memory-swap') + 1], '1280m')
+        self.assertNotIn('--device', arguments)
+
     def test_local_profile_cannot_expand_an_existing_shared_host_limit(self):
         with patch.dict("os.environ", {
             "MOCK_GUEST_MEMORY_MIB": "1024", "MOCK_LOCAL_REPLACEMENT": "1",
@@ -69,6 +154,9 @@ class LocalMockTests(unittest.TestCase):
             {"Mounts": [{"Type": "bind", "Source": "/opt/maddy", "Destination": "/fixture"}]},
             {"HostConfig": {**self.inspection["HostConfig"], "Privileged": True}},
             {"HostConfig": {**self.inspection["HostConfig"], "MemorySwap": -1}},
+            {"HostConfig": {**self.inspection["HostConfig"], "Devices": [{
+                'PathOnHost': '/dev/sda', 'PathInContainer': '/dev/sda',
+                'CgroupPermissions': 'rwm'}]}},
         )
         for mutation in mutations:
             with (

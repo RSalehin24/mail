@@ -98,7 +98,8 @@ async function relay(connection) {
   assert.equal(await connection.read(`document.querySelector('[role=dialog]').textContent.includes(${JSON.stringify(material.relay_key)})`), false);
   await connection.click({ tag: 'button', name: 'Reveal outgoing key' });
   await reauthenticate(connection);
-  assert.equal(await connection.read(`document.querySelector('[role=dialog]').textContent.includes(${JSON.stringify(material.relay_key)})`), true);
+  // Reauthentication closes before the resumed reveal request completes.
+  await connection.until(`document.querySelector('[role=dialog]')?.textContent.includes(${JSON.stringify(material.relay_key)})`);
   await connection.click({ tag: 'button', name: 'Close' });
   assert.equal(await connection.read(`document.body.textContent.includes(${JSON.stringify(material.relay_key)})`), false);
   report.assertions.password_fields_masked = true;

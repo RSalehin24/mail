@@ -125,9 +125,14 @@ class MockHostTests(unittest.TestCase):
             arguments[index + 1] for index, value in enumerate(arguments) if value == "-drive"
         ]
         self.assertEqual(len(drives), 3)
-        self.assertTrue(drives[0].startswith("file=/fixture/disk.qcow2,if=virtio,"))
-        self.assertTrue(drives[1].startswith("file=/fixture/swap.raw,if=virtio,"))
-        self.assertEqual(drives[2], "file=/fixture/seed.iso,if=virtio,format=raw,readonly=on")
+        self.assertTrue(drives[0].startswith("file=/fixture/disk.qcow2,if=none,id=fixture-disk,"))
+        self.assertTrue(drives[1].startswith("file=/fixture/swap.raw,if=none,id=fixture-swap,"))
+        self.assertEqual(drives[2],
+                         "file=/fixture/seed.iso,if=none,id=fixture-seed,format=raw,readonly=on")
+        self.assertIn('iothread,id=fixture-io,thread-pool-min=1,thread-pool-max=2', arguments)
+        devices = [arguments[i + 1] for i, value in enumerate(arguments) if value == '-device']
+        self.assertEqual(devices, [f'virtio-blk-pci,drive=fixture-{name},iothread=fixture-io'
+                                   for name in ('disk', 'swap', 'seed')])
         self.assertNotIn("-cdrom", arguments)
 
     def test_guest_connection_is_pinned_to_the_mock_and_bounded_for_software_emulation(self):

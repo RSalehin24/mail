@@ -18,11 +18,22 @@ class CutoverRuntimeTests(unittest.TestCase):
         host = GuestHelper.load()
         bundle = QualificationBundle(Path(os.environ['MAIL_ADMIN_HOST_EVIDENCE']))
         bundle.verify_source()
-        self.fixture = CutoverSystemdFixture(host.record['instance_id'],
-            {**bundle.identity, 'qualification_suite_sha256':
-             file_digest(bundle.artifacts['qualification_suite'])})
-        self.addCleanup(self.fixture.close)
-        self.fixture.prepare_consumers(host.record['runtime_image_id'])
+        self.host_record = host.record
+        self.identity = {**bundle.identity, 'qualification_suite_sha256':
+                         file_digest(bundle.artifacts['qualification_suite'])}
+        self.fixture = None
+        self.addCleanup(self.close_fixture)
+        self.prepare_fixture()
+
+    def close_fixture(self):
+        if self.fixture is not None:
+            self.fixture.close()
+            self.fixture = None
+
+    def prepare_fixture(self):
+        self.close_fixture()
+        self.fixture = CutoverSystemdFixture(self.host_record['instance_id'], self.identity)
+        self.fixture.prepare_consumers(self.host_record['runtime_image_id'])
         self.fixture.legacy.guard.enter({'manual_renewal_inhibited': True})
 
     def assert_paused(self):
@@ -76,6 +87,7 @@ class CutoverRuntimeTests(unittest.TestCase):
                 self.fail_file_install(index)
 
     def fail_forward_phase(self, selected):
+        self.prepare_fixture()
         operation = self.fixture.operation()
         original = self.original(operation)
         phase = operation._phase
@@ -93,6 +105,7 @@ class CutoverRuntimeTests(unittest.TestCase):
         self.assert_original(operation, original)
 
     def fail_file_install(self, selected):
+        self.prepare_fixture()
         operation = self.fixture.operation()
         original = self.original(operation)
         replace = operation.package.files.replace
@@ -118,6 +131,7 @@ class CutoverRuntimeTests(unittest.TestCase):
                 self.fail_rollback_phase(selected)
 
     def fail_rollback_phase(self, selected):
+        self.prepare_fixture()
         operation = self.fixture.operation()
         original = self.original(operation)
         operation.run()

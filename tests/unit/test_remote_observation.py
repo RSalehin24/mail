@@ -115,10 +115,14 @@ class RemoteObservationTests(unittest.TestCase):
             ),
             patch("tools.run_remote.source_digest", return_value="current"),
             patch("tools.run_remote.verify_images"),
-            patch("tools.run_remote.command"),
+            patch("tools.run_remote.fixture_reference", return_value="approved-loaded-fixture"),
+            patch("tools.run_remote.command") as export,
         ):
             with self.assertRaisesRegex(RuntimeError, "changed during export"):
                 local_archive(Path("/unused/fixture.tar.gz"))
+        arguments = export.call_args.args[0]
+        self.assertNotIn('--platform', arguments)
+        self.assertIn('approved-loaded-fixture', arguments)
 
     def test_timeout_or_launch_error_cannot_be_reported_as_a_passing_native_run(self):
         for error in (subprocess.TimeoutExpired("fixture SSH", 900), OSError("fixture SSH failed")):

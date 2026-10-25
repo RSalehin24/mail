@@ -8,7 +8,7 @@ from tests.recovery_web_support import RecoveredHttps, verify_closed_authenticat
 
 class RecoveredHttpsTests(unittest.TestCase):
     def test_fresh_replacement_password_is_used_without_reusing_the_previous_fixture_password(self):
-        with patch('tests.recovery_web_support.ssl.create_default_context'):
+        with patch('tests.recovery_web_support.recovery_context'):
             web = RecoveredHttps(password='fresh fixture replacement')
         with patch.object(web, 'api', return_value=(
             200, {}, {'challenge': 'fixture', 'email_otp_available': False},
@@ -17,7 +17,7 @@ class RecoveredHttpsTests(unittest.TestCase):
         self.assertEqual(api.call_args.args[2]['password'], 'fresh fixture replacement')
 
     def web(self):
-        with patch('tests.recovery_web_support.ssl.create_default_context'):
+        with patch('tests.recovery_web_support.recovery_context'):
             return RecoveredHttps()
 
     def test_any_successful_old_cookie_password_or_factor_blocks_recovery(self):
@@ -54,13 +54,13 @@ class RecoveredHttpsTests(unittest.TestCase):
             verify_closed_authentication(tools, {'synthetic': True})
 
     def test_local_connection_preserves_exact_application_host_and_origin(self):
-        with patch('tests.host_https_support.http.client.HTTPSConnection') as connection:
+        with patch('tests.host_https_support.LoopbackHttps') as connection:
             response = connection.return_value.getresponse.return_value
             response.status, response.getheaders.return_value = 200, []
             response.read.return_value = b'{"status":"ok"}'
             self.assertEqual(request(('fixture-trust', 10), ('GET', '/api/status', None), '')[0],
                              200)
-            self.assertEqual(connection.call_args.kwargs['timeout'], 10)
+            connection.assert_called_once_with('fixture-trust', 10)
             headers = connection.return_value.request.call_args.args[3]
             self.assertEqual(headers['Host'], MAIL_HOST)
             self.assertEqual(headers['Origin'], 'https://' + MAIL_HOST)

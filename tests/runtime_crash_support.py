@@ -1,10 +1,12 @@
 """Pause one real helper command while killing only its private HTTPS caller."""
 
 import http.client
+import sqlite3
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+from shared.errors import ServiceError
 from tests.runtime_support import RuntimeFixture
 
 
@@ -50,7 +52,16 @@ def kill_pending_api(assertions, web, operation):
 def wait_for_complete(journal, identifier):
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
-        record = journal.lookup(identifier)
+        try:
+            record = journal.lookup(identifier)
+        except ServiceError as error:
+            cause = error.__cause__
+            if (error.code != 'journal_unavailable'
+                    or not isinstance(cause, sqlite3.OperationalError)
+                    or getattr(cause, 'sqlite_errorcode', None)
+                    not in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}):
+                raise
+            record = None
         if record and record['state'] != 'pending':
             return record
         time.sleep(0.1)

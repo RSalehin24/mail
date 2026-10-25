@@ -90,7 +90,10 @@ class GuardedDeletionTests(RecoveryCase):
                    'acknowledged': True, 'cutoff': self.request.cutoff}
         self.complete_after_observed_pending(web, payload)
         status, _, outcome = web.api('DELETE', '/api/accounts/' + self.email, payload)
-        self.assertEqual((status, outcome['state']), (200, 'complete'))
+        # Retain only the API's stable error identifier, never the full response
+        # (which may contain private fixture data), when this acceptance step fails.
+        self.assertEqual(status, 200, f"Deletion error identifier: {outcome.get('error')}")
+        self.assertEqual(outcome.get('state'), 'complete')
         self.assertEqual(self.fixture.maddy.inventories(), {'credentials': [], 'storage': []})
         with web.database.transaction() as database:
             self.assertEqual(database.execute('SELECT COUNT(*) FROM mailboxes').fetchone()[0], 0)

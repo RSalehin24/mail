@@ -6,5 +6,5 @@
   "recovery_time_seconds": 14400,
   "backup_destination": "s3://rsalehin24-mail-backup/mail-admin/production/rsalehin24-me/",
   "backup_encryption_mechanism": "Restic 0.19.1 encrypted deduplicated R2 repository",
-  "backup_key_reference": "/Users/rsalehin24/Documents/Others/mail/local-state/production-restic-password.key"
+  "backup_key_reference": null
 }
