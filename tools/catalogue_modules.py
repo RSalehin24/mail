@@ -1,4 +1,4 @@
-"""Fresh bounded controllers prevent earlier catalogue groups inflating later fork peaks."""
+"""Fresh bounded controllers prevent unrelated assertions inflating later child peaks."""
 
 import json
 import re
@@ -22,8 +22,9 @@ class GroupController:
             raise ValueError('The isolated catalogue requires the bounded fixture command')
         arguments = ('create', '--name', self.name, '--label',
                      'mail-admin.catalogue-controller=' + self.name) + self.command[2:]
+        selector = '--assertion-module' if self.group.startswith('tests.') else '--group'
         identifier = self.docker(arguments + self.entrypoint + (
-            '--group', self.group, '--report-directory', output,
+            selector, self.group, '--report-directory', output,
         ))
         if re.fullmatch(r'[0-9a-f]{64}', identifier) is None:
             raise RuntimeError('The group controller identity is invalid')
@@ -85,17 +86,46 @@ def valid_cases(group, cases):
 
 
 def run_catalogue(command, context, docker):
-    root, evidence, entrypoint = context
+    from tools.catalogue_assertions import validate_module_inventory
+    from tools.catalogue_resume import (
+        bind_directory,
+        completed_module,
+        execution_identity,
+        preserve_assembly,
+        require_stopped_controller,
+        resume_directory,
+    )
+    from tools.qualification_bundle import QualificationBundle
+
+    root, evidence, entrypoint, *resume = context
+    bundle = QualificationBundle(evidence)
+    bundle.verify_source()
     inventory = catalogue_inventory(command, entrypoint, docker)
-    directory = evidence.resolve().parent / ('qualification-' + str(uuid.uuid4()))
-    directory.mkdir(mode=0o700)
-    (directory / 'inventory.json').write_text(json.dumps(inventory, indent=2) + '\n')
+    identity = execution_identity(inventory, command, json.loads(
+        docker(('info', '--format', '{{json .}}')),
+    ))
+    if resume and resume[0] is not None:
+        directory = resume_directory(evidence, resume[0])
+    else:
+        directory = evidence.resolve().parent / ('qualification-' + str(uuid.uuid4()))
+        directory.mkdir(mode=0o700)
+    bind_directory(directory, identity)
+    inventory_path = directory / 'inventory.json'
+    if not inventory_path.exists():
+        with inventory_path.open('x') as writer:
+            json.dump(inventory, writer, indent=2)
     output = '/app/build/' + str(directory.relative_to(root / 'build'))
-    for group in inventory['groups']:
-        print('Isolated catalogue group: ' + group, flush=True)
-        GroupController((group, directory), (command, entrypoint, docker)).run(output)
+    modules = validate_module_inventory(inventory)
+    for module in modules:
+        require_stopped_controller(directory, module, docker)
+        if completed_module(directory, (module, modules[module]), (identity, bundle)):
+            print('Verified completed catalogue assertions: ' + module, flush=True)
+            continue
+        print('Isolated catalogue assertions: ' + module, flush=True)
+        GroupController((module, directory), (command, entrypoint, docker)).run(output)
+    preserve_assembly(directory)
     result = subprocess.run(  # noqa: S603, S607 -- the same pinned controller and frozen directory.
-        ('docker',) + command + entrypoint + ('--assemble', '--report-directory', output),
+        ('docker',) + command + entrypoint + ('--assemble-modules', '--report-directory', output),
         check=False, timeout=MODULE_TIMEOUT_SECONDS,
     )
     return result.returncode

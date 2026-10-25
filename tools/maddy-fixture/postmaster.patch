@@ -1,0 +1,32 @@
+--- a/conn.go
++++ b/conn.go
+@@ -662,7 +662,7 @@
+ 	}
+ 
+ 	p := parser{s: strings.TrimSpace(arg)}
+-	recipient, err := p.parsePath()
++	recipient, err := p.parseForwardPath()
+ 	if err != nil {
+ 		c.writeResponse(501, EnhancedCode{5, 5, 2}, "Was expecting RCPT arg syntax of TO:<address>")
+ 		return
+--- a/parse.go
++++ b/parse.go
+@@ -212,3 +212,18 @@
+ 		}
+ 	}
+ }
++
++// RFC 5321 permits the complete case-insensitive Postmaster forward-path.
++// Reverse-path and ordinary mailbox parsing retain their existing validation.
++func (p *parser) parseForwardPath() (string, error) {
++	end := strings.IndexAny(p.s, " \t")
++	if end < 0 {
++		end = len(p.s)
++	}
++	token := p.s[:end]
++	if strings.EqualFold(token, "postmaster") || strings.EqualFold(token, "<postmaster>") {
++		p.s = p.s[end:]
++		return "postmaster", nil
++	}
++	return p.parsePath()
++}

@@ -10,7 +10,7 @@ from tests.runtime_auth_support import RuntimeAuthentication
 from tests.runtime_support import RuntimeFixture
 
 
-class MailFlowTests(unittest.TestCase):
+class MailFlowFixture(unittest.TestCase):
     def setUp(self):
         self.maddy = RealMaddyFixture()
         self.addCleanup(self.maddy.close)
@@ -44,6 +44,7 @@ class MailFlowTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(result["state"], "complete")
 
+class MailFlowTests(MailFlowFixture):
     def test_https_to_unix_helper_to_real_maddy_preserves_password_and_mail(self):
         email = "end-to-end@rsalehin24.me"
         original, replacement = (

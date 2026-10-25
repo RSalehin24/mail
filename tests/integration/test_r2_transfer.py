@@ -3,19 +3,24 @@ import http.client
 import secrets
 import ssl
 import tarfile
+import time
 import unittest
 import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 
 from backend.archive import decrypt_archive, encrypt_archive, extract_archive
+from host.backup import Backup, BackupDependencies, BackupPaths
 from host.r2 import R2Options, R2Transfer
 from host.s3_http import S3Http
 from host.s3_signing import S3Credentials, SigV4
 from shared.errors import ServiceError
 from tests.r2_support import R2Peer
+from tests.restore_support import FixtureCipher
 from tests.tls_support import CertificateFixture
+from tests.unit.test_host_capture_alerts import SnapshotFixture
 
 
 class R2TransferTests(unittest.TestCase):
@@ -151,3 +156,50 @@ class R2TransferTests(unittest.TestCase):
         with self.assertRaisesRegex(ServiceError, "off_host_transfer_failed"):
             self.transfer.publish(self.archive())
         self.assertEqual(self.peer.server.requests, [])
+
+    def captured_backup(self, transfer):
+        source, staging = self.root / 'live-mail', self.root / 'immutable-staging'
+        source.mkdir(mode=0o700, exist_ok=True)
+        staging.mkdir(mode=0o700, exist_ok=True)
+        (source / 'message').write_bytes(b'captured-before-writers-resume')
+        writers = SnapshotFixture()
+        cipher = FixtureCipher()
+        paths = BackupPaths(staging, self.root / 'verified-manifest.json', {'maddy': source})
+        backup = Backup(paths, BackupDependencies(writers, writers, cipher, transfer, time.time))
+        snapshot = backup.capture()
+        (source / 'message').write_bytes(b'newer-live-mail-after-capture')
+        self.assertEqual((snapshot / 'maddy/message').read_bytes(),
+                         b'captured-before-writers-resume')
+        self.assertFalse(backup.paths.manifest.exists())
+        return backup, snapshot, cipher
+
+    def test_immutable_staging_and_manifest_publication_follow_actual_verified_https_transfer(self):
+        def fetch(reference, destination):
+            self.assertFalse(backup.paths.manifest.exists())
+            self.transfer.fetch(reference, destination)
+
+        observed = SimpleNamespace(publish=self.transfer.publish, fetch=fetch)
+        backup, snapshot, cipher = self.captured_backup(observed)
+        manifest = backup.transfer(snapshot)
+        self.assertTrue(manifest['verified'])
+        self.assertTrue(backup.paths.manifest.exists())
+        downloaded, raw = self.root / 'off-server.encrypted', self.root / 'restored.tar.gz'
+        self.transfer.fetch(manifest['reference'], downloaded)
+        decrypt_archive(downloaded, raw, cipher.key)
+        restored = self.root / 'immutable-restore'
+        extract_archive(raw, restored)
+        self.assertEqual((restored / 'snapshot/maddy/message').read_bytes(),
+                         b'captured-before-writers-resume')
+
+    def test_failed_download_verification_never_publishes_a_trusted_manifest(self):
+        def corrupted(reference, destination):
+            self.transfer.fetch(reference, destination)
+            destination.write_bytes(b'observed-corrupt-off-server-copy')
+
+        observed = SimpleNamespace(publish=self.transfer.publish, fetch=corrupted)
+        backup, snapshot, _ = self.captured_backup(observed)
+        with self.assertRaisesRegex(ServiceError, 'off_host_archive_integrity_failed'):
+            backup.transfer(snapshot)
+        self.assertFalse(backup.paths.manifest.exists())
+        self.assertTrue(any(method == 'PUT' for method, _ in self.peer.server.requests))
+        self.assertTrue(any(method == 'GET' for method, _ in self.peer.server.requests))

@@ -62,7 +62,7 @@ class PrivateTerminal:
         if not re.fullmatch(r"[A-Z2-7]{32,128}", seed):
             raise RuntimeError("Recovery utility returned an invalid fixture factor")
         self.expect(b"New authenticator code: ")
-        self.send(totp(seed, time.time()))
+        self.send(self.next_step_code(seed))
         self.expect(b"Save these five single-use recovery codes now:\n")
         codes = tuple(self.expect(b"\n").decode().strip() for _ in range(5))
         if any(not re.fullmatch(r"[0-9a-f]{32}", code) for code in codes):
@@ -70,6 +70,15 @@ class PrivateTerminal:
         if self.password_echoed:
             raise RuntimeError("Recovery utility echoed its protected password input")
         return RecoveryMaterial(seed, codes)
+
+    def next_step_code(self, seed):
+        # Wait inside the existing terminal deadline so subsequent factor tests have a fresh step.
+        previous = int(time.time() // 30)
+        while int(time.time() // 30) <= previous:
+            if time.monotonic() >= self.deadline:
+                raise RuntimeError('Recovery factor did not advance within the terminal deadline')
+            time.sleep(0.1)
+        return totp(seed, time.time())
 
 
 def recover_through_terminal(recovery, tools, destination):

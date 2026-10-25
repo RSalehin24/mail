@@ -30,7 +30,6 @@ from host.locks import HostLock
 from shared.files import protected_json
 from tests.api_support import FakeRelayTransport
 from tests.auth_support import PASSWORD
-from tests.maddy_support import IMAGE
 from tools.resources import MADDY_RUNTIME_TMPFS_BYTES, RESTORE_MEMORY_MIB
 
 
@@ -298,7 +297,7 @@ class RecoveryArchive:
         command += (
             "--entrypoint",
             "/usr/local/libexec/mail-admin-maddy",
-            IMAGE,
+            self.fixture.maddy_image,
             "-config",
             "/data/maddy.conf",
             "run",

@@ -1,0 +1,16 @@
+{
+  "node": {
+    "path": "/Users/rsalehin24/.nvm/versions/node/v22.20.0/bin/node",
+    "sha256": "49161ba4e67afda85c25b2daa1f0e91d1bffc023d2dbc4886eda7a9ba38bca62",
+    "version": "v22.20.0"
+  },
+  "chrome": {
+    "path": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "sha256": "011a77fd50ddc001d31c4ef042e655a0ffb8ca64646c6ab4fcd6fe0c6ba7f1be",
+    "version": "Google Chrome 155.0.8059.86"
+  },
+  "chrome_framework": {
+    "path": "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/155.0.8059.86/Google Chrome Framework",
+    "sha256": "31e490f22d701cb5d592d7068ec9b772a0bf55c048a20140cf857b6330b2ecaf"
+  }
+}

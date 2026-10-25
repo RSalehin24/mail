@@ -1,11 +1,8 @@
 import copy
-import hashlib
 import json
 import os
 import unittest
 from dataclasses import replace
-from datetime import UTC, datetime
-from pathlib import Path
 from unittest.mock import patch
 
 from host.locks import HostLock, LockPolicy
@@ -17,6 +14,7 @@ from host.rollout import (
 )
 from shared.errors import ServiceError
 from shared.files import atomic_json, protected_json
+from tests.rollout_support import write_gate_fixtures
 from tests.support import StateFixture
 
 
@@ -50,34 +48,7 @@ class RolloutStateTests(unittest.TestCase):
         return directory
 
     def gate_fixtures(self, directory):
-        # Synthetic parser inputs inside the unit temp directory, never release evidence.
-        contracts = Path(__file__).resolve().parents[2] / (
-            "docs/mail-admin-implementation/requirements/contracts.json"
-        )
-        gates = json.loads(contracts.read_bytes())["gates"]
-        (directory / "reports").mkdir(mode=0o700)
-        references = {}
-        for index, gate in enumerate(gates):
-            stamp = self.fixture.now - 1000 + index * 2
-            report = {
-                "schema_version": 1, "test_id": gate["id"],
-                "artifact_set_sha256": self.deployment["artifact_set_sha256"],
-                "specification_sha256": self.deployment["specification_sha256"],
-                "runner_revision": self.deployment["qualification_suite_sha256"],
-                "environment": gate["environment"], "result": "pass",
-                "started_at_utc": datetime.fromtimestamp(stamp, UTC).isoformat(),
-                "completed_at_utc": datetime.fromtimestamp(stamp + 1, UTC).isoformat(),
-                "cases": [{"id": case["id"], "result": "pass"} for case in gate["cases"]],
-                "observed_target": {key: value for key, value in self.deployment["inputs"].items()
-                                    if key != "lock_wait_seconds"},
-            }
-            name = "reports/" + gate["id"] + ".json"
-            atomic_json(directory / name, report)
-            references[gate["id"]] = {
-                "report": name,
-                "report_sha256": hashlib.sha256((directory / name).read_bytes()).hexdigest(),
-            }
-        atomic_json(directory / "checkpoints.json", references)
+        write_gate_fixtures(directory, self.deployment, self.fixture.now)
 
     def assert_releases_are_isolated(self, phase):
         directory = self.completed(phase)

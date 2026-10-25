@@ -138,6 +138,23 @@ class HelperTests(unittest.TestCase):
             with self.assertRaisesRegex(ServiceError, "inventory_unavailable"):
                 maddy.inventories()
 
+    def test_production_cli_version_remains_exact_and_fixture_version_is_separately_checked(self):
+        from tests.maddy_support import FixtureMaddy
+
+        deployment = {'inputs': {'operation_timeout_seconds': 5}}
+        for implementation, accepted in (
+            (DockerMaddy, '0.9.5'), (FixtureMaddy, '0.9.5+postmaster-fixture.1'),
+        ):
+            maddy = implementation(deployment)
+            with patch.object(maddy, 'change', return_value=CommandResult(0, accepted)):
+                maddy.validate_cli_version()
+            other = '0.9.5+postmaster-fixture.1' if implementation is DockerMaddy else '0.9.5'
+            for rejected in ('0.9.50', '0.9.5+foreign', '0.9.5+postmaster-fixture.10', other):
+                with (self.subTest(version=rejected),
+                      patch.object(maddy, 'change', return_value=CommandResult(0, rejected)),
+                      self.assertRaisesRegex(ServiceError, 'maddy_version_mismatch')):
+                    maddy.validate_cli_version()
+
     def test_zero_exit_unavailable_update_pipe_is_a_cli_failure_before_inventory_or_mutation(self):
         output = ('Failed to initialize update pipe, do not remove messages from mailboxes '
                   'open by clients: dial unix /run/maddy/sql-fixture.sock: connection refused\n')

@@ -9,7 +9,7 @@ from host.render import rendered_files
 from shared.files import protected_bytes, protected_json
 from tools.qualification_archive import ArtifactArchive
 from tools.qualification_bundle import QualificationBundle
-from tools.qualification_cases import HOST_CASE_TESTS
+from tools.qualification_cases import CASE_TESTS, HOST_CASE_TESTS
 from tools.qualification_installation import LIBRARY, UNIT_TARGETS, InstalledFile, InstalledTree
 
 HOST_UNITS = {"mail-admin-helper.service", "mail-admin-paths.service", "docker-ordering.conf",
@@ -69,16 +69,16 @@ def unit_manifest(archive: ArtifactArchive, configuration: dict) -> dict[str, In
     }
 
 
-def host_report(bundle: QualificationBundle) -> dict | None:
+def host_report(bundle: QualificationBundle, group: str = 'T08') -> dict | None:
     from check_release import validate_report_time, verified_file
     from verification_support import read_json
 
-    record = next(entry for entry in bundle.context["evidence"]["tests"] if entry["id"] == "T08")
+    record = next(entry for entry in bundle.context["evidence"]["tests"] if entry["id"] == group)
     if record["report"] is None:
         return None
     report = read_json(verified_file(bundle.context, record))
     if (type(report.get("schema_version")) is not int or report["schema_version"] != 1
-        or report.get("test_id") != "T08"
+        or report.get("test_id") != group
         or report.get("environment") != "isolated-linux-amd64"
         or any(report.get(key) != value for key, value in bundle.identity.items())):
         raise ValueError("Host report differs from the frozen artifact set")
@@ -106,7 +106,8 @@ def verify_host_execution(bundle: QualificationBundle, execution: dict) -> None:
 def verify_host_cases(bundle: QualificationBundle, report: dict) -> None:
     from verification_support import indexed
 
-    group = next(group for group in bundle.context["catalog"]["groups"] if group["id"] == "T08")
+    group = next(group for group in bundle.context["catalog"]["groups"]
+                 if group["id"] == report['test_id'])
     cases = indexed(report["cases"])
     if cases.keys() != {case["id"] for case in group["cases"]}:
         raise ValueError("Unexpected, missing or repeated host case")
@@ -132,14 +133,18 @@ def verify_host_cases(bundle: QualificationBundle, report: dict) -> None:
 def merge_host_report(bundle: QualificationBundle, report: dict) -> None:
     from verification_support import parse_timestamp
 
-    if report["test_id"] != "T08":
+    if not any(case['id'] in HOST_CASE_TESTS for case in report['cases']):
         return
-    observed = host_report(bundle)
+    observed = host_report(bundle, report['test_id'])
     if observed is None:
+        for case in report['cases']:
+            if case['id'] in HOST_CASE_TESTS and case['result'] != 'fail':
+                case.update(result='not_run', assertions=[])
+        report['result'] = 'blocked'
         return
     cases = {case["id"]: case for case in observed["cases"]}
-    report["cases"] = [cases[case["id"]] if case["id"] in HOST_CASE_TESTS else case
-                       for case in report["cases"]]
+    report["cases"] = [merge_host_case(case, cases[case['id']])
+                       if case['id'] in HOST_CASE_TESTS else case for case in report['cases']]
     report["started_at_utc"] = min(report["started_at_utc"], observed["started_at_utc"],
                                    key=parse_timestamp)
     report["completed_at_utc"] = max(report["completed_at_utc"], observed["completed_at_utc"],
@@ -147,3 +152,13 @@ def merge_host_report(bundle: QualificationBundle, report: dict) -> None:
     report["execution"]["host"] = observed["execution"]
     passed = all(case["result"] == "pass" for case in report["cases"])
     report["result"] = "pass" if passed else "blocked"
+
+
+def merge_host_case(local: dict, host: dict) -> dict:
+    if not CASE_TESTS.get(local['id']):
+        return host
+    if local['result'] == 'not_run':
+        return local
+    assertions = {**local['assertions'], **host['assertions']}
+    return {'id': local['id'], 'assertions': assertions,
+            'result': 'pass' if local['result'] == host['result'] == 'pass' else 'fail'}

@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from tools.fixture_images import ACME_IMAGES  # noqa: E402
+from tools.maddy_fixture import MADDY_FIXTURE_IMAGE  # noqa: E402
 from tools.maddy_modules import MODULE_TIMEOUT_SECONDS, module_inventory  # noqa: E402
 from tools.resources import FIXTURE_DISK_RESERVE_BYTES, fixture_budget  # noqa: E402
 from tools.run_tests import source_digest  # noqa: E402
@@ -123,7 +124,7 @@ def local_archive(path: Path) -> str:
             str(raw),
             "mail-admin:candidate",
             "mail-admin:qualification",
-            "foxcpp/maddy@sha256:2b0c7e0e06b5e6e9e0738a2d6a826dc03b945e864db69288efd7fad4a62ee1e8",
+            MADDY_FIXTURE_IMAGE,
             *ACME_IMAGES,
         )
     )
@@ -135,11 +136,15 @@ def local_archive(path: Path) -> str:
         images['mail-admin:qualification'],
         lambda arguments: command(('docker',) + arguments), 'runtime',
     )
-    if any(record['source_sha256'] != source for record in (inventory, runtime_inventory)):
+    acme_inventory = module_inventory(images['mail-admin:qualification'],
+                                     lambda arguments: command(('docker',) + arguments), 'acme')
+    if any(record['source_sha256'] != source
+           for record in (inventory, runtime_inventory, acme_inventory)):
         raise RuntimeError('Frozen module inventory differs from the exported source')
     (path.parent / "images.json").write_text(json.dumps({
         "images": images, "source_sha256": source, 'maddy_modules': inventory['modules'],
         'runtime_modules': runtime_inventory['modules'],
+        'acme_modules': acme_inventory['modules'],
     }, indent=2) + "\n")
     with raw.open("rb") as reader, gzip.open(path, "xb", compresslevel=1) as writer:
         shutil.copyfileobj(reader, writer)
@@ -167,7 +172,7 @@ def fixture_support_files() -> tuple[Path, ...]:
     return tuple(ROOT / "tools" / name for name in (
         "run_linux.py", "resources.py", "maddy_modules.py", "run_tests.py",
         'run_remote.py', 'fixture_images.py',
-        'catalogue_modules.py',
+        'catalogue_modules.py', 'maddy_fixture.py',
     ))
 
 
@@ -207,7 +212,7 @@ class NativeRun:
         self.outcomes[suite] = "pass" if result.returncode == 0 else "fail"
 
     def _timeout(self, suite: str) -> int:
-        if suite not in {'maddy', 'runtime'}:
+        if suite not in {'maddy', 'runtime', 'acme'}:
             return MODULE_TIMEOUT_SECONDS
         modules = json.loads((self.local / 'images.json').read_bytes())[suite + '_modules']
         if (not isinstance(modules, list) or not 1 <= len(modules) <= 128

@@ -1,5 +1,6 @@
 """Keep the real host Certbot adapter while remapping only its isolated environment."""
 
+from host.container_identity import ContainerIdentity
 from host.docker import Docker
 from tests.certbot_support import CERTBOT_DEADLINE_SECONDS
 from tools.fixture_images import CERTBOT_IMAGE
@@ -67,3 +68,14 @@ class PrivateCertbotDocker:
     def inspect(self, identifier):
         self.require_owned(identifier)
         return self.docker.inspect(identifier)
+
+    def adopt_recorded_run(self, run):
+        identifier = run['container_id']
+        record = ContainerIdentity(self.docker, ('certbot', run['name'])).observe(identifier)
+        expected_image = self.docker.inspect(CERTBOT_IMAGE)['Id']
+        if (record['Image'] != expected_image
+                or record['Config']['Labels'].get('mail-admin.fixture') != self.client.network.name
+                or record['HostConfig']['NetworkMode'] != self.client.network.name):
+            raise AssertionError('Refusing adoption outside this private Certbot fixture')
+        self.created.add(identifier)
+        self.client.network.created.append(identifier)

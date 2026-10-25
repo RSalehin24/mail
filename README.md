@@ -99,9 +99,11 @@ Runtime evidence is recorded separately under `verification/`. Missing, failed,
 skipped, stale or unimplemented acceptance cases block candidate qualification.
 No live deployment is authorized by local tests or by a generated evidence file.
 
-The frozen catalogue driver runs each group in a fresh 192 MiB controller and
-retains its actual exit/OOM observations. A missing group, lost controller outcome
-or mismatched assertion blocks final assembly. Unmapped cases remain `not_run`.
+The frozen catalogue driver runs each registered assertion module in a fresh
+192 MiB controller and retains its actual exit/OOM observations. It assembles
+cases from the exact module results, with separately verified host reports where
+required. Missing reports, lost controller outcomes or mismatched assertions block
+assembly. Unmapped cases remain `not_run`.
 
 The implemented API includes token-gated setup, TOTP/recovery/optional Email OTP,
 opaque persistent sessions, recent authentication, password/factor replacement,
@@ -109,6 +111,8 @@ mailbox management, client configuration, DNS/Maddy diagnostics, encrypted relay
 settings, revision-bound delivery confirmation, and optional provider credit reads.
 Email OTP and permanent deletion default to disabled. Relay polling sends no mail.
 No existing incoming mailbox password is recoverable or stored in plaintext.
+The helper removes terminal journal records older than 90 days in bounded batches
+under its maintenance lock. Unresolved operations remain until reconciliation.
 
 `tools/run_tests.py` writes actual per-test outcomes and source identities to
 `build/unit-checks.json` and `build/integration-checks.json`. It does not issue
@@ -161,7 +165,8 @@ bucket separately; credentials remain outside the source tree. The approved pinn
 Restic utility implements encrypted, deduplicated R2 snapshots and seven-day expiration.
 A real R2 sharing/retention probe passed. Root recovery commands restore verified state
 into a new directory and close restored authentication before SSH recovery. Full
-replacement-host boot qualification is still pending. Read the
+replacement-host recovery and boot passed for an earlier prototype; the final
+candidate still requires matching recovery evidence. Read the
 [backup design](verification/backup-design.md); no live backup schedule is enabled.
 
 `tools/run_mock_host.py` manages a software-emulated Linux mock with its own kernel,

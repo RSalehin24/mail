@@ -6,6 +6,7 @@ from pathlib import Path
 from helper.journal import Journal
 from host.docker import Docker
 from shared.files import protected_json
+from tests.fixture_values import REPLACEMENT_PASSWORD
 from tests.recovery_activation_support import credential_digest, verify_mail
 from tests.recovery_web_support import RecoveredHttps, restored_permissions
 
@@ -32,12 +33,14 @@ class RestoredBoot:
         for name in ('maddy', 'mail-admin'):
             self.consumer(name)
         checks = self.mail_and_helper()
-        web = RecoveredHttps(35)
+        material = protected_json(self.target.root / 'replacement-auth.json')
+        web = RecoveredHttps(35, material.get('password', REPLACEMENT_PASSWORD))
         readiness = web.ready()
-        web.login(protected_json(self.target.root / 'replacement-auth.json'))
+        web.login(material)
         if web.api('GET', '/api/accounts')[0] != 200:
             raise RuntimeError('The recovered dashboard/helper did not survive kernel reboot')
-        self.target.record('boot', {**checks, **restored_permissions(), **verify_mail(),
+        mail = verify_mail(self.target.context.get('message_observation'))
+        self.target.record('boot', {**checks, **restored_permissions(), **mail,
             'previous_boot_id': prior['boot_id'], 'boot_id': current,
             'authentication_method': 'fresh_password_and_totp_after_kernel_boot',
             'https_readiness_seconds': readiness,

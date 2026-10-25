@@ -146,7 +146,7 @@ class NativeResticRestoreTests(unittest.TestCase):
         self.addCleanup(tools.discard_recovery, outcome["recovery_utility_name"])
         self.assertEqual(outcome["state"], "credentials_recovered_requires_activation")
         observed = tools.docker.inspect(outcome["recovery_utility_name"])
-        self.assertEqual(observed["HostConfig"]["LogConfig"]["Type"], "none")
+        self.assert_isolated_operator(observed)
         authentication, relay = dashboard.load(restored)
         self.assertEqual(relay.reveal(), "fixture-encrypted-relay-secret")
         self.assertFalse(relay.otp_ready())
@@ -181,3 +181,23 @@ class NativeResticRestoreTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertFalse(settings["otp_ready"])
         self.assertNotIn("fixture-encrypted-relay-secret", json.dumps(settings))
+
+    def assert_isolated_operator(self, observed):
+        self.assertEqual(observed['Image'], os.environ['MAIL_ADMIN_RUNTIME_IMAGE'])
+        self.assertEqual(observed['Config']['User'], '0:0')
+        self.assertTrue(observed['Config']['Tty'])
+        self.assertTrue(observed['Config']['OpenStdin'])
+        settings = observed['HostConfig']
+        self.assertEqual(settings['LogConfig']['Type'], 'none')
+        self.assertEqual(settings['NetworkMode'], 'none')
+        self.assertTrue(settings['ReadonlyRootfs'])
+        self.assertFalse(settings['Privileged'])
+        self.assertIn('no-new-privileges:true', settings['SecurityOpt'])
+        self.assertEqual(settings['Memory'], 128 * 1024**2)
+        mounts = {mount['Destination']: mount for mount in observed['Mounts']
+                  if mount['Type'] == 'bind'}
+        self.assertEqual(set(mounts), {'/app/data', '/run/secrets/mail-admin',
+                                      '/run/mail-admin-installation.json'})
+        self.assertEqual({name: mount['RW'] for name, mount in mounts.items()},
+                         {'/app/data': True, '/run/secrets/mail-admin': False,
+                          '/run/mail-admin-installation.json': False})

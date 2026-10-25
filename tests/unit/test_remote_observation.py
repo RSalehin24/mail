@@ -141,6 +141,7 @@ class RemoteObservationTests(unittest.TestCase):
             (Path(directory) / 'images.json').write_text(json.dumps({
                 'maddy_modules': ['test_first', 'test_second'],
                 'runtime_modules': ['test_runtime'],
+                'acme_modules': ['test_acme'],
             }))
             native = NativeRun("fixture@192.0.2.1", (Path(directory), "/fixture"))
             completed = subprocess.CompletedProcess((), 0, "synthetic assertions passed", "")
@@ -165,12 +166,14 @@ class RemoteObservationTests(unittest.TestCase):
             path.write_text(json.dumps({
                 'maddy_modules': ['test_first', 'test_second'],
                 'runtime_modules': ['test_first', 'test_second', 'test_third'],
+                'acme_modules': ['test_first'],
             }))
             self.assertEqual(MODULE_TIMEOUT_SECONDS, 900)
             self.assertEqual(native._timeout('maddy'), 2 * 900 + 60)
             self.assertEqual(native._timeout('runtime'), 3 * 900 + 60)
+            self.assertEqual(native._timeout('acme'), 900 + 60)
             for modules in ([], ['test_first', 'test_first'], [['invalid']], ['../outside']):
-                for suite in ('maddy', 'runtime'):
+                for suite in ('maddy', 'runtime', 'acme'):
                     path.write_text(json.dumps({suite + '_modules': modules}))
                     with self.assertRaises(ValueError):
                         native._timeout(suite)

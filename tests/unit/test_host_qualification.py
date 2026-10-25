@@ -6,15 +6,16 @@ from unittest.mock import Mock, patch
 
 from tests.qualification_support import write_bundle
 from tests.support import StateFixture
+from tools.catalogue_reports import validate_case
 from tools.qualification_bundle import QualificationBundle
-from tools.qualification_cases import HOST_CASE_TESTS
+from tools.qualification_cases import CASE_TESTS, HOST_CASE_TESTS
 from tools.qualification_host import (
     HOST_SCOPE,
     host_report,
     merge_host_report,
     source_manifest_digest,
 )
-from tools.run_host_qualification import lifecycle_group, qualify
+from tools.run_host_qualification import host_group, lifecycle_group, qualify
 
 
 class HostQualificationTests(unittest.TestCase):
@@ -135,6 +136,78 @@ class HostQualificationTests(unittest.TestCase):
         self.assertEqual({case['id'] for case in observed['cases']},
                          {case['id'] for case in original['cases']})
         self.assertEqual(original, before)
+
+    def retention_report(self):
+        group = host_group(self.bundle, 'T22')
+        cases = [{'id': case['id'], 'result': 'not_run', 'assertions': []}
+                 for case in group['cases']]
+        selected = next(case for case in cases if case['id'] == 'T22.02')
+        selected.update(result='pass', assertions=dict.fromkeys(HOST_CASE_TESTS['T22.02'], 'pass'))
+        return {**copy.deepcopy(self.report), 'test_id': 'T22', 'cases': cases, 'result': 'blocked'}
+
+    def test_host_retention_report_cannot_fill_unrelated_local_assertions(self):
+        observed = self.retention_report()
+        self.record = next(record for record in self.bundle.context['evidence']['tests']
+                           if record['id'] == 'T22')
+        self.record['report'] = self.path.name
+        self.publish(observed)
+        self.assertEqual(host_report(self.bundle, 'T22'), observed)
+        changed = copy.deepcopy(observed)
+        case = next(case for case in changed['cases'] if case['id'] == 'T22.02')
+        case['assertions'].update(dict.fromkeys(CASE_TESTS['T22.02'], 'pass'))
+        self.publish(changed)
+        with self.assertRaisesRegex(ValueError, 'assertions differ'):
+            host_report(self.bundle, 'T22')
+
+    def test_a_composite_case_requires_both_exact_local_and_host_assertions(self):
+        local = self.retention_report()
+        case = next(case for case in local['cases'] if case['id'] == 'T22.02')
+        case['assertions'] = dict.fromkeys(CASE_TESTS['T22.02'], 'pass')
+        with patch('tools.qualification_host.host_report', return_value=self.retention_report()):
+            merge_host_report(self.bundle, local)
+        combined = next(case for case in local['cases'] if case['id'] == 'T22.02')
+        validate_case(combined, local['execution'])
+        self.assertEqual(set(combined['assertions']),
+                         set(CASE_TESTS['T22.02'] + HOST_CASE_TESTS['T22.02']))
+        for missing in CASE_TESTS['T22.02'] + HOST_CASE_TESTS['T22.02']:
+            changed = copy.deepcopy(combined)
+            del changed['assertions'][missing]
+            with self.subTest(missing=missing), self.assertRaises(ValueError):
+                validate_case(changed, local['execution'])
+
+    def test_missing_host_retention_stays_not_run_even_after_local_checks_pass(self):
+        local = self.retention_report()
+        local['execution'] = {'system': 'Linux', 'machine': 'x86_64'}
+        case = next(case for case in local['cases'] if case['id'] == 'T22.02')
+        case['assertions'] = dict.fromkeys(CASE_TESTS['T22.02'], 'pass')
+        with self.assertRaisesRegex(ValueError, 'Missing host'):
+            validate_case(case, local['execution'])
+        with patch('tools.qualification_host.host_report', return_value=None):
+            merge_host_report(self.bundle, local)
+        self.assertEqual(case, {'id': 'T22.02', 'result': 'not_run', 'assertions': []})
+        validate_case(case, local['execution'])
+        self.assertEqual(local['result'], 'blocked')
+
+    def test_host_runner_accepts_only_groups_with_registered_host_assertions(self):
+        self.assertEqual(host_group(self.bundle, 'T22')['id'], 'T22')
+        for identifier in ('T17', '../outside', 'P01'):
+            with self.subTest(identifier=identifier), self.assertRaises(ValueError):
+                host_group(self.bundle, identifier)
+
+    def test_missing_host_evidence_cannot_hide_a_failed_local_retention_assertion(self):
+        local = self.retention_report()
+        local['execution'] = {'system': 'Linux', 'machine': 'x86_64'}
+        case = next(case for case in local['cases'] if case['id'] == 'T22.02')
+        case.update(result='fail', assertions=dict.fromkeys(CASE_TESTS['T22.02'], 'pass'))
+        case['assertions'][CASE_TESTS['T22.02'][0]] = 'error'
+        before = copy.deepcopy(case)
+        with patch('tools.qualification_host.host_report', return_value=None):
+            merge_host_report(self.bundle, local)
+        self.assertEqual(case, before)
+        validate_case(case, local['execution'])
+        case['assertions'][CASE_TESTS['T22.02'][0]] = 'pass'
+        with self.assertRaisesRegex(ValueError, 'Missing host'):
+            validate_case(case, local['execution'])
 
     def test_post_run_binding_failure_keeps_raw_assertions_without_qualifying_references(self):
         with (patch('tools.run_host_qualification.GuestHelper.load', return_value=Mock()),

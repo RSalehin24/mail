@@ -1,31 +1,13 @@
 """Terminate a real helper process only after an observed durable mutation boundary."""
 
-import multiprocessing
 import signal
 from unittest.mock import patch
 
+from tests.process_fault_support import kill_at_observed_boundary
+
 
 def kill_at_boundary(helper, request, boundary):
-    context = multiprocessing.get_context('fork')
-    parent, child = context.Pipe(duplex=False)
-    process = context.Process(target=_run, args=(child, (helper, request, boundary)))
-    process.start()
-    child.close()
-    try:
-        if not parent.poll(35):
-            raise RuntimeError('Helper did not reach the selected crash boundary')
-        if parent.recv() != boundary:
-            raise RuntimeError('Helper exited before the selected crash boundary')
-        process.kill()
-        process.join(timeout=5)
-        if process.exitcode != -signal.SIGKILL:
-            raise RuntimeError('Helper SIGKILL was not observed')
-    finally:
-        parent.close()
-        if process.is_alive():
-            process.kill()
-        process.join(timeout=5)
-        process.close()
+    return kill_at_observed_boundary(_run, (helper, request, boundary), boundary)
 
 
 def _run(channel, operation):

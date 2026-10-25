@@ -1,4 +1,7 @@
+import tempfile
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from tests.recovery_target_support import RecoveryTarget
@@ -8,6 +11,34 @@ SOURCE = '8a8f1170-b11c-4adf-8626-537e42976ea3'
 
 
 class RecoveryTargetGuardTests(unittest.TestCase):
+    def test_existing_phase_evidence_cannot_be_rewritten_by_a_later_retry(self):
+        with (patch('tests.recovery_target_support.require_fixture_guest'),
+              tempfile.TemporaryDirectory() as temporary):
+            target = RecoveryTarget(self.context())
+            target.root = Path(temporary)
+            target.record('stage', {'result': 'fail'})
+            path = target.root / 'stage-observation.json'
+            original = path.read_bytes()
+            with self.assertRaisesRegex(RuntimeError, 'must be preserved'):
+                target.record('stage', {'result': 'pass'})
+            self.assertEqual(path.read_bytes(), original)
+
+    def test_recovering_an_already_replaced_source_uses_a_distinct_private_password(self):
+        with patch('tests.recovery_target_support.require_fixture_guest'):
+            target = RecoveryTarget(self.context())
+        selected = 'fresh replacement fixture password per recovery'
+        with (patch.object(target, 'operation'), patch.object(target, 'tools'),
+              patch.object(target, 'record'),
+              patch('tests.recovery_target_support.secrets.token_urlsafe', return_value=selected),
+              patch('tests.recovery_target_support.TerminalRecovery') as terminal,
+              patch('tests.recovery_target_support.atomic_json') as save):
+            terminal.return_value.recover.return_value = SimpleNamespace(seed='A' * 32,
+                                                                         codes=('a' * 32,))
+            target.recover()
+        self.assertEqual(terminal.return_value.recover.call_args.args,
+                         (target.destination, selected))
+        self.assertEqual(save.call_args.args[1]['password'], selected)
+
     def context(self):
         return {'target_instance_id': TARGET, 'source_instance_id': SOURCE,
                 'directory': '/root/mail-admin-fixture/replacement-' + TARGET}

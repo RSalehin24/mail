@@ -1,4 +1,4 @@
-"""Run Maddy and runtime modules in fresh bounded controllers; retain raw outcomes."""
+"""Run application modules in fresh bounded controllers; retain every raw outcome."""
 
 import hashlib
 import json
@@ -25,7 +25,7 @@ print(json.dumps({'source_sha256':source_digest(), 'suite':suite,
 
 
 def module_inventory(image: str, docker, suite: str = "maddy") -> dict:
-    if suite not in {"maddy", "runtime"}:
+    if suite not in {"maddy", "runtime", "acme"}:
         raise ValueError("Unsupported isolated module suite")
     response = docker((
         "run", "--rm", "--platform", "linux/amd64", "--network", "none", "--read-only",
@@ -143,7 +143,7 @@ def module_metadata(modules: dict) -> dict:
 
 
 def report_name(suite: str) -> str:
-    return ("linux-" if suite == "runtime" else "") + suite + "-checks.json"
+    return ("" if suite == "maddy" else "linux-") + suite + "-checks.json"
 
 
 def module_references(directory: Path, outcomes: dict, suite: str = "maddy") -> dict:

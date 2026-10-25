@@ -53,9 +53,10 @@ def verify_closed_authentication(tools, old):
 
 
 class RecoveredHttps:
-    def __init__(self, timeout=5):
+    def __init__(self, timeout=5, password=REPLACEMENT_PASSWORD):
         self.context = ssl.create_default_context(cafile='/opt/maddy/tls/fixture/fullchain.pem')
         self.cookie, self.timeout = '', timeout
+        self.password = password
 
     def api(self, method, path, payload=None):
         return request((self.context, self.timeout), (method, path, payload), self.cookie)
@@ -73,7 +74,7 @@ class RecoveredHttps:
 
     def challenge(self):
         status, _, result = self.api('POST', '/api/login', {
-            'email': 'rsalehin24@gmail.com', 'password': REPLACEMENT_PASSWORD,
+            'email': 'rsalehin24@gmail.com', 'password': self.password,
         })
         if status != 200 or result.get('email_otp_available') is not False:
             raise RuntimeError('Recovered password challenge or closed email OTP failed')
@@ -85,7 +86,7 @@ class RecoveredHttps:
     def login(self, material):
         challenge = self.challenge()
         status, headers, _ = self.verify({'challenge': challenge, 'factor': 'totp',
-                                          'code': totp(material['seed'], time.time())})
+                                          'code': totp(material['seed'], time.time() + 30)})
         if status != 200:
             raise RuntimeError('Recovered password and replacement factor did not authenticate')
         header = headers.get('set-cookie', headers.get('Set-Cookie', ''))

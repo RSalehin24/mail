@@ -108,6 +108,7 @@ def load_bundle(evidence: Path) -> QualificationBundle:
     if not CASE_TESTS.keys() <= cases:
         raise ValueError("Qualification adapter references an unknown isolated case")
     verify_runtime_image(bundle)
+    os.environ['MAIL_ADMIN_CATALOGUE_EVIDENCE'] = str(evidence.resolve())
     return bundle
 
 
@@ -118,19 +119,59 @@ def finish_catalogue(bundle, reports, directory):
     cases = [case for report in reports.values() for case in report["cases"]]
     result = {"result": "pass" if all(case["result"] == "pass" for case in cases) else "blocked",
               "passed_cases": sum(case["result"] == "pass" for case in cases),
+              "failed_cases": sum(case["result"] == "fail" for case in cases),
+              "not_run_cases": sum(case["result"] == "not_run" for case in cases),
               "required_cases": len(cases), "reports": str(directory), **bundle.identity}
     write_record(directory / "result.json", result)
     return result
 
 
 def catalogue_inventory(evidence: Path) -> dict:
+    from tools.catalogue_assertions import assertion_modules
     from tools.run_tests import source_digest
 
     bundle = load_bundle(evidence)
-    return {**bundle.identity, 'source_sha256': source_digest(), 'groups': {
+    return {**bundle.identity, 'source_sha256': source_digest(),
+            'assertion_modules': assertion_modules(), 'groups': {
         group['id']: [case['id'] for case in group['cases']]
         for group in bundle.context['catalog']['groups'] if group['id'].startswith('T')
     }}
+
+
+def qualify_assertion_module(evidence: Path, selection: tuple[str, Path]) -> dict:
+    from tools.catalogue_assertions import assertion_modules, module_group
+    from tools.catalogue_reports import report_directory
+
+    module, selected = selection
+    bundle = load_bundle(evidence)
+    modules = assertion_modules()
+    if module not in modules:
+        raise ValueError('Only an existing frozen assertion module may execute')
+    directory = report_directory(evidence, selected)
+    tests = modules[module]
+    report = group_report(bundle, module_group(module, tests), {test: (test,) for test in tests})
+    write_record(directory / (module + '.json'), report)
+    return report
+
+
+def assemble_modules(evidence: Path, selected: Path) -> dict:
+    from tools.catalogue_assertions import group_from_modules, read_modules
+    from tools.catalogue_reports import report_directory, validate_group
+    from tools.qualification_host import merge_host_report
+
+    bundle = load_bundle(evidence)
+    directory = report_directory(evidence, selected)
+    modules, reports = read_modules(bundle, directory), {}
+    for group in bundle.context['catalog']['groups']:
+        if group['id'].startswith('T'):
+            report = group_from_modules(bundle, group, (directory, modules))
+            merge_host_report(bundle, report)
+            validate_group(bundle, group, report)
+            write_record(directory / (group['id'] + '.json'), report)
+            reports[group['id']] = report
+    bundle.verify_source()
+    bundle.verify_artifacts()
+    return finish_catalogue(bundle, reports, directory)
 
 
 def qualify_group(evidence: Path, selection: tuple[str, Path]) -> dict:
@@ -206,7 +247,9 @@ def main() -> int:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--inventory', action='store_true')
     mode.add_argument('--group')
+    mode.add_argument('--assertion-module')
     mode.add_argument('--assemble', action='store_true')
+    mode.add_argument('--assemble-modules', action='store_true')
     parser.add_argument('--report-directory', type=Path)
     arguments = parser.parse_args()
     result = selected_run(arguments)
@@ -219,11 +262,18 @@ def selected_run(arguments):
         if arguments.report_directory is not None:
             raise ValueError('An inventory cannot select an output directory')
         return catalogue_inventory(arguments.evidence)
-    if arguments.group or arguments.assemble:
+    if (arguments.group or arguments.assemble or arguments.assertion_module
+            or arguments.assemble_modules):
         if arguments.report_directory is None:
             raise ValueError('Group execution requires an explicit report directory')
         if arguments.group:
             return qualify_group(arguments.evidence, (arguments.group, arguments.report_directory))
+        if arguments.assertion_module:
+            return qualify_assertion_module(
+                arguments.evidence, (arguments.assertion_module, arguments.report_directory),
+            )
+        if arguments.assemble_modules:
+            return assemble_modules(arguments.evidence, arguments.report_directory)
         return assemble_groups(arguments.evidence, arguments.report_directory)
     if arguments.report_directory is not None:
         raise ValueError('An output directory requires an explicit group or assembly')

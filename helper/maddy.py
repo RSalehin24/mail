@@ -70,8 +70,15 @@ class DockerMaddy:
             raise ServiceError("maddy_storage_missing", 503)
         if not container["State"]["Running"]:
             raise ServiceError("maddy_unavailable", 503)
+        self.validate_cli_version()
+
+    def expected_cli_version(self) -> str:
+        return '0.9.5'
+
+    def validate_cli_version(self) -> None:
         result = self.change(("version",))
-        if not cli_succeeded(result) or not re.search(r"(?<![0-9.])0\.9\.5(?=$|\s)", result.output):
+        pattern = r'(?<![0-9.])' + re.escape(self.expected_cli_version()) + r'(?=$|\s)'
+        if not cli_succeeded(result) or not re.search(pattern, result.output):
             raise ServiceError("maddy_version_mismatch", 503)
 
     def expected_mounts(self) -> dict[str, str]:

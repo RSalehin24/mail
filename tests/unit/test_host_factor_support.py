@@ -31,11 +31,21 @@ class HostFactorSupportTests(unittest.TestCase):
         terminal = PrivateTerminal(10, REPLACEMENT_PASSWORD)
         replies = [b'', b'', b'', b'A' * 32, b'', b'', *([b'a' * 32] * 5)]
         with (patch.object(terminal, 'expect', side_effect=replies),
-              patch.object(terminal, 'send') as send):
+              patch.object(terminal, 'send') as send,
+              patch('tests.recovery_terminal.time.time', side_effect=(60, 90, 90))):
             terminal.credentials()
         self.assertNotEqual(PASSWORD, REPLACEMENT_PASSWORD)
         self.assertEqual([call.args[0] for call in send.call_args_list[:2]],
                          [REPLACEMENT_PASSWORD, REPLACEMENT_PASSWORD])
+        self.assertEqual(send.call_args_list[2].args[0], totp('A' * 32, 90))
+
+    def test_factor_wait_cannot_extend_the_existing_terminal_deadline(self):
+        terminal = PrivateTerminal(10)
+        terminal.deadline = 1
+        with (patch('tests.recovery_terminal.time.time', return_value=60),
+              patch('tests.recovery_terminal.time.monotonic', return_value=2),
+              self.assertRaisesRegex(RuntimeError, 'within the terminal deadline')):
+            terminal.next_step_code('A' * 32)
 
     def test_echo_detection_uses_the_selected_replacement_password(self):
         terminal = PrivateTerminal(10, REPLACEMENT_PASSWORD)

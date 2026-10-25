@@ -7,6 +7,15 @@ from tests.recovery_web_support import RecoveredHttps, verify_closed_authenticat
 
 
 class RecoveredHttpsTests(unittest.TestCase):
+    def test_fresh_replacement_password_is_used_without_reusing_the_previous_fixture_password(self):
+        with patch('tests.recovery_web_support.ssl.create_default_context'):
+            web = RecoveredHttps(password='fresh fixture replacement')
+        with patch.object(web, 'api', return_value=(
+            200, {}, {'challenge': 'fixture', 'email_otp_available': False},
+        )) as api:
+            self.assertEqual(web.challenge(), 'fixture')
+        self.assertEqual(api.call_args.args[2]['password'], 'fresh fixture replacement')
+
     def web(self):
         with patch('tests.recovery_web_support.ssl.create_default_context'):
             return RecoveredHttps()

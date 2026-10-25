@@ -19,13 +19,13 @@ from tools.qualification_host import HOST_SCOPE, verify_host_installation  # noq
 from tools.run_qualification import _update_references, group_report, write_record  # noqa: E402
 
 
-def qualify(evidence: Path) -> dict:
+def qualify(evidence: Path, identifier: str = 'T08') -> dict:
     host = GuestHelper.load()
     bundle = QualificationBundle(evidence)
     bundle.verify_source()
     before = verify_host_installation(bundle, host)
     os.environ['MAIL_ADMIN_HOST_EVIDENCE'] = str(evidence.resolve())
-    group = lifecycle_group(bundle)
+    group = host_group(bundle, identifier)
     report = group_report(bundle, group, HOST_CASE_TESTS)
     directory = evidence.resolve().parent / ("host-qualification-" + str(uuid.uuid4()))
     directory.mkdir(mode=0o700)
@@ -39,9 +39,9 @@ def qualify(evidence: Path) -> dict:
         "runtime_image_id": host.record["runtime_image_id"],
         "acceleration": "software-emulation", **before,
     }
-    write_record(directory / "T08.json", report)
+    write_record(directory / (identifier + '.json'), report)
     updated = copy.deepcopy(bundle.context["evidence"])
-    _update_references(updated, {"T08": report}, directory)
+    _update_references(updated, {identifier: report}, directory)
     path = directory.parent / (directory.name + "-evidence.json")
     write_record(path, updated)
     return {"result": report["result"], "reports": str(directory), "evidence": str(path),
@@ -56,10 +56,22 @@ def lifecycle_group(bundle: QualificationBundle) -> dict:
     return {**group, 'cases': cases}
 
 
+def host_group(bundle: QualificationBundle, identifier: str) -> dict:
+    if identifier == 'T08':
+        return lifecycle_group(bundle)
+    selected = next((group for group in bundle.context['catalog']['groups']
+                     if group['id'] == identifier), None)
+    if selected is None or not any(case['id'] in HOST_CASE_TESTS for case in selected['cases']):
+        raise ValueError('An existing registered host qualification group is required')
+    return selected
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("evidence", type=Path)
-    result = qualify(parser.parse_args().evidence)
+    parser.add_argument('--group', default='T08')
+    arguments = parser.parse_args()
+    result = qualify(arguments.evidence, arguments.group)
     print(json.dumps(result))
     return 0 if result["result"] == "pass" else 1
 

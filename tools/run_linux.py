@@ -67,8 +67,11 @@ def main() -> None:
         default="maddy"
     )
     parser.add_argument("--evidence", type=Path)
-    parser.add_argument("--module", help="Run one Maddy/runtime module; not the complete suite")
+    parser.add_argument("--module", help="Run one Maddy/runtime/ACME module; partial suite")
+    parser.add_argument("--resume", type=Path, help="Resume a matching interrupted catalogue")
     arguments = parser.parse_args()
+    if arguments.resume is not None and arguments.suite != 'qualification':
+        parser.error('--resume requires --suite qualification')
     entrypoint = suite_command(arguments.suite, arguments.evidence, arguments.module)
     require_fixture_disk(ROOT)
     context = json.loads(docker(("context", "inspect")))[0]
@@ -137,10 +140,12 @@ def main() -> None:
             )
             if arguments.suite == "maddy" and arguments.module is None:
                 code = run_maddy(command, root, docker)
-            elif arguments.suite == "runtime" and arguments.module is None:
-                code = run_modules(command, (root, "runtime"), docker)
+            elif arguments.suite in {"runtime", "acme"} and arguments.module is None:
+                code = run_modules(command, (root, arguments.suite), docker)
             elif arguments.suite == 'qualification':
-                code = run_catalogue(command, (root, arguments.evidence, entrypoint), docker)
+                code = run_catalogue(command, (
+                    root, arguments.evidence, entrypoint, arguments.resume,
+                ), docker)
             else:
                 result = subprocess.run(  # noqa: S603, S607 -- fixed pinned fixture command.
                     ("docker",) + command + entrypoint, check=False

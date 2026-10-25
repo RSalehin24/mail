@@ -36,7 +36,8 @@ def fixture_budget(suite: str) -> FixtureBudget:
         return FixtureBudget(128, WEB_MEMORY_MIB + MADDY_MEMORY_MIB)
     if suite == "maddy":
         companions = max(
-            2 * MADDY_MEMORY_MIB, MADDY_MEMORY_MIB + ACME_WRITER_MEMORY_MIB, RESTORE_MEMORY_MIB,
+            2 * MADDY_MEMORY_MIB, MADDY_MEMORY_MIB + ACME_WRITER_MEMORY_MIB,
+            MADDY_MEMORY_MIB + WEB_MEMORY_MIB, RESTORE_MEMORY_MIB,
         )
         return FixtureBudget(192, companions)
     if suite in {"unit", "integration"}:

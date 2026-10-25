@@ -63,6 +63,16 @@ class CatalogueControllerTests(unittest.TestCase):
         creates = [call for call in self.docker.calls if call[0] == 'create']
         self.assertTrue(all(call[call.index('--memory') + 1] == '192m' for call in creates))
 
+    def test_a_fresh_assertion_module_cannot_execute_the_accumulated_group(self):
+        selected = 'tests.maddy.test_restic_restore'
+        job = self.job(selected)
+        (self.root / (selected + '.json')).write_text(json.dumps({'test_id': selected}))
+        self.run_job(job, 0)
+        create = next(call for call in self.docker.calls if call[0] == 'create')
+        self.assertIn('--assertion-module', create)
+        self.assertNotIn('--group', create)
+        self.assertEqual(create[create.index('--memory') + 1], '192m')
+
     def test_oom_is_recorded_as_failure_even_when_a_report_already_exists(self):
         self.docker.state.update({'ExitCode': 137, 'OOMKilled': True})
         job = self.job('T09')

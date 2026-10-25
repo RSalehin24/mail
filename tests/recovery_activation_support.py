@@ -16,6 +16,7 @@ from host.docker import Docker
 from shared.files import atomic_json, protected_json
 from shared.runtime_policy import RuntimePolicy
 from tests.fixture_values import LIFECYCLE_MAILBOX_PASSWORD
+from tests.fixture_values import REPLACEMENT_PASSWORD as LEGACY_FIXTURE_PASSWORD
 from tests.recovery_install_support import command
 from tests.recovery_web_support import (
     RecoveredHttps,
@@ -33,7 +34,7 @@ def credential_digest():
     return hashlib.sha256(json.dumps(records).encode()).hexdigest()
 
 
-def verify_mail():
+def verify_mail(expected=None):
     context = ssl.create_default_context(cafile='/opt/maddy/tls/fixture/fullchain.pem')
     with imaplib.IMAP4_SSL('127.0.0.1', 993, ssl_context=context, timeout=5) as connection:
         connection.login(MAILBOX, LIFECYCLE_MAILBOX_PASSWORD)
@@ -48,9 +49,18 @@ def verify_mail():
             if status != 'OK' or not isinstance(content[0], tuple):
                 raise RuntimeError('Restored fixture body unavailable')
             bodies.append(content[0][1])
-        if BODY not in b'\n'.join(bodies):
+        content = b'\n'.join(bodies)
+        if BODY not in content:
             raise RuntimeError('Restored fixture body changed')
-    return {'mailbox_imap_authenticated': True, 'original_message_body_restored': True}
+        if expected is not None:
+            excluded = expected.get('post_capture_body')
+            if (expected['captured_body'].encode() not in content
+                    or excluded is not None and excluded.encode() in content):
+                raise RuntimeError('Restored mail does not match the immutable source cutoff')
+    return {'mailbox_imap_authenticated': True, 'original_message_body_restored': True,
+            'captured_message_visible': expected is not None,
+            'post_capture_message_absent': expected is not None
+            and expected.get('post_capture_body') is not None}
 
 
 class RecoveryActivation:
@@ -121,10 +131,10 @@ class RecoveryActivation:
             raise RuntimeError('Verified activation is required')
         timeout = float(self.profile['consumers']['mail-admin']['environment']
                         ['OPERATION_TIMEOUT_SECONDS'])
-        web = RecoveredHttps(timeout + 5)
+        material = protected_json(self.target.root / 'replacement-auth.json')
+        web = RecoveredHttps(timeout + 5, material.get('password', LEGACY_FIXTURE_PASSWORD))
         old = protected_json(self.target.root / 'original-auth.json')
         checks = web.old_authentication_rejected(old)
-        material = protected_json(self.target.root / 'replacement-auth.json')
         cookie = web.login(material)
         atomic_json(self.target.root / 'verified-cookie.json', {'cookie': cookie})
         self.target.record('https-authentication', {
@@ -135,7 +145,8 @@ class RecoveryActivation:
             raise RuntimeError('Authenticated HTTPS to actual helper inventory failed')
         if credential_digest() != activated['credential_digest_before']:
             raise RuntimeError('Restored credentials changed during activation')
-        self.target.record('verify', {**checks, **verify_mail(), **restored_permissions(),
+        mail = verify_mail(self.target.context.get('message_observation'))
+        self.target.record('verify', {**checks, **mail, **restored_permissions(),
             'https_nonroot_helper_inventory_passed': True, 'credentials_unchanged': True,
             'observed_at': time.time(), 'boot_id': Path('/proc/sys/kernel/random/boot_id')
             .read_text().strip()})

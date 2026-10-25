@@ -1,8 +1,11 @@
 """Execute recovery on a different, empty disposable guest using an external kit."""
 
 import argparse
+import re
+import secrets
 import time
 import uuid
+from datetime import datetime
 from pathlib import Path
 
 from host.backup_cli import prepare_state
@@ -12,10 +15,11 @@ from host.restic_process import ResticProcess
 from host.restic_repository import ResticRepository
 from host.restore import Restore
 from shared.files import atomic_json, protected_json
-from tests.fixture_values import REPLACEMENT_PASSWORD
 from tests.host_support import require_fixture_guest
 from tests.recovery_install_support import RecoveryInstallation, command
 from tests.recovery_terminal import TerminalRecovery
+from tools.qualification_bundle import QualificationBundle
+from tools.run_tests import source_digest, timestamp
 
 
 class RecoveryTarget:
@@ -57,11 +61,28 @@ class RecoveryTarget:
         return ImageTools(Docker(), profile)
 
     def record(self, phase, facts):
-        atomic_json(self.root / (phase + '-observation.json'), {
-            **facts, 'phase': phase, 'observed_at': time.time(),
+        if re.fullmatch(r'[a-z][a-z-]{0,48}', phase) is None:
+            raise RuntimeError('Unexpected recovery observation phase')
+        path = self.root / (phase + '-observation.json')
+        if path.exists():
+            raise RuntimeError('Existing recovery evidence must be preserved; use a fresh attempt')
+        stamp = timestamp()
+        atomic_json(path, {
+            **facts, **self.qualification_binding(),
+            'phase': phase, 'observed_at': datetime.fromisoformat(stamp).timestamp(),
+            'observed_at_utc': stamp,
             'target_instance_id': self.context['target_instance_id'],
             'source_instance_id': self.context['source_instance_id'],
         })
+
+    def qualification_binding(self):
+        evidence = self.context.get('qualification_evidence')
+        if evidence is None:
+            return {'scope': 'development; not acceptance'}
+        bundle = QualificationBundle(Path(evidence))
+        bundle.verify_source()
+        return {**bundle.identity, 'source_sha256': source_digest(),
+                'scope': 'frozen-disposable-replacement-recovery'}
 
     def stage(self):
         self.require_empty()
@@ -78,11 +99,12 @@ class RecoveryTarget:
         self.record('prepare', {**prepared, 'services_started': False})
 
     def recover(self):
+        password = secrets.token_urlsafe(40)
         material = TerminalRecovery(self.operation(), self.tools()).recover(
-            self.destination, REPLACEMENT_PASSWORD,
+            self.destination, password,
         )
         atomic_json(self.root / 'replacement-auth.json', {
-            'seed': material.seed, 'codes': list(material.codes),
+            'seed': material.seed, 'codes': list(material.codes), 'password': password,
         })
         self.record('recover', {'private_terminal_completed': True,
                                 'credentials_logged': False, 'services_started': False})

@@ -225,7 +225,7 @@ class RunnerTests(unittest.TestCase):
         required = (budget.controller_mib + budget.companions_mib + 128) * 1024 * 1024
         self.assertEqual(budget.minimum_available_bytes, required)
         self.assertGreaterEqual(fixture_budget("maddy").companions_mib, 2 * MADDY_MEMORY_MIB)
-        self.assertEqual(fixture_budget("maddy").minimum_available_bytes, 512 * 1024**2)
+        self.assertEqual(fixture_budget("maddy").minimum_available_bytes, 544 * 1024**2)
         self.assertEqual(fixture_budget("qualification").minimum_available_bytes, 800 * 1024**2)
         with self.assertRaises(ValueError):
             fixture_budget("unknown")

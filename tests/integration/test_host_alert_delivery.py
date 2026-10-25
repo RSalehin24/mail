@@ -31,7 +31,7 @@ class HostAlertDeliveryTests(AlertDeliveryFixture):
     def write_healthy(self):
         atomic_json(self.paths[Path('/var/lib/mail-admin-backup/manifest.json')], {
             'verified': True, 'available': True, 'availability_observed_at': self.state.now,
-            'cutoff': datetime.fromtimestamp(self.state.now, UTC).isoformat()})
+            'cutoff': datetime.fromtimestamp(self.state.now - 1, UTC).isoformat()})
         atomic_json(self.paths[Path('/var/lib/mail-admin-certificates/state.json')], {
             **self.certificate, 'outcome': 'active', 'consumers': {}})
 
@@ -47,6 +47,18 @@ class HostAlertDeliveryTests(AlertDeliveryFixture):
         scope.enter_context(patch('host.monitor.protected_json', side_effect=self.fixed_state))
         scope.enter_context(patch('host.monitor.os.statvfs', side_effect=self.actual_capacity))
         return scope
+
+    def test_submicrosecond_clock_keeps_a_healthy_backup_cutoff_in_the_past(self):
+        self.state.now = float(int(self.state.now)) + 0.0000007
+        self.write_healthy()
+        manifest = self.paths[Path('/var/lib/mail-admin-backup/manifest.json')]
+        cutoff = datetime.fromisoformat(protected_json(manifest, os.getuid())['cutoff'])
+        age = self.state.now - cutoff.timestamp()
+        self.assertGreater(age, 0)
+        self.assertLess(age, 2)
+        with self.host_scope():
+            self.monitor.host()
+        self.assert_received('recovered', 4)
 
     def fail_delivery_with_host_faults(self):
         manifest, certificate = self.paths.values()

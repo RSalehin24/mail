@@ -14,7 +14,7 @@ class RuntimeAuthentication:
     def __init__(self, assertions, fixture):
         self.assertions, self.fixture = assertions, fixture
 
-    def enroll(self):
+    def bootstrap(self):
         auth = Authentication(
             AuthDependencies(
                 self.fixture.database,
@@ -23,7 +23,12 @@ class RuntimeAuthentication:
                 time.time,
             )
         )
-        token = Enrollment(auth).issue_bootstrap()
+        return Enrollment(auth).issue_bootstrap()
+
+    def enroll(self):
+        self.confirm(self.bootstrap())
+
+    def confirm(self, token):
         status, headers, material = self.fixture.api("POST", "/api/setup", {"token": token})
         self.assertions.assertEqual(status, 200)
         self.assertions.assertEqual(headers["cache-control"], "no-store")

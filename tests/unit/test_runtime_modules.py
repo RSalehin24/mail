@@ -39,7 +39,7 @@ class RuntimeModuleTests(test_maddy_modules.MaddyModuleTests):
         self.assertEqual(module_inventory('pinned-image', docker, 'runtime'), self.inventory)
         self.assertIn('MAIL_ADMIN_MODULE_SUITE=runtime', calls[0])
         with self.assertRaises(ValueError):
-            module_inventory('pinned-image', docker, 'acme')
+            module_inventory('pinned-image', docker, 'integration')
         with patch.dict(self.inventory, {'suite': 'maddy'}), self.assertRaises(ValueError):
             module_inventory('pinned-image', docker, 'runtime')
 

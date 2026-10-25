@@ -18,9 +18,9 @@ from helper.service import HelperDependencies, HostHelper
 from host.locks import LockPolicy
 from tests.helper_support import DeletePolicy
 from tests.tls_support import CertificateFixture
+from tools.maddy_fixture import fixture_reference
 from tools.resources import MADDY_MEMORY_MIB, MADDY_RUNTIME_TMPFS_BYTES
 
-IMAGE = "foxcpp/maddy:0.9.5@sha256:2b0c7e0e06b5e6e9e0738a2d6a826dc03b945e864db69288efd7fad4a62ee1e8"
 CONFIGURATION = """hostname mail.rsalehin24.me
 state_dir /data
 runtime_dir /run/maddy
@@ -65,8 +65,13 @@ def imap_login(fixture, email, password):
     return connection
 
 
+class FixtureMaddy(DockerMaddy):
+    def expected_cli_version(self):
+        return '0.9.5+postmaster-fixture.1'
+
+
 class RealMaddyFixture:
-    def __init__(self):
+    def __init__(self, configuration=CONFIGURATION):
         self.docker = shutil.which("docker")
         if not self.docker:
             raise RuntimeError("Docker is required; cases cannot be skipped")
@@ -95,7 +100,7 @@ class RealMaddyFixture:
         self.certificates = CertificateFixture(self.root)
         self.tls = self.certificates.issue()
         self.configuration = self.root / "maddy.conf"
-        self.configuration.write_text(CONFIGURATION)
+        self.configuration.write_text(configuration)
         self.configuration.chmod(0o600)
         self.identifier = ""
 
@@ -117,7 +122,7 @@ class RealMaddyFixture:
         if not endpoint.startswith("unix://") or not override.startswith("unix://"):
             raise RuntimeError("Qualification requires a local Unix Docker endpoint")
 
-    def start(self):
+    def launch(self):
         launcher = self.root / "maddy-launcher"
         shutil.copy2(Path(__file__).resolve().parents[1] / "host/maddy-launcher", launcher)
         launcher.chmod(0o755)
@@ -160,7 +165,7 @@ class RealMaddyFixture:
             + (
                 "--entrypoint",
                 "/usr/local/libexec/mail-admin-maddy",
-                IMAGE,
+                fixture_reference(),
                 "-config",
                 "/data/maddy.conf",
                 "run",
@@ -171,10 +176,14 @@ class RealMaddyFixture:
         inspected = json.loads(self.command(("inspect", self.identifier)).stdout)[0]
         self.refresh_ports(inspected)
         self._wait()
+        self.maddy_image = inspected['Image']
+        return inspected
+
+    def start(self):
+        inspected = self.launch()
         image = inspected["Image"]
-        self.maddy_image = image
         mounts = {mount["Destination"]: mount["Source"] for mount in inspected["Mounts"]}
-        self.maddy = DockerMaddy(
+        self.maddy = FixtureMaddy(
             {
                 "inputs": {"maddy_image_id": image, "operation_timeout_seconds": 10},
                 "maddy_mounts": mounts,

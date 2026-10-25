@@ -25,8 +25,67 @@ READINESS_TESTS = 'tests.integration.test_relay_readiness.RelayReadinessApiTests
 STORAGE_FAILURE_TESTS = 'tests.integration.test_storage_failures.StorageFailureApiTests'
 NETWORK_DEADLINE_TESTS = 'tests.integration.test_network_deadlines.NetworkDeadlineApiTests'
 HOUSEKEEPING_TESTS = 'tests.unit.test_housekeeping.HousekeepingTests'
+GUARDED_DELETION_TESTS = 'tests.maddy.test_guarded_deletion.GuardedDeletionTests'
+ACME_COORDINATION_TESTS = 'tests.acme.test_coordination.AcmeCoordinationTests'
+SNAPSHOT_CAPTURE_TEST = (
+    'tests.acme.test_snapshot_capture.ActualSnapshotCaptureTests.'
+    'test_both_real_writers_stop_and_only_previously_running_services_resume'
+)
+LOCK_EXCLUSION_TESTS = 'tests.unit.test_coordination_exclusion.CoordinationExclusionTests'
+KERNEL_TESTS = 'tests.host.test_kernel_scenarios.KernelScenarioTests'
+CUTOVER_RUNTIME_TESTS = 'tests.host.test_cutover_runtime.CutoverRuntimeTests'
+CUTOVER_BOOT_TEST = (
+    'tests.host.test_cutover_reboot.CutoverRebootTests.'
+    'test_timers_stay_disabled_before_and_during_cutover_across_a_real_kernel_boot'
+)
+CUTOVER_SERVICE_TEST = (
+    f'{CUTOVER_RUNTIME_TESTS}.'
+    'test_loaded_service_takes_both_locks_and_missed_timer_runs_follow_served_checks'
+)
+MAINTENANCE_TESTS = 'tests.maddy.test_maintenance_coordination.MaintenanceCoordinationTests'
+GENERATION_CRASH_TESTS = 'tests.acme.test_generation_crashes.GenerationCrashTests'
 
 HOST_CASE_TESTS: dict[str, tuple[str, ...]] = {
+    'T18.02': (
+        'tests.host.test_replacement_recovery.ReplacementRecoveryTests.'
+        'test_actual_immutable_off_vm_snapshot_is_verified_before_publication_and_download',
+    ),
+    'T18.03': (
+        'tests.host.test_replacement_recovery.ReplacementRecoveryTests.'
+        'test_complete_replacement_has_real_keys_boot_journal_tls_acme_mail_and_https',
+    ),
+    'T18.04': (
+        'tests.host.test_replacement_recovery.ReplacementRecoveryTests.'
+        'test_off_source_key_decrypts_the_snapshot_and_selected_recovery_objectives_hold',
+    ),
+    'T05.05': (
+        f'{KERNEL_TESTS}.'
+        'test_interrupted_offline_recovery_survives_kernel_boot_without_renewal_restarting_web',
+    ),
+    'T15.03': (
+        f'{KERNEL_TESTS}.'
+        'test_kernel_power_cut_at_all_staging_publication_and_consumer_boundaries_recovers',
+    ),
+    'T15.06': (
+        f'{KERNEL_TESTS}.'
+        'test_referenced_and_rollback_pairs_survive_retention_and_an_actual_kernel_boot',
+    ),
+    'T16.01': (
+        'tests.host.test_legacy_drain.LegacyDrainTests.'
+        'test_real_managed_legacy_writer_drains_before_baseline_scope_can_change_files',
+        'tests.host.test_legacy_drain.LegacyDrainTests.'
+        'test_real_manual_writer_leaves_completion_unknown_and_blocks_the_baseline_after_exit',
+    ),
+    'T16.02': (CUTOVER_BOOT_TEST,),
+    'T16.03': (
+        f'{CUTOVER_RUNTIME_TESTS}.'
+        'test_every_real_forward_file_and_activation_transition_requires_matched_rollback',
+        f'{CUTOVER_RUNTIME_TESTS}.'
+        'test_every_interrupted_real_rollback_stays_paused_until_its_matched_retry_is_verified',
+        CUTOVER_BOOT_TEST,
+    ),
+    'T16.04': (CUTOVER_SERVICE_TEST,),
+    'T16.05': (CUTOVER_SERVICE_TEST,),
     "T08.01": (
         f"{DASHBOARD_HOST_TESTS}."
         "test_helper_starts_late_preserving_authorization_and_completed_mutation",
@@ -44,9 +103,98 @@ HOST_CASE_TESTS: dict[str, tuple[str, ...]] = {
         f"{DASHBOARD_HOST_TESTS}."
         "test_full_reboot_prepares_restricted_paths_before_autostart_and_preserves_outcomes",
     ),
+    'T22.02': (
+        'tests.host.test_log_retention.HostLogRetentionTests.'
+        'test_shipped_journal_limit_expires_old_records_and_keeps_current_records',
+    ),
 }
 
 CASE_TESTS: dict[str, tuple[str, ...]] = {
+    'T05.05': (
+        f'{MAINTENANCE_TESTS}.'
+        'test_interruption_keeps_actual_web_closed_against_renewal_and_unverified_resume',
+    ),
+    'T15.03': (
+        f'{GENERATION_CRASH_TESTS}.'
+        'test_sigkill_at_each_staging_and_publication_boundary_keeps_one_complete_pair',
+        f'{GENERATION_CRASH_TESTS}.'
+        'test_sigkill_between_actual_consumer_activations_resumes_without_another_issuance',
+    ),
+    'T15.06': (
+        f'{GENERATION_CRASH_TESTS}.'
+        'test_retention_protects_references_and_restarted_consumers_serve_the_active_pair',
+    ),
+    'T16.05': (
+        f'{MAINTENANCE_TESTS}.'
+        'test_first_dashboard_registration_cannot_race_real_renewal_activation',
+    ),
+    'T01.01': (
+        'tests.integration.test_rollout_gates.RolloutGateTests.'
+        'test_failed_build_or_recovery_assertion_blocks_all_dependent_maintenance_gates',
+        'tests.unit.test_cutover.CutoverAdapterTests.'
+        'test_gate_or_approval_failure_prevents_all_cutover_host_actions',
+    ),
+    'T01.02': (
+        'tests.integration.test_rollout_gates.RolloutGateTests.'
+        'test_every_missing_or_invalid_deployment_input_is_rejected',
+        'tests.unit.test_rollout.RolloutTests.'
+        'test_missing_deployment_identities_never_match_null_approval',
+    ),
+    'T01.03': (
+        'tests.maddy.test_baseline_sources.BaselineSourceTests.'
+        'test_initial_install_and_running_or_stopped_upgrades_enforce_actual_state_sources',
+        'tests.maddy.test_restic_restore.NativeResticRestoreTests.'
+        'test_actual_mail_and_enrolled_dashboard_restore_from_a_deduplicated_repository',
+    ),
+    'T01.04': (
+        'tests.integration.test_rollout_gates.RolloutGateTests.'
+        'test_skipped_failed_missing_and_reversed_phase_gates_cannot_be_used',
+        'tests.browser.test_https.HttpsBrowserTests.'
+        'test_fresh_bootstrap_precedes_startup_and_enrollment_follows_lock_release',
+    ),
+    'T01.05': (
+        'tests.unit.test_qualification_adapters.QualificationAdapterTests.'
+        'test_authenticated_metadata_and_negotiated_key_are_observed_not_expected_copies',
+        'tests.unit.test_qualification_adapters.QualificationAdapterTests.'
+        'test_running_image_is_compared_with_archive_contents_and_replacement_is_rejected',
+        'tests.unit.test_qualification_adapters.QualificationAdapterTests.'
+        'test_helper_or_unit_content_permissions_and_extra_source_drift_fail',
+        'tests.unit.test_qualification_adapters.QualificationAdapterTests.'
+        'test_effective_configuration_drift_is_type_sensitive',
+    ),
+    'T03.04': (
+        'tests.browser.test_https.HttpsBrowserTests.'
+        'test_secrets_are_masked_no_store_and_absent_from_browser_and_application_logs',
+    ),
+    'T03.05': (
+        'tests.browser.test_https.HttpsBrowserTests.'
+        'test_untrusted_names_and_notes_are_inert_and_actual_api_errors_have_only_safe_ids',
+    ),
+    'T18.02': (
+        'tests.integration.test_r2_transfer.R2TransferTests.'
+        'test_immutable_staging_and_manifest_publication_follow_actual_verified_https_transfer',
+        'tests.integration.test_r2_transfer.R2TransferTests.'
+        'test_failed_download_verification_never_publishes_a_trusted_manifest',
+        'tests.integration.test_r2_transfer.R2TransferTests.test_existing_archive_cannot_be_overwritten',
+    ),
+    'T19.05': (
+        'tests.maddy.test_maintenance_coordination.MaintenanceCoordinationTests.'
+        'test_real_terminal_recovery_activates_after_both_shared_locks_are_released',
+        'tests.unit.test_host_recovery.HostRecoveryTests.'
+        'test_parallel_recovery_cannot_enter_the_gap_before_container_creation',
+        'tests.unit.test_host_recovery.HostRecoveryTests.'
+        'test_resume_keeps_the_private_lease_during_activation_without_self_deadlock',
+        'tests.maddy.test_surviving_helper.SurvivingHelperTests.'
+        'test_sigkill_parent_keeps_actual_cli_survivor_and_blocks_backup_and_duplicate_writes',
+        'tests.maddy.test_restic_reconciliation.ResticReconciliationTests.'
+        'test_a_real_surviving_process_blocks_reconciliation_until_repository_verification',
+        'tests.maddy.test_restic_restore.NativeResticRestoreTests.'
+        'test_actual_mail_and_enrolled_dashboard_restore_from_a_deduplicated_repository',
+    ),
+    'T21.04': (
+        'tests.acme.test_resource_peak.ResourcePeakTests.'
+        'test_combined_peak_includes_tmpfs_helper_cli_and_transient_work_within_budget',
+    ),
     "T02.01": (f"{SETUP_TESTS}.test_missing_wrong_expired_and_reused_tokens_are_rejected",),
     "T02.02": (
         f"{SETUP_TESTS}.test_wrong_six_digit_totp_does_not_initialize_or_issue_recovery_codes",
@@ -150,6 +298,12 @@ CASE_TESTS: dict[str, tuple[str, ...]] = {
     ),
     "T05.03": (
         f"{SECURITY_TESTS}.test_replacement_revokes_old_authentication_and_recovery_material",
+    ),
+    'T05.04': (
+        'tests.maddy.test_restic_restore.NativeResticRestoreTests.'
+        'test_actual_mail_and_enrolled_dashboard_restore_from_a_deduplicated_repository',
+        'tests.unit.test_host_recovery.RecoveryImageTests.'
+        'test_nonterminal_recovery_performs_no_docker_action',
     ),
     "T06.01": (
         f"{API_TESTS}.test_full_login_cookie_flags_and_logout",
@@ -375,6 +529,54 @@ CASE_TESTS: dict[str, tuple[str, ...]] = {
         f'{READINESS_TESTS}.'
         'test_polling_sends_nothing_and_excess_explicit_sends_do_not_reach_smtp_or_logs',
     ),
+    'T17.01': (
+        f'{GUARDED_DELETION_TESTS}.'
+        'test_restored_backup_requires_age_incarnation_and_complete_store_coverage',
+        f'{GUARDED_DELETION_TESTS}.'
+        'test_https_delete_updates_metadata_and_old_backup_cannot_cover_recreated_mail',
+        f'{GUARDED_DELETION_TESTS}.'
+        'test_pending_https_delete_resolves_once_and_old_backup_cannot_cover_recreated_mail',
+    ),
+    'T17.02': (
+        f'{GUARDED_DELETION_TESTS}.'
+        'test_unavailable_or_tampered_archive_and_forged_cutoff_cannot_authorize_real_deletion',
+    ),
+    'T17.03': (
+        f'{GUARDED_DELETION_TESTS}.'
+        'test_missing_stale_changed_or_protected_recipient_policy_blocks_actual_removal',
+    ),
+    'T17.04': (
+        'tests.maddy.test_operational_recipients.OperationalRecipientTests.'
+        'test_actual_smtp_postmaster_and_aliases_deliver_into_the_selected_target',
+        'tests.maddy.test_operational_recipients.OperationalRecipientTests.'
+        'test_complete_case_insensitive_bare_tokens_deliver_but_lookalikes_and_senders_fail',
+        'tests.maddy.test_operational_recipients.OperationalRecipientTests.'
+        'test_ordinary_recipient_delivery_and_esmtp_parameter_validation_are_preserved',
+    ),
+    'T18.01': (SNAPSHOT_CAPTURE_TEST,),
+    'T19.01': (
+        f'{ACME_COORDINATION_TESTS}.'
+        'test_real_acquisition_allows_mailbox_cli_but_excludes_capture_until_completion',
+    ),
+    'T19.02': (
+        SNAPSHOT_CAPTURE_TEST,
+        f'{LOCK_EXCLUSION_TESTS}.'
+        'test_real_contended_renewal_is_acquired_before_maddy_and_waits_are_bounded',
+    ),
+    'T19.03': (
+        f'{LOCK_EXCLUSION_TESTS}.'
+        'test_real_contended_renewal_is_acquired_before_maddy_and_waits_are_bounded',
+        f'{LOCK_EXCLUSION_TESTS}.'
+        'test_actual_stable_lock_files_reject_modes_symlinks_and_unexpected_owners',
+    ),
+    'T19.04': (
+        f'{ACME_COORDINATION_TESTS}.'
+        'test_sigkill_of_host_renewal_preserves_surviving_certbot_exclusion_until_reconciled',
+        f'{ACME_COORDINATION_TESTS}.'
+        'test_lost_attachment_releases_parent_locks_but_live_certbot_still_blocks_capture',
+        'tests.maddy.test_surviving_helper.SurvivingHelperTests.'
+        'test_sigkill_parent_keeps_actual_cli_survivor_and_blocks_backup_and_duplicate_writes',
+    ),
     "T18.05": (
         "tests.maddy.test_restic_restore.NativeResticRestoreTests."
         "test_actual_mail_and_enrolled_dashboard_restore_from_a_deduplicated_repository",
@@ -472,6 +674,12 @@ CASE_TESTS: dict[str, tuple[str, ...]] = {
         'test_cleanup_preserves_active_shared_budgets_until_the_exact_window_boundary',
         f'{HOUSEKEEPING_TESTS}.'
         'test_cleanup_never_reopens_consumed_recovery_codes_or_the_totp_replay_watermark',
+    ),
+    'T22.02': (
+        'tests.unit.test_history_retention.HistoryRetentionTests.'
+        'test_audit_and_unreferenced_relay_history_expire_in_bounded_batches_after_ninety_days',
+        'tests.runtime.test_log_retention.ContainerLogRetentionTests.'
+        'test_shipped_local_driver_rotates_old_output_and_retains_current_logs',
     ),
     'T22.03': (
         f'{HOUSEKEEPING_TESTS}.'

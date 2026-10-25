@@ -17,6 +17,7 @@ from tests.tls_compose_support import ConsumerCompose, ConsumerFixtureDocker
 class PrivateTlsConsumers:
     def __init__(self, mail, renewal):
         self.mail, self.renewal = mail, renewal
+        self.start_mail = mail.start
         self.web = RuntimeFixture()
         self.compose = ConsumerCompose(mail, self.web)
         self.records = {}
@@ -28,7 +29,7 @@ class PrivateTlsConsumers:
         return self.start_roles(('maddy',))
 
     def start_roles(self, roles):
-        self.mail.start()
+        self.start_mail()
         self.web.mount_root = self.web.root
         generation = self.renewal.generations.stage(self.mail.tls)
         self.compose.configuration()
@@ -81,13 +82,17 @@ class PrivateTlsConsumers:
             }
         return observations
 
-    def resume_in_new_process(self):
+    def save_context(self):
         context = self.mail.root / ('activation-context-' + str(uuid.uuid4()) + '.json')
         atomic_json(context, {
             'mail_root': str(self.mail.root), 'web_root': str(self.web.root),
             'project': self.compose.project, 'names': self.compose.names, 'records': self.records,
             'trust': str(self.renewal.generations.validator.trust_file),
         })
+        return context
+
+    def resume_in_new_process(self):
+        context = self.save_context()
         result = subprocess.run((sys.executable, '-m', 'tests.tls_activation_worker', str(context)),
                                 capture_output=True, text=True, timeout=90, check=False)
         if result.returncode:

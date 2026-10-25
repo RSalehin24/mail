@@ -5,7 +5,83 @@
 `tools/qualification_cases.py` against a frozen release bundle on isolated
 Linux/amd64. Every other catalogue case remains `not_run`; a missing assertion,
 skip, expected failure, test-loading error or changed source cannot pass a case.
-The current registry is incomplete and cannot qualify G01.
+All 111 cases now have reviewed local/host assertion mappings. G01 remains blocked
+until their actual matching execution and the candidate checker pass. A mapping is
+not an executed acceptance result. See the [111-case work list](qualification-worklist.md).
+
+The isolated Maddy postmaster patch and pinned build inputs were approved. Its
+fixture image is restricted to the exact OCI/configuration identities in
+`tools/maddy_fixture.py`; production selection is separate. Source hashes, patch,
+parser regression and provenance are described in
+[the fixture notes](../tools/maddy-fixture/README.md).
+
+`tools/run_https_browser.py --evidence BUNDLE/evidence.json` exercises the actual
+HTTPS runtime with an isolated Chrome profile and a specific fixture-leaf SPKI pin.
+The source-frozen `tools/browser-fixture.json` binds the existing Node, Chrome
+launcher and Chrome framework by path, hash and version before and after execution.
+The catalogue rejects development, changed-runner, stale or differently bound
+browser reports. The private material remains in the bounded fixture directory.
+
+Resume interrupted local catalogue execution with:
+
+```sh
+.venv/bin/python tools/run_linux.py --suite qualification \
+  --evidence BUNDLE/evidence.json --resume BUNDLE/qualification-UUID
+```
+
+The runner reuses only successful, complete, fresh modules whose source, artifact,
+image, engine, inventory and controller limits still match. Failed/interrupted
+module attempts and partial assembly files are retained. Live controllers block
+resume; completed catalogue results remain immutable. Normal assertion failures
+remain failures while independent modules continue.
+
+Guest kernel scenarios use `python -m tests.kernel_scenario_worker prepare DIRECTORY
+--instance UUID --evidence EVIDENCE` in the bounded fixture controller, followed by
+an externally observed power cut of the exact `LocalMock`, then `verify` with the
+same bindings. `--only activation` and `--only recovery` select independent batches;
+only their recorded selected cases can qualify. The full TLS batch includes every
+staging/publication boundary. Host T05/T15 assertions consume the resulting frozen
+observation through `MAIL_ADMIN_KERNEL_OBSERVATION`.
+
+The private systemd cutover fixtures exercise the production `Cutover`,
+`RootCutoverHost`, `ReleaseFiles` and `RollbackPackage` with only unit names, paths
+and the isolated renewal entry point adapted. T16 also requires a real partial
+installation across a kernel boot (`tests/cutover_reboot_support.py`), supplied by
+`MAIL_ADMIN_CUTOVER_REBOOT`. A disabled timer or a configuration file alone cannot
+complete these runtime assertions.
+
+Full replacement uses `tests/recovery_capture_support.py`, the existing
+`tests/recovery_target_support.py` phases and
+`tools/record_replacement_isolation.py`. A verified frozen R2 capture must precede
+source shutdown. Source/replacement controllers are inspected independently; the
+source must stay stopped and its disk must never attach to the target. Recovery
+phase records are immutable. Host T18 consumes `MAIL_ADMIN_REPLACEMENT_CONTEXT` and
+requires all 18 roles, real ACME lineage/account state, matching before/after-cutoff
+mail markers, fresh private password/TOTP, actual HTTPS/helper/mail checks, a new
+kernel boot and the selected RPO/RTO. Earlier prototype observations cannot fill
+these bindings. Alert-provider credentials and external monitoring are separate
+release inputs and are not dependencies of source capture.
+
+The operations-development runner now isolates catalogue assertions by test
+module, preserving the original 192 MiB controller bound. The previous frozen
+group runner accumulated unrelated T20 imports/state before invoking Restic;
+its child was OOM-killed and T20.05 failed. That interrupted run is preserved in
+`build/qualification-8a5ad743-resumed.log`. The actual restoration assertion passes
+in a fresh development controller (`build/fresh-restic-qualification-controller-actual.log`).
+Assembly requires each frozen module's exact assertions, artifact/image bindings
+and observed controller exit without OOM; shared assertions execute once and keep
+their original execution start time. Unmapped cases remain `not_run`, and a missing
+module/controller observation prevents assembly. This runner change still needs a
+complete final frozen catalogue run; its focused resource regression is not G01.
+
+Host assertions can also supply part of a case: T22.02 requires both the database
+history/container-log assertions and the independent guest-journal assertion.
+`tools/run_host_qualification.py EVIDENCE --group T22` executes only its registered
+host portion and leaves the other group cases `not_run`. The report remains
+blocked until complete catalogue assembly. The merger verifies the frozen source,
+installed files, configuration, image and exact host assertions before combining
+them with local outcomes. A missing host report cannot qualify local-only evidence
+or hide a local failure. The default host group remains T08.
 
 The runtime development suite now reuses the Maddy module-isolation runner, with
 its original 128 MiB controller limit. A combined expanded runtime run was killed

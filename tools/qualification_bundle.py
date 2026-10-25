@@ -12,6 +12,7 @@ from check_release import (  # noqa: E402
     validate_identity,
     verified_file,
 )
+from check_release import validate_report_time as validate_report_time  # noqa: E402
 from verification_support import read_json  # noqa: E402
 
 from tools.qualification_archive import ArtifactArchive, image_identity  # noqa: E402

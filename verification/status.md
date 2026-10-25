@@ -7,6 +7,119 @@ installation, live-service restart, mailbox mutation, external mail or DNS chang
 has been performed by the implementation run. Only explicitly authorized synthetic
 fixtures have been added to the existing host.
 
+Current source `a70f7897` is frozen in `build/release-candidate-a70f7897/`.
+Its complete catalogue execution is in progress; no new acceptance total is assumed. The single 111-case
+[work list](qualification-worklist.md) tracks the remaining work. New development
+passes do not change the historical **69 passed / 0 failed / 42 not run / 111**.
+
+The earlier source **`d1eb54cd`** remains frozen in
+`build/release-candidate-d1eb54cd/`, artifact set
+`c725e00b37f6e003d9ecb8c544358e2367e9a224c103f925b6f91116fa040c6e`.
+It passes Ruff, strict mypy, frontend lint/type checks, **428 unit and 67 API tests**
+(`build/check-expanded-operations-offline-isolation.log`). The application checks
+and the passing specification checks (`build/plan-expanded-operations-corrected.log`)
+have separate scopes. The new frozen catalogue has not completed.
+
+The integrated fixes wire bounded 90-day terminal helper-journal cleanup into
+the actual locked request path, prevent floating timestamp rounding from making
+a healthy backup fixture appear future-dated, and isolate catalogue assertions in
+fresh controllers. New tests cover guarded deletion, real writer quiescence,
+surviving helper/Certbot children, certificate process crashes and finite logs.
+The registry now contains **111 distinct local/host case mappings**. Kernel-boundary,
+cutover and full replacement recovery bindings are implemented; their matching
+runtime evidence is still required. Registration alone does not qualify any case.
+
+
+Current full checks pass **452 unit and 72 API tests**, Ruff, strict mypy, frontend
+lint/type checks and the specification suite
+(`build/browser-dns-fixed-source-checks-20261025.log`). The frontend also passed
+lint/type checks under pinned Node 24 (`build/frontend-node24-verification-20261025.log`).
+These counts support the candidate; acceptance totals come only from its case reports.
+
+Current focused development runs passed the approved isolated postmaster fix,
+rollout rejection guards, actual install/upgrade observation, immutable HTTPS
+transfer, actual HTTPS browser handling, combined application/helper/transient
+memory including tmpfs, and real terminal recovery/maintenance coordination.
+The corrected frozen HTTPS browser run passes
+(`build/frozen-https-browser-a70f7897.log`). Its local DNS fixture explicitly observes
+unknown MX status; the first frozen browser attempt remains failed in its original
+`a0a5251c` bundle. The complete matching catalogue is in progress.
+
+
+The matching `a70f7897` native comparison completed. Its first runtime attempt
+retains missing-fixture setup errors and actual 15-second startup failures. After
+staging the approved Maddy image and exact frozen test archive, the affected API
+crash, mail-flow and schema modules pass; key-recovery restart timing still fails.
+Production Maddy identity, mounts, configuration and start time remain unchanged.
+The heavier native guarded-deletion gate is closed: 533,929,984 bytes available
+against 570,425,344 required (`build/native-guarded-deletion-admission-a70f7897.json`).
+No test deadline or memory cap was raised.
+
+Two actual systemd legacy-drain assertions also passed at their original bounds
+(`build/legacy-systemd-development-20261025.log`). The mock's nested cutover setup
+was refused by its capacity gate: 620,843,008 bytes available versus 637,534,208
+required for both controllers, Maddy and the unchanged reserve. Emulated TLS
+attempts also retain Docker command/consumer-boundary deadline failures. No kernel
+power-cut success or matching full replacement result has been claimed for them.
+
+Development source `9a1abc88` passed **423 Linux unit and 67 Linux API tests**,
+the real snapshot stop/resume assertion and the actual helper-parent SIGKILL
+assertion (`build/snapshot-helper-current-checks.log`). Source `419a16fc` passed
+all 12 private-ACME tests and four actual Maddy mutation-crash tests
+(`build/private-operations-qualified-checks.log`). The later `a3c4c0be` run passed
+all 21 HTTPS runtime assertions, but its expanded ACME suite passed 12 and failed
+one new snapshot assertion (`build/independent-retention-checks.log`). That failure
+was a stale private Docker port after restart; the corrected assertion passed at
+`9a1abc88`. These results cannot fill the final candidate's reports. Process
+SIGKILL results do not establish kernel-reboot behavior.
+
+The native `8a5ad743` Maddy suite passed all 53 assertions across 17 modules, and
+the unchanged normal HTTPS deletion assertion passed separately at `a3c4c0be`
+under its original five-second deadline and 128 MiB controller. Their records are
+`build/mail-admin-native-maddy-7dc51e2a-bf89-4bf5-96cd-994ccc29e68b/result.json`
+and `build/mail-admin-normal-delete-82303fa6-2c6c-41b7-bebf-eb1f9b636d12/observed-runtime-14580c30-a287-44e2-91b7-55ede4c54697/result.json`.
+The earlier emulated normal-deletion failure is retained. The `d1eb54cd`
+native follow-up passed all 21 runtime assertions at the original bounds
+(`build/native-startup-comparison-20261024.log`). Its Maddy capacity gate remained
+closed; no failed emulated cold-start observation is replaced by later health.
+
+Actual Docker log rotation passed at `a3c4c0be`. A separate owned-guest journal
+probe wrote 64 MiB under the shipped 32 MiB limit, expired the first marker,
+retained the last marker and observed 33,468,416 allocated bytes. Its result is
+`build/private-journal-a3a9c1d7-edeb-46f0-be07-9f5f41792c62/observation-3371219a03394efe9e1ec11f329baa20.json`.
+The probe retained the guest's older helper/runtime installation, so it is component
+evidence only. The final T22.02 case requires matching local and host assertions;
+missing host evidence stays `not_run`, and a local failure remains a failure.
+
+The actual HTTPS Chrome fixture passed secret masking, persistence/profile scans,
+untrusted text, safe API errors and bootstrap/lock ordering
+(`build/https-browser-aeee88bc-c0b4-4109-9176-469bb17e9f5f/observation.json`).
+This is development evidence. Frozen HTTPS browser, host/reboot, recovery, cutover
+and complete catalogue execution still remain.
+
+The pinned Maddy 0.9.5 bare SMTP `postmaster` failure remains recorded in
+`build/guarded-pending-and-retention-checks.log`. The user approved the isolated
+patch and pinned source/compiler inputs in `build/proposed-maddy-postmaster-fix.md`.
+The Go SMTP parser suite and all three actual SMTP-to-IMAP recipient tests pass
+against fixture image `sha256:11c98cb08dc68166b4238527b00088e0d8be175e9fb9528c210b45600d43bfaa`.
+Production image selection remains separate.
+Independent SMTP-sender credentials and an external monitor/provider are also
+still required release inputs. No live-server change is authorized.
+
+The frozen `8a5ad743` catalogue stopped at T20: Restic's initialization child was
+OOM-killed after unrelated assertions accumulated in the same 192 MiB controller.
+T20.05 failed, and the controller's observed `OOMKilled` flag stopped assembly.
+Its original failure remains in `build/qualification-8a5ad743-resumed.log` and the
+T20 controller progress record. There is no completed catalogue result for this
+source. The new runner executes each registered assertion module once in a fresh
+controller under the same limit, and assembles cases only from matching raw
+module reports plus completed, non-OOM controller observations. Its regression
+checks reject missing, skipped, foreign and killed outcomes. The actual Restic
+restoration assertion passed in the new frozen development controller
+(`build/fresh-restic-qualification-controller-actual.log`); this single assertion
+does not qualify T20 or the complete catalogue. No application resource or
+readiness limit was raised.
+
 The strict helper-response checks and public-runtime bind guards have now been
 merged locally, with their regression tests. The isolated development copy passed
 **396 unit, 62 API/integration, 17 actual HTTPS runtime and 6 private-ACME tests**,
@@ -19,12 +132,12 @@ plus Ruff, strict mypy and frontend checks. Its runtime modules peaked at
 `3f34376b` and do not qualify subsequent canonical-source changes. New local alert
 checks exercise actual TLS-SMTP delivery during an unavailable dashboard, missed
 backups, disk/inode/expiry warnings, retry ordering, recovery and a real stalled
-TLS transport. Additional actual API-process crash checks are being built and
-have not yet passed. T20.01/T20.03 and T22.04/T22.05 have reviewed mappings; they
-remain unqualified until executed in a new frozen bundle. No release count has
-been increased using development reports.
+TLS transport. Three actual API-process crash checks subsequently passed as
+recorded below. T20.01/T20.03 and T22.04/T22.05 have reviewed mappings; the full
+new frozen execution has not completed. No release count has been increased using
+development reports.
 
-Current canonical source **`8a5ad743`** is frozen separately in
+Earlier source **`8a5ad743`** remains frozen separately in
 `build/release-candidate-8a5ad743/`, artifact set
 `ba7a99b7ab5b3fe511ebbc68c152bc995add763b82356cc0f4cf5cb4f5481764`.
 Local full checks pass **397 unit and 66 API/integration tests** with Ruff,
@@ -37,10 +150,9 @@ rejects that age. A deterministic failing regression and corrected fixture pass
 in the independent operations-development copy
 (`build/alert-cutoff-rounding-before-fix.log` and
 `build/alert-cutoff-rounding-fixed.log`). The frozen source remains unchanged and
-cannot be promoted using an intermittently passing fixture. Its complete catalogue
-is running for gap/failure evidence, not as a release-ready claim. The earlier
-Linux-suite failure is retained even if that independent catalogue attempt passes
-its sampled alert assertion. Seven new mappings remain pending frozen execution.
+cannot be promoted using an intermittently passing fixture. Its catalogue stopped
+at the T20 OOM recorded above. The earlier Linux-suite failure remains a failure.
+The seven new mappings have no successful complete frozen execution.
 Actual partial Linux runs additionally passed three API SIGKILL tests and five
 real image/mount/database/journal admission checks; they are distinct development
 results (`build/runtime-api-crash-checks.log`, `build/linux-maddy-admission.log`,

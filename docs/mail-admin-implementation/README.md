@@ -48,7 +48,7 @@ The following command must reject the untouched template because no application 
 PYTHONDONTWRITEBYTECODE=1 python3 docs/mail-admin-implementation/tools/check_release.py docs/mail-admin-implementation/verification/runtime-evidence.template.json
 ```
 
-Application build/test commands are an output of W01; they are not claimed to exist now. Documentation and model results do not substitute for application tests.
+Application build/test commands delivered by W01 are documented in the repository's `README.md`. Documentation and model results do not substitute for application tests. See `verification/status.md` in the repository root for actual checks and remaining qualification.
 
 To reproduce the complete local check record, including verifier regression tests and Docker Compose/shell examples:
 
@@ -62,4 +62,4 @@ The example checks require the existing Docker Compose CLI. They render document
 
 A qualified release has complete requirements-to-test coverage, passing case-level reports from a trusted runner, matching artifact/configuration identities, fresh environment evidence, and recorded operator approval. Any required missing, failed, skipped, stale or mismatched record blocks qualification. This is a conditional assurance claim for the specified behaviors and environments, with explicit assumptions in the assurance contract. It is not a claim that every possible future execution is defect-free.
 
-Current work changes documentation and local verification tools only. It does not authorize production deployment, DNS edits, mailbox deletion, sending mail, new external services, or upgrades.
+Local implementation and synthetic qualification are in progress. This plan does not authorize production deployment, DNS edits, production mailbox deletion, external mail, new services, or upgrades. Production maintenance requires the operator approval recorded by the rollout gates.

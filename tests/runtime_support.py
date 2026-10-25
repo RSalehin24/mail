@@ -106,6 +106,10 @@ class RuntimeFixture:
         ))
 
     def _start_container(self):
+        self.launch()
+        self.ready()
+
+    def launch(self):
         command = (
             "create",
             "--name",
@@ -151,7 +155,6 @@ class RuntimeFixture:
         command += (os.environ["MAIL_ADMIN_RUNTIME_REFERENCE"],)
         self.identifier = self.command(command).stdout.strip()
         self.command(("start", self.identifier))
-        self.ready()
 
     def ready(self):
         deadline = time.monotonic() + STARTUP_TIMEOUT_SECONDS
@@ -201,8 +204,8 @@ class RuntimeFixture:
             time.sleep(0.25)
         raise RuntimeError("Runtime failed to stop: " + self.diagnostics())
 
-    def probe_arguments(self):
-        container = json.loads(self.command(("inspect", self.identifier)).stdout)[0]
+    def operator_deployment(self, identifier=None):
+        container = json.loads(self.command(("inspect", identifier or self.identifier)).stdout)[0]
         names = {
             "HASH_MEMORY_KIB",
             "HASH_PARALLELISM",
@@ -225,6 +228,10 @@ class RuntimeFixture:
                 "cpu_limit": 0.5,
             },
         }
+        return deployment
+
+    def probe_arguments(self):
+        deployment = self.operator_deployment()
         arguments = ImageTools(Docker("docker"), deployment).authentication_arguments("probe")
         paths = {
             "/opt/mail-admin/data": self.root / "data",

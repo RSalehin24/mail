@@ -73,6 +73,7 @@ class HostHelper:
             return self._duplicate(request, previous)
         if self.journal.unresolved():
             raise ServiceError("reconciliation_required", 409)
+        self.journal.retain(self.dependencies.clock())
         self.maddy.validate()
         inventory = self.maddy.inventories()
         self.journal.synchronize(inventory, self.dependencies.clock())
