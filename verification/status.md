@@ -8,9 +8,15 @@ has been performed by the implementation run. Only explicitly authorized synthet
 fixtures have been added to the existing host.
 
 Current source `a70f7897` is frozen in `build/release-candidate-a70f7897/`.
-Its complete catalogue execution is in progress; no new acceptance total is assumed. The single 111-case
-[work list](qualification-worklist.md) tracks the remaining work. New development
-passes do not change the historical **69 passed / 0 failed / 42 not run / 111**.
+Its completed frozen catalogue records **94 passed / 1 failed / 16 not run / 111**.
+All 63 assertion controllers completed without OOM. T17.01 failed its normal HTTPS
+deletion assertion; matching host reports are still absent for 16 cases. The candidate
+checker remains blocked. Raw results are in
+`build/release-candidate-a70f7897/qualification-25c9c359-9e16-4f39-a628-3aa96342c78a/`.
+The single 111-case [work list](qualification-worklist.md) records these outcomes.
+The [Ubuntu handover](ubuntu-handover.md) covers transfer, remaining failures and
+platform-specific fixture gaps. The historical **69 passed / 0 failed / 42 not run / 111**
+report remains unchanged.
 
 The earlier source **`d1eb54cd`** remains frozen in
 `build/release-candidate-d1eb54cd/`, artifact set
@@ -18,7 +24,7 @@ The earlier source **`d1eb54cd`** remains frozen in
 It passes Ruff, strict mypy, frontend lint/type checks, **428 unit and 67 API tests**
 (`build/check-expanded-operations-offline-isolation.log`). The application checks
 and the passing specification checks (`build/plan-expanded-operations-corrected.log`)
-have separate scopes. The new frozen catalogue has not completed.
+have separate scopes. Those prototype reports do not qualify the current candidate.
 
 The integrated fixes wire bounded 90-day terminal helper-journal cleanup into
 the actual locked request path, prevent floating timestamp rounding from making
@@ -43,7 +49,7 @@ memory including tmpfs, and real terminal recovery/maintenance coordination.
 The corrected frozen HTTPS browser run passes
 (`build/frozen-https-browser-a70f7897.log`). Its local DNS fixture explicitly observes
 unknown MX status; the first frozen browser attempt remains failed in its original
-`a0a5251c` bundle. The complete matching catalogue is in progress.
+`a0a5251c` bundle. The matching catalogue completed with the result recorded above.
 
 
 The matching `a70f7897` native comparison completed. Its first runtime attempt
@@ -94,8 +100,8 @@ missing host evidence stays `not_run`, and a local failure remains a failure.
 The actual HTTPS Chrome fixture passed secret masking, persistence/profile scans,
 untrusted text, safe API errors and bootstrap/lock ordering
 (`build/https-browser-aeee88bc-c0b4-4109-9176-469bb17e9f5f/observation.json`).
-This is development evidence. Frozen HTTPS browser, host/reboot, recovery, cutover
-and complete catalogue execution still remain.
+This is development evidence. Matching frozen host/reboot, recovery and cutover
+evidence still remains missing; the later frozen browser/catalogue results are above.
 
 The pinned Maddy 0.9.5 bare SMTP `postmaster` failure remains recorded in
 `build/guarded-pending-and-retention-checks.log`. The user approved the isolated
@@ -166,7 +172,7 @@ The audit is
 Required application dependencies, recovery keys, reports and retained mock disks
 were not part of that cleanup.
 
-Latest completed frozen evidence at **`a9c00d9e`** records **69 passed / 42
+Historical frozen evidence at **`a9c00d9e`** records **69 passed / 42
 `not_run` / zero failed out of 111**. All 22 controllers completed without OOM;
 the maximum observed peak reached the unchanged 192 MiB cap. Its result is
 `build/release-candidate-a9c00d9e/qualification-4fdf4f33-0546-4051-8392-9d2e52fe9e37/reviewed-summary.json`.
