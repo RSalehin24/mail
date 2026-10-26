@@ -5,6 +5,13 @@ This workstation runs CachyOS (Arch based), x86_64, with approximately 31 GiB RA
 The [Ubuntu handover](ubuntu-handover.md) is a historical Mac transfer record.
 Its candidate identities and results do not qualify this working tree.
 
+## Latest outcome
+
+Source `76307198` passed **111 / 111 catalogue cases**, with zero failures and
+zero unrun cases. The candidate evidence checker passed on 26 October 2026.
+The final evidence and remaining production work are recorded at the end of this
+checkpoint; earlier sections preserve intermediate attempts and their limitations.
+
 ## Environment
 
 The development environment is installed without replacing system Python:
@@ -216,3 +223,70 @@ collector hook signature. These older reports cannot qualify the new source.
 Closed private cutover fixtures were archived outside the guest to retain their
 contents and recover guest disk space; the exact archive inventory and digest are
 in `build/setup/kvm-closed-cutover-fixtures.json`.
+
+## 26 October: resumed Docker replacement recovery
+
+The latest frozen candidate is `build/release-candidate-linux-docker-verified/`,
+source `76307198695bcc6a040f692d37ed8dc8b9e8d87ad3b5cd270d3135fa1b7d002a`,
+artifact set `c28e9f264e129ed0fbb6747e38b184bec575294323866243a5f6a4501c436a1f`.
+Its native catalogue completed at **95 passed / 0 failed / 16 not run / 111**.
+The supporting local checks passed **472 unit and 72 integration tests**.
+Matching source-host observations passed the cutover, TLS reboot, offline reboot
+and helper checks; these must still be assembled with replacement evidence.
+
+Full-state R2 source capture passed after the capture-observation correction.
+The replacement downloaded and verified the snapshot and loaded the saved release
+image. Its controller stopped during authentication preparation. On 26 October,
+the same owned Docker controller was restarted, and preparation reconciled from
+the retained successful utility exit. Private terminal credential recovery and
+fresh-target installation then passed. Logs use the `resumed-` prefix under
+`build/setup/`; interrupted attempts and their observations remain preserved.
+
+The source controller remains stopped. The interruption exceeded the four-hour
+RTO budget; completing this attempt can diagnose recovery behavior but cannot
+establish a passing recovery time. A fresh timed recovery remains required,
+as do final evidence assembly and the candidate gate. No production deployment
+is qualified by these results.
+
+## Final candidate evidence: 26 October 2026
+
+The same frozen source and artifacts above now have a complete assembled result:
+**111 passed / 0 failed / 0 not run / 111**. Original native module reports and
+controller receipts were retained unchanged, validated again against the same
+source, artifacts, images, engine and resource limits, then assembled with matching
+host reports. The original 95/0/16 result remains unchanged in its own directory.
+
+- Final evidence: `build/release-candidate-linux-docker-verified/qualification-bef1aa31-5826-4f32-927a-b76de102cc7b-evidence.json`.
+- Catalogue result: `build/release-candidate-linux-docker-verified/qualification-bef1aa31-5826-4f32-927a-b76de102cc7b/result.json`.
+- Candidate checker: `build/setup/consolidated-candidate-check.json`, result `pass`.
+- Assembly log: `build/setup/consolidated-catalogue.log`.
+- Fresh replacement pipeline: `build/setup/fresh-timed-recovery-pipeline.log`.
+
+Fresh empty replacement instance `984f4744-f126-435b-90af-c0ec0fc28d15` restored a
+new immutable full-state R2 snapshot using the independently retained workstation
+password and credentials. The source remained stopped from 11:38:34 UTC through
+the post-reboot host checks at 11:40:06 UTC. All three T18 host assertions passed,
+including the selected 26-hour RPO and four-hour RTO. Captured mail was present,
+post-cutoff mail absent, old authentication rejected, fresh authentication accepted,
+and restored helper, relay keys, TLS, ACME state and services verified after an
+actual new-kernel boot. The earlier interrupted attempt remains a recorded RTO
+failure; it was not reused as a passing timing observation.
+
+The fixture preparation now preserves qualified systemd unit mode 0644 rather
+than inheriting its private capture umask. Replacement bootstrap also installs the
+static journal namespace configuration from the verified restored host bundle.
+The installed-source gate subsequently passed without excluding either check.
+Bootstrap actions and retained failed attempts are recorded under `build/setup/`.
+
+All 33 Markdown documents and 42 shell examples pass the local document audit.
+This is candidate qualification with synthetic fixtures. Production operator inputs,
+preflight, maintenance scheduling, target acceptance and final approval remain
+outstanding. Follow the documented rollout for those stages; no production system
+was deployed or changed during this continuation. Private `build/` and `local-state/`
+artifacts are ignored by Git and require protected retention for another workstation.
+
+A read-only production preflight check remains blocked at
+`backup_key_reference`, which is intentionally unset in the production inputs.
+The independent synthetic qualification password does not fill that production
+reference. The recovered fresh guest remains running for inspection; the source
+and interrupted replacement are stopped with their private disks retained.

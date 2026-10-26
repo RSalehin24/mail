@@ -8,8 +8,10 @@ skip, expected failure, test-loading error or changed source cannot pass a case.
 All 111 cases now have reviewed local/host assertion mappings. G01 remains blocked
 until their actual matching execution and the candidate checker pass. A mapping is
 not an executed acceptance result. See the [111-case work list](qualification-worklist.md).
-The latest Linux frozen catalogue (`31fdf6af`) completed at 95 passed, 0 failed
-and 16 not run. Complete matching host/recovery observations are still missing.
+The latest Linux frozen catalogue (`76307198`) passed all 111 cases after matching
+native, source-host and replacement-host evidence was assembled. The candidate
+evidence checker also passed on 26 October 2026. Production preflight and target
+acceptance remain outstanding.
 The historical Mac catalogue (`a70f7897`) remains at 94 passed, 1 failed and
 16 not run on its original workstation. See the
 [continuation checkpoint](linux-continuation.md) for artifact identities and setup.

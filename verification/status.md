@@ -8,13 +8,16 @@ has been performed by the implementation run. Only explicitly authorized synthet
 fixtures have been added to the existing host.
 
 For the active Linux checkout, see the [continuation checkpoint](linux-continuation.md).
-The latest Linux frozen source `31fdf6af` completed all 63 catalogue modules:
-**95 passed / 0 failed / 16 not run / 111**. Local checks passed 465 unit and
-72 integration tests; frozen HTTPS browser and supporting real R2 retention checks
-passed. Full host recovery remains blocked after two capture deadline failures.
-These results do not constitute release qualification.
+The latest Linux frozen source `76307198` passed **111 / 111 catalogue cases**,
+with **0 failed and 0 not run**. The candidate evidence checker passed on 26 October
+2026. Supporting checks passed 472 unit and 72 integration tests. A fresh Docker
+replacement recovered the actual R2 snapshot, passed all three replacement host
+checks, and verified restored mail, HTTPS, helper, keys and ACME state after a real
+kernel reboot within the selected recovery objectives. The interrupted attempt's
+RTO failure remains preserved. See the continuation checkpoint for final evidence.
+Production preflight, target acceptance and operator approval remain outstanding.
 
-Its source edits are not qualified by the results below. Historical `build/` paths
+The historical results below do not qualify other source revisions. Historical `build/` paths
 refer to retained evidence on the original workstation; they are not present in
 this checkout until explicitly transferred. The sections below retain prior
 source-specific observations; words such as “current” apply to their recorded snapshot.

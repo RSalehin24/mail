@@ -5,6 +5,11 @@ not Ubuntu; consult the [Linux continuation](linux-continuation.md) for its actu
 setup, source changes and missing private artifacts. Identities and results below
 remain historical and must not be applied to the modified working tree.
 
+The Linux continuation now records **111 / 111 passing catalogue cases** and a
+passing candidate evidence check for source `76307198` on 26 October 2026.
+Production preflight and deployment are still outstanding. The checkpoint below
+retains its original historical results.
+
 Prepared 25 October 2026. This handover covers the application and its unfinished
 qualification on a better **native Ubuntu amd64** machine. It authorizes no
 production deployment. Continue with one working candidate, focused fixes, then

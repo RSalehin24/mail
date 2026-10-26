@@ -1,9 +1,10 @@
 # Qualification work list
 
-The latest Linux source `31fdf6af` completed its frozen catalogue at
-**95 passed / 0 failed / 16 not run / 111**. Matching complete host/recovery
-observations remain missing; the release is blocked. The
-[continuation checkpoint](linux-continuation.md) identifies its artifacts and logs.
+The latest Linux source `76307198` passed its assembled frozen catalogue at
+**111 passed / 0 failed / 0 not run / 111**, and the candidate evidence checker
+passed on 26 October 2026. The [continuation checkpoint](linux-continuation.md)
+identifies matching native, host and replacement evidence. Production preflight
+and deployment remain separate outstanding stages.
 
 The table below is the recorded `a70f7897` acceptance snapshot, not a result for
 the modified Linux checkout. Original bundle/report paths require private transfer.

@@ -7,6 +7,12 @@ For workstation setup and retained historical evidence, see the
 [Linux continuation](linux-continuation.md). Private artifacts referenced below
 are not included in a source clone.
 
+The 26 October Linux candidate (`76307198`) passed all 111 isolated catalogue
+cases and the candidate evidence checker. A fresh Docker replacement verified the
+selected recovery objectives using synthetic data and independently retained keys.
+These results do not supply production credentials, production budgets or target
+acceptance; the inputs below remain required for production preflight.
+
 ## Inputs still required
 
 - Qualified R2 repository configuration, separately recoverable encryption key,
