@@ -48,8 +48,10 @@ export class Connection {
         return name.trim() === specification.name && element.getBoundingClientRect().width > 0;
       });
       if (candidates.length !== 1) return {count: candidates.length};
-      const element = candidates[0], bounds = element.getBoundingClientRect();
-      return {count: 1, disabled: element.disabled, x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2};
+      const element = candidates[0];
+      element.scrollIntoView({block: 'center', inline: 'nearest', behavior: 'instant'});
+      const bounds = element.getBoundingClientRect();
+      return {count: 1, disabled: Boolean(element.disabled || element.getAttribute('aria-disabled') === 'true'), x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2};
     })()`);
     assert.equal(result.count, 1, `Unique visible control: ${specification.name}`);
     assert.equal(result.disabled, false, `Enabled control: ${specification.name}`);
@@ -63,12 +65,25 @@ export class Connection {
       await delay(100);
       target = await this.target(specification);
     }
+    // Navigation and asynchronously loaded connection fields can move a control.
+    // Use stable post-layout coordinates before dispatching the physical click.
+    for (let attempt = 0; attempt < 10; attempt++) {
+      await delay(50);
+      const next = await this.target(specification);
+      const stable = Math.abs(next.x - target.x) < 1 && Math.abs(next.y - target.y) < 1;
+      target = next;
+      if (stable) break;
+      assert.ok(attempt < 9, 'Control position stabilized');
+    }
     const { x, y } = target;
+    await this.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
     await this.call('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
     await this.call('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
   }
   async fill(name, text) {
     await this.click({ tag: 'input,textarea', name });
+    await this.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65 });
+    await this.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65 });
     await this.call('Input.insertText', { text });
   }
   async screenshot(name) {

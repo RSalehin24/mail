@@ -122,3 +122,69 @@ class ConsumerTests(unittest.TestCase):
             with self.assertRaisesRegex(ServiceError, "consumer_restart_pause_incomplete"):
                 docker.stop_for_maintenance("mail-admin")
         execute.assert_called_once_with(("update", "--restart", "no", "mail-admin"))
+
+    def test_graceful_stop_has_time_for_declared_grace_but_other_bounds_are_unchanged(self):
+        from helper.process import CommandResult
+        docker = Docker(timeout=5)
+        with patch('host.docker.execute', return_value=CommandResult(0, '')) as execute:
+            docker.run(('stop', '--time', '30', 'maddy'))
+            self.assertEqual(execute.call_args.args[0].timeout, 35)
+            docker.run(('inspect', 'maddy'))
+            self.assertEqual(execute.call_args.args[0].timeout, 5)
+
+    def test_canceled_start_retries_only_known_stopped_container_and_keeps_other_errors(self):
+        docker = MagicMock()
+        docker.run.side_effect = [ServiceError('command_completion_unknown', 503), '']
+        docker.inspect.return_value = {'State': {'Running': False, 'Status': 'exited',
+                                                 'Error': 'Canceled: context canceled'}}
+        snapshots = DockerSnapshots((docker, MagicMock(), MagicMock()))
+        snapshots._start_existing('maddy')
+        self.assertEqual(docker.run.call_count, 2)
+        docker.reset_mock()
+        docker.run.side_effect = ServiceError('docker_operation_failed', 503)
+        docker.inspect.return_value = {'State': {'Running': False, 'Status': 'exited',
+                                                 'Error': 'permission denied'}}
+        with self.assertRaises(ServiceError):
+            snapshots._start_existing('maddy')
+        self.assertEqual(docker.run.call_count, 1)
+
+class SnapshotReadinessTests(unittest.TestCase):
+    def test_tls_readiness_retries_within_existing_budget(self):
+        docker = SimpleNamespace(timeout=5)
+        snapshots = DockerSnapshots((docker, MagicMock(), MagicMock()))
+        with (
+            patch('host.docker.time.monotonic', side_effect=[0, 0.1, 0.2, 0.3, 0.4]),
+            patch('host.docker.time.sleep'),
+            patch(
+                'host.docker.verify_served', side_effect=[ConnectionRefusedError(), None],
+            ) as probe,
+        ):
+            snapshots._verify_resumed('maddy', 'expected')
+        self.assertEqual(probe.call_count, 2)
+        self.assertEqual(probe.call_args.args[:2], (('127.0.0.1', 993), 'expected'))
+        self.assertLess(probe.call_args.args[2], 5)
+
+    def test_tls_readiness_does_not_extend_budget(self):
+        snapshots = DockerSnapshots((SimpleNamespace(timeout=5), MagicMock(), MagicMock()))
+        with (
+            patch('host.docker.time.monotonic', side_effect=[0, 0.1, 5.1]),
+            patch('host.docker.verify_served', side_effect=ConnectionRefusedError()),
+        ):
+            with self.assertRaises(ConnectionRefusedError):
+                snapshots._verify_resumed('mail-admin', 'expected')
+
+
+class MaintenanceBudgetTests(unittest.TestCase):
+    def test_backup_lifecycle_does_not_reuse_the_short_api_cli_deadline(self):
+        from host.backup import FULL_STATE_SOURCES
+        from host.context import HostContext
+        from host.docker import Docker
+        deployment = {'inputs': {'operation_timeout_seconds': 5},
+                      'backup_sources': {name: '/fixture/' + name for name in FULL_STATE_SOURCES},
+                      'maddy_message_paths': ['messages']}
+        context = HostContext(deployment, Docker(timeout=5), MagicMock(), MagicMock(), MagicMock())
+        with patch('host.context.backup_service', side_effect=lambda capture, *_: capture):
+            capture = context.backup()
+        self.assertEqual(context.docker.timeout, 5)
+        self.assertEqual(capture.dependencies.services.docker.timeout, 30)
+        self.assertEqual(capture.dependencies.services.startup_timeout, 15)

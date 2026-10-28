@@ -176,6 +176,7 @@ class RolloutStateTests(unittest.TestCase):
 
         directory = self.completed()
         instance = BackupOperations.__new__(BackupOperations)
+        instance.backup = object()
         instance.deployment = {**self.deployment, "rollback_snapshot_ids": []}
         guard = RolloutGuard(self.deployment, (
             RolloutPaths(directory=directory), os.getuid(), lambda: self.fixture.now,

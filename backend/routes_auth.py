@@ -103,14 +103,18 @@ def clear_cookie(response: Response) -> None:
 
 
 @protected.post("/security/reauth")
-async def reauth(body: LoginRequest, request: Request) -> dict[str, str]:
+async def reauth(body: LoginRequest, request: Request) -> dict[str, Any]:
     application = services(request)
     challenge = await application.hashes.run(
         lambda: application.authentication.password_challenge(
             Credentials(body.email, body.password, peer(request)), session(request)
         )
     )
-    return {"challenge": challenge}
+    available = await application.io.run(application.relay.otp_ready)
+    return {
+        "challenge": challenge,
+        "email_otp_available": bool(application.settings.email_otp_enabled and available),
+    }
 
 
 @protected.post("/security/reauth/verify")
@@ -160,3 +164,8 @@ async def replace_totp(body: TotpRequest, request: Request, response: Response) 
     )
     clear_cookie(response)
     return {"recovery_codes": codes, "revoked": True}
+
+
+@protected.get("/session")
+def inspect_session() -> dict[str, bool]:
+    return {"authenticated": True}

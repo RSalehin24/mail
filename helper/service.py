@@ -5,9 +5,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+from helper.backup_control import BackupControl
 from helper.journal import Journal
 from helper.maddy import MaddyAccess, cli_reported_error, cli_succeeded, provisioning_warning
 from helper.protocol import HelperRequest
+from helper.recovery import RecoveryControl
 from host.locks import HostLock, LockPolicy
 from shared.errors import ServiceError
 from shared.validation import HELPER_PROTOCOL
@@ -27,6 +29,8 @@ class HelperDependencies:
     lock_policy: LockPolicy
     clock: Callable[[], float]
     status: Callable[[], dict[str, Any]]
+    recovery: RecoveryControl | None = None
+    backups: BackupControl | None = None
 
 
 class HostHelper:
@@ -35,8 +39,36 @@ class HostHelper:
         self.maddy, self.journal = dependencies.maddy, dependencies.journal
 
     def handle(self, request: HelperRequest) -> dict[str, Any]:
+        if request.operation.startswith("backup_"):
+            if self.dependencies.backups is None or request.recovery is None:
+                raise ServiceError("backup_control_unavailable", 503)
+            with HostLock(self.dependencies.lock, self.dependencies.lock_policy):
+                return {
+                    "protocol": HELPER_PROTOCOL,
+                    **self.dependencies.backups.handle(
+                        request.operation,
+                        request.request_id,
+                        request.recovery,
+                        self.dependencies.clock(),
+                    ),
+                }
+        if request.operation.startswith("recovery_"):
+            if self.dependencies.recovery is None or request.recovery is None:
+                raise ServiceError("recovery_unavailable", 503)
+            with HostLock(self.dependencies.lock, self.dependencies.lock_policy):
+                return {
+                    "protocol": HELPER_PROTOCOL,
+                    **self.dependencies.recovery.handle(
+                        request.operation,
+                        request.request_id,
+                        request.recovery,
+                        int(self.dependencies.clock()),
+                    ),
+                }
         if request.operation == "outcome":
             return {"protocol": HELPER_PROTOCOL, "outcome": self.journal.lookup(request.request_id)}
+        if request.operation == "telemetry":
+            return {"protocol": HELPER_PROTOCOL, "summary": self.dependencies.status()}
         if request.operation == "status":
             return {
                 "protocol": HELPER_PROTOCOL,
@@ -56,18 +88,27 @@ class HostHelper:
                 inventory = self.maddy.inventories()
                 return {
                     "state": "available",
+                    "observed_at": self.dependencies.clock(),
                     "credential_count": len(inventory["credentials"]),
                     "storage_count": len(inventory["storage"]),
                 }
         except (OSError, ServiceError) as error:
             return {
                 "state": "unknown",
+                "observed_at": self.dependencies.clock(),
                 "reason": error.code
                 if isinstance(error, ServiceError)
                 else "observation_unavailable",
             }
 
     def _locked(self, request: HelperRequest) -> dict[str, Any]:
+        if self.dependencies.recovery is not None and request.operation != "inventory":
+            if any(
+                row["state"]
+                in {"capturing", "deleting", "restoring", "removing", "reconciliation_required"}
+                for row in self.dependencies.recovery.records.listing()
+            ):
+                raise ServiceError("reconciliation_required", 409)
         previous = self.journal.lookup(request.request_id)
         if previous:
             return self._duplicate(request, previous)
@@ -79,6 +120,8 @@ class HostHelper:
         self.journal.synchronize(inventory, self.dependencies.clock())
         if request.operation == "inventory":
             return {"protocol": HELPER_PROTOCOL, **inventory}
+        if self.dependencies.recovery is not None and self.dependencies.recovery.records.busy():
+            raise ServiceError("recovery_operation_in_progress", 409)
         self._preconditions(request, inventory)
         self.journal.begin(request, (self.dependencies.clock(), inventory))
         if request.operation == "create":

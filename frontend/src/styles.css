@@ -19,3 +19,24 @@ body { margin: 0; }
 .connection-field { padding: 12px 0; border-bottom: 1px solid #8b9c931f; }
 @media(max-width:959px) { .desktop-table { display: none; } .mailbox-cards { display: grid; gap: 14px; } .page { padding: 24px 20px; } }
 @media(max-width:599px) { .auth-card { padding: 26px 20px; } .stat-row { grid-template-columns: 1fr; gap: 10px; } .stat-card { padding: 14px 18px; } .client-pair { grid-template-columns: 1fr; } .page { padding: 20px 16px; } button { min-height: 48px; } }
+/* Workspace: quiet surfaces, precise alignment, and a single action entry per row. */
+.page-heading { margin-bottom: 8px; }
+.eyebrow { font-size: 10px !important; letter-spacing: .15em !important; font-weight: 700 !important; }
+.mailbox-surface { border-radius: 16px !important; overflow: hidden; box-shadow: 0 4px 24px #102c2204 !important; }
+.table-toolbar { padding: 22px 24px; }
+.selection-toolbar { padding: 10px 24px; background: #3d8a7110; }
+.mailbox-table { table-layout: auto; }
+.mailbox-table thead { background: #859a900a; }
+.mailbox-table th { text-align: center; font-size: 11px; letter-spacing: .06em; font-weight: 700; white-space: nowrap; height: 54px; padding-top: 0; padding-bottom: 0; color: inherit; }
+.mailbox-table td { padding-top: 18px; padding-bottom: 18px; border-bottom-color: #839b9018; }
+.mailbox-table tbody tr:last-child td { border-bottom: none; }
+.mailbox-table .column-sort { font-size: 11px; letter-spacing: .06em; font-weight: 700; }
+.mailbox-avatar { width: 34px !important; height: 34px !important; font-size: 12px !important; font-weight: 700 !important; background: #7ba8971a !important; color: #4c8e77 !important; border: 1px solid #7ba89720; }
+.name-button { color: inherit !important; font-weight: 500 !important; text-transform: none !important; white-space: normal; }
+.status-chip { height: 26px !important; font-size: 11px !important; font-weight: 600; border-radius: 7px !important; }
+.mailbox-menu-item { display: flex !important; width: 100%; gap: 12px; min-height: 44px !important; font: inherit; font-size: 13px !important; text-align: left; }
+.mailbox-mobile-card { border-radius: 12px !important; padding: 16px; box-shadow: none !important; }
+.receipt-notice { margin-bottom: 20px; border-radius: 12px !important; }
+@media(max-width:959px) { .mailbox-cards { padding: 16px; } .stat-row { gap: 12px; } .stat-card { padding: 18px; } }
+@media(max-width:599px) { .table-toolbar { padding: 18px 16px; } .selection-toolbar { padding: 10px 16px; } .mailbox-cards { padding: 12px; } .page-heading > .MuiButton-root { align-self: flex-start; } }
+a:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; border-radius: 2px; }

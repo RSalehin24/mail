@@ -29,12 +29,19 @@ async function login(connection) {
   await connection.click({ tag: 'button', name: 'Use a recovery code' });
   await connection.fill('Recovery code', codes.pop());
   await connection.click({ tag: 'button', name: 'Verify and sign in' });
+  await connection.until(`[...document.querySelectorAll('button')].some(button => button.getAttribute('aria-label') === 'Sign out')`);
+  await connection.click({ tag: 'a', name: 'RSalehin24 Mail Admin home' });
   await connection.until(`document.querySelector('h1')?.textContent === 'Mailboxes'`);
-  await connection.until(`document.body.textContent.includes('Host telemetry observed')`);
+  await connection.until(`document.querySelector('.mailbox-surface') !== null && !document.body.textContent.includes('Loading mailboxes…')`);
 }
 
 async function reauthenticate(connection) {
   await connection.until(`document.querySelector('#reauth-title') !== null`);
+  await connection.fill('Master password', 'incorrect synthetic reauthentication password');
+  await connection.click({ tag: 'button', name: 'Verify password' });
+  await connection.until(`document.querySelector('#reauth-title') !== null && [...document.querySelectorAll('[role=dialog]')].at(-1).textContent.includes('Invalid master password.')`);
+  assert.ok(await connection.read(`document.querySelector('h1') !== null`));
+  report.assertions.failed_reauth_preserves_session = true;
   await connection.fill('Master password', material.password);
   await connection.click({ tag: 'button', name: 'Verify password' });
   await connection.until(`[...document.querySelectorAll('button')].some(button => button.textContent === 'Recovery code')`);
@@ -71,6 +78,7 @@ async function inertMailbox(connection) {
 
 async function relay(connection) {
   await connection.click({ tag: 'button', name: 'Settings' });
+  await connection.click({ tag: 'button', name: 'Outgoing mail provider' });
   await connection.until(`document.querySelector('fieldset')?.disabled === false`);
   await connection.fill('Brevo SMTP login', 'synthetic-browser-login');
   await connection.fill('Brevo SMTP key', material.relay_key);
@@ -80,7 +88,7 @@ async function relay(connection) {
   await connection.until(`document.body.textContent.includes('Saved revision 1')`);
   assert.equal(await connection.read(`document.querySelector('input[autocomplete="new-password"]').value`), '');
   await connection.call('Page.reload', { ignoreCache: true });
-  await connection.until(`document.querySelector('h1')?.textContent === 'Mailboxes'`);
+  await connection.until(`document.querySelector('h1')?.textContent === 'Settings'`);
   report.assertions.session_survives_reload = true;
   assert.equal(await connection.read(`document.body.textContent.includes(${JSON.stringify(material.relay_key)})`), false);
   await connection.click({ tag: 'button', name: 'Sign out' });
@@ -93,16 +101,58 @@ async function relay(connection) {
   assert.equal(denied.status, 403);
   assert.equal(denied.body.error, 'recent_authentication_required');
   report.assertions.reveal_requires_recent_auth = true;
-  await connection.click({ tag: 'button', name: 'Configure' });
+  await connection.click({ tag: 'button', name: 'Actions for https-browser@rsalehin24.me' });
+  await connection.click({ tag: 'button', name: 'Mailbox settings' });
   await connection.until(`document.querySelector('#client-title') !== null`);
-  assert.equal(await connection.read(`document.querySelector('[role=dialog]').textContent.includes(${JSON.stringify(material.relay_key)})`), false);
+  assert.equal(await connection.read(`document.body.textContent.includes(${JSON.stringify(material.relay_key)})`), false);
+  await connection.until(`document.querySelector('.client-pair') !== null`);
   await connection.click({ tag: 'button', name: 'Reveal outgoing key' });
   await reauthenticate(connection);
   // Reauthentication closes before the resumed reveal request completes.
-  await connection.until(`document.querySelector('[role=dialog]')?.textContent.includes(${JSON.stringify(material.relay_key)})`);
-  await connection.click({ tag: 'button', name: 'Close' });
+  await connection.until(`document.body.textContent.includes(${JSON.stringify(material.relay_key)})`);
+  await connection.click({ tag: 'a', name: 'RSalehin24 Mail Admin home' });
+  await connection.until(`document.querySelector('h1')?.textContent === 'Mailboxes'`);
   assert.equal(await connection.read(`document.body.textContent.includes(${JSON.stringify(material.relay_key)})`), false);
   report.assertions.password_fields_masked = true;
+}
+
+async function mailboxDetails(connection) {
+  await connection.until(`document.querySelector('button[aria-label="Actions for https-browser@rsalehin24.me"]') !== null`);
+  await connection.click({ tag: 'button', name: 'Actions for https-browser@rsalehin24.me' });
+  await connection.click({ tag: 'button', name: 'Open mailbox' });
+  await connection.until(`document.querySelector('h1')?.textContent === 'https-browser@rsalehin24.me'`);
+  await connection.click({ tag: 'button', name: 'Configuration' });
+  await connection.until(`document.querySelector('input[aria-invalid]') !== null`);
+  await connection.fill('Display name', 'Operations team');
+  await connection.fill('Notes / purpose', 'Mailbox details updated in place');
+  await connection.click({ tag: 'button', name: 'Save details' });
+  await connection.until(`document.querySelector('[role=dialog]') === null && document.body.textContent.includes('Operations team')`);
+  await connection.call('Page.reload', { ignoreCache: true });
+  await connection.until(`document.querySelector('h1')?.textContent === 'https-browser@rsalehin24.me' && document.body.textContent.includes('Operations team')`);
+  await connection.click({ tag: 'a', name: 'RSalehin24 Mail Admin home' });
+  await connection.until(`document.querySelector('h1')?.textContent === 'Mailboxes'`);
+  assert.equal(await connection.read(`document.body.textContent.includes('Host telemetry observed') || document.body.textContent.includes('configured unverified')`), false);
+  report.assertions.mailbox_name_edit_persists = true;
+  await connection.until(`document.querySelector('.desktop-table') !== null && !document.body.textContent.includes('Loading mailboxes…')`);
+  const headers = await connection.read(`[...document.querySelectorAll('.desktop-table th')].filter(cell => cell.textContent.trim()).map(cell => ({text: cell.textContent.trim(), align: getComputedStyle(cell).textAlign}))`);
+  assert.ok(headers.every(cell => cell.align === 'center'));
+  assert.ok(headers.some(cell => cell.text === 'Actions'));
+  report.assertions.centered_table_headers = true;
+  await connection.click({ tag: 'button', name: 'Settings' });
+  await connection.click({ tag: 'a', name: 'RSalehin24 Mail Admin home' });
+  await connection.until(`document.querySelector('h1')?.textContent === 'Mailboxes'`);
+  report.assertions.brand_link_returns_home = true;
+  for (const width of [360, 768, 1280]) {
+    await connection.call('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: false});
+    await connection.until(`document.documentElement.scrollWidth <= innerWidth`);
+    await connection.screenshot(`workspace-${width}`);
+  }
+  report.assertions.responsive_workspace = true;
+  await connection.click({ tag: 'button', name: 'Server' });
+  await connection.until(`document.querySelector('h1')?.textContent === 'Server'`);
+  await connection.until(`Number(document.querySelector('[data-sample-count]')?.getAttribute('data-sample-count')) >= 3`);
+  assert.equal(await connection.read(`document.body.textContent.includes('Host telemetry observed')`), false);
+  report.assertions.actionable_service_status = true;
 }
 
 async function safeErrors(connection) {
@@ -131,7 +181,9 @@ async function profileHasSecret(directory) {
     const path = join(directory, entry.name);
     if (entry.isDirectory() && await profileHasSecret(path)) return true;
     if (entry.isFile()) {
-      const bytes = await readFile(path);
+      let bytes;
+      try { bytes = await readFile(path); }
+      catch (error) { if (error.code === 'ENOENT') continue; throw error; }
       if (credentials.some(value => bytes.includes(Buffer.from(value)))) return true;
     }
   }
@@ -154,6 +206,7 @@ try {
   await login(connection);
   await inertMailbox(connection);
   await relay(connection);
+  await mailboxDetails(connection);
   await safeErrors(connection);
   await persistence(connection);
   assert.ok(responses.length >= 10);
@@ -164,6 +217,7 @@ try {
   report.api_responses_observed = responses.length;
   report.result = 'pass';
 } catch (error) {
+  report.responses = responses.map(response => ({ url: response.url, status: response.status }));
   report.reason = credentials.reduce((message, value) => message.replaceAll(value, '[redacted]'), String(error.message));
   if (connection) {
     const text = await connection.read('document.body.innerText');

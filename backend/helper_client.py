@@ -47,6 +47,22 @@ class HelperClient:
         try:
             return self._exchange(request)
         except (OSError, ValueError) as error:
+            if request["operation"] in {
+                "recovery_delete",
+                "recovery_restore",
+                "recovery_remove",
+                "recovery_reconcile",
+            }:
+                try:
+                    return self._exchange(
+                        {
+                            "operation": "recovery_outcome",
+                            "request_id": request["request_id"],
+                            "job_id": request["request_id"],
+                        }
+                    )
+                except (OSError, ValueError, ServiceError) as lookup:
+                    raise ServiceError("mutation_outcome_unknown", 503) from lookup
             if request["operation"] not in {"create", "password", "delete"}:
                 raise ServiceError("helper_unavailable", 503) from error
             return self._lookup(request)

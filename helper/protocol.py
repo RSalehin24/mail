@@ -14,11 +14,32 @@ class HelperRequest:
     email: str = ""
     password: str = ""
     cutoff: str = ""
+    recovery: dict[str, Any] | None = None
 
     @classmethod
     def parse(cls, payload: dict[str, Any]) -> "HelperRequest":
+        operation = payload.get('operation')
+        if isinstance(operation, str) and operation.startswith('backup_'):
+            from helper.backup_control import validate_backup
+            if type(payload.get('protocol')) is not int or payload['protocol'] != HELPER_PROTOCOL:
+                raise ServiceError('unsupported_helper_request', 400)
+            try:
+                values = validate_backup(payload)
+            except (TypeError, AttributeError, KeyError) as error:
+                raise ServiceError('invalid_helper_fields', 400) from error
+            return cls(operation, request_id(payload['request_id']), recovery=values)
+        if isinstance(operation, str) and operation.startswith('recovery_'):
+            from helper.recovery import validate_recovery
+            if type(payload.get('protocol')) is not int or payload['protocol'] != HELPER_PROTOCOL:
+                raise ServiceError('unsupported_helper_request', 400)
+            try:
+                values = validate_recovery(payload)
+            except (TypeError, AttributeError, KeyError) as error:
+                raise ServiceError('invalid_helper_fields', 400) from error
+            return cls(operation, request_id(payload['request_id']), recovery=values)
         fields = {
             "status": set(),
+            "telemetry": set(),
             "inventory": set(),
             "outcome": set(),
             "create": {"email", "password"},

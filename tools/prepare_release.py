@@ -161,6 +161,7 @@ def prepare(destination: Path, inputs: dict[str, object] | None = None) -> None:
             "host",
             "shared",
             "frontend/src",
+            "frontend/public",
             "frontend/package.json",
             "frontend/package-lock.json",
             "frontend/tsconfig.json",

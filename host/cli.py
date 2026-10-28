@@ -110,9 +110,14 @@ def run(action: str, context: HostContext) -> None:
     elif action in {"backup", "backup-verify"}:
         require_checkpoint("G07", context.deployment)
         operation = BackupOperations(context.backup(), context.deployment)
-        operation.run() if action == "backup" else operation.verify()
+        if action == 'backup' and Path('/var/lib/mail-admin-helper/backup-control.db').is_file():
+            from host.backup_tracking import tracked_backup
+            tracked_backup(context)
+        else:
+            operation.run() if action == "backup" else operation.verify()
     elif action in {"monitor", "monitor-external"}:
-        monitor = Monitor(context.alerts, (context.deployment, time.time))
+        monitor = Monitor(context.alerts, (context.deployment, time.time),
+                          Path("/var/lib/mail-admin-alerts"))
         monitor.external() if action == "monitor-external" else monitor.host()
     elif action in {"tls-cutover", "rollback"}:
         cutover_action(action, context)
@@ -215,7 +220,8 @@ def external_monitor() -> int:
         Path("/var/lib/mail-admin-alerts/external.json"),
         (alert_transport(configuration["alert_configuration"]), time.time),
     )
-    Monitor(alerts, (configuration, time.time)).external()
+    Monitor(alerts, (configuration, time.time),
+            Path("/var/lib/mail-admin-alerts")).external()
     return 0
 
 

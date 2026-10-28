@@ -1,3 +1,13 @@
+# Current production state — 27 October 2026
+
+Settings and backup/recovery controls are live as `mail-admin-settings-d7dec30d3de3`.
+Recoverable mailbox deletion is enabled; permanent deletion remains disabled.
+Read the [current implementation and verification record](mail-admin-completion.md)
+for pagination coverage, restore behavior, evidence, rollback state and remaining
+full-server recovery/reboot limitations. Statements below are historical.
+
+---
+
 # Operator handoff
 
 The application and synthetic test harness are reviewable. This is not an approval
@@ -12,6 +22,13 @@ cases and the candidate evidence checker. A fresh Docker replacement verified th
 selected recovery objectives using synthetic data and independently retained keys.
 These results do not supply production credentials, production budgets or target
 acceptance; the inputs below remain required for production preflight.
+
+Production deployment has now been requested. The operator selected the existing
+protected local-state credentials and Restic password; the non-secret backup
+reference is set in `operator-inputs.json`. Authenticated target observations and
+a deployment draft are retained under `build/deployment-preparation/`. Alert
+credentials, maintenance timing and the Maddy security-release decision remain
+pending before production maintenance. See the latest continuation checkpoint.
 
 ## Inputs still required
 
@@ -249,3 +266,58 @@ including when it was already enabled, so the Docker wants link is created.
 installation target lets a later Docker start request the helper again after an
 earlier Docker startup failure. Verify this on the isolated host before release;
 enabling a unit alone does not establish successful boot recovery.
+
+
+## 27 October 2026: daily retention and admin page update
+
+Live: `mail-admin-daily-3ef6cfe8ea46` at https://mail.rsalehin24.me.
+See `verification/mail-admin-completion.md` for current deployment and acceptance.
+Settings and Deleted Mailboxes now have the requested tab groups, responsive
+recovery tables and shared native pagination. Server is unchanged. The R2
+repository contains exactly one verified snapshot after the audited initial
+cleanup and a successful follow-up daily replacement. All eight mailbox account
+pairs and nine protections are preserved; the 03:00 Asia/Dhaka schedule and
+backup/recovery timers remain active. Daily retention keeps the latest verified
+snapshot per Dhaka calendar day within the existing seven-day window, with
+unresolved restore pins and verified post-restore backups.
+
+Keep the root Restic state's `retention/` audit/verification records with recovery
+materials. An independent retirement-record copy is in
+`build/daily-retention-evidence.json`. Historical qualification records and local
+application rollback releases were preserved. Final acceptance evidence is in
+`build/daily-final-release-update/`, `build/daily-final-observation.json`, and
+`build/daily-final-live-assets.json`. Final checks passed 504 unit tests, 88 API
+tests, native repository retention/recovery and Maddy recovery tests, eight runtime
+tests, authenticated HTTPS browser checks, and light/dark layout checks at
+360/768/1280 pixels. A full-server boot recovery is a separate historical limit;
+this rollout verified repository integrity and isolated recovery without restoring
+production mailbox data.
+
+
+UI follow-up: live version `mail-admin-ui-2a79f0b72a7b` supersedes the daily release's
+frontend. The protection form is above its table and reason editing focuses it;
+Backups has a compact verified-snapshot presentation; Logs hides an unused Actions
+column; errors omit diagnostic IDs; all calendar dates use `Aug 10, 2026`.
+See `build/protection-ux-live-observation.json` and
+`verification/mail-admin-completion.md` for current acceptance. No host recovery or
+retention code changed, and the repository still has one verified snapshot.
+
+
+Protection follow-up deployed: `mail-admin-ui-5ab98ed4b639`. Add protection and Save
+reason now persist directly; no separate Save protections button. Every row has
+outlined Edit reason and Remove protection buttons. Removing protection requires
+acknowledgment/authentication and never deletes mailbox data. The schedule label
+explicitly reads 3:00 AM. See `build/single-protection-live-observation.json` and
+`verification/mail-admin-completion.md` for preserved state and final evidence.
+
+
+Server disk cleanup completed: 3.47 GiB reclaimed; 4.77 GiB used,
+23.16 GiB free. Superseded uploads, staging payloads, retired local
+snapshot copies and older application rollback containers/image bundles were
+removed. Keep only the current and immediate previous application recovery sets;
+original baseline recovery sources and historical qualification/audit records
+remain. Nine protections, eight account pairs, one verified R2 snapshot and
+active backup/recovery timers were verified. See `build/server-tidy-summary.json`
+and `verification/mail-admin-completion.md` for cleanup evidence. The private
+historical staging evidence archive is local at
+`build/server-tidy-historical-evidence.tar.gz`.

@@ -31,18 +31,55 @@ class Mailboxes:
                     "'reconciliation_required' THEN mailboxes.status ELSE excluded.status END",
                     (email, now, now, status),
                 )
+            connection.execute(
+                "UPDATE mailboxes SET created=? WHERE created IS NULL OR created<=0", (now,),
+            )
             rows = {
                 row["email"]: dict(row) for row in connection.execute("SELECT * FROM mailboxes")
+            }
+            confirmed_senders = {row[0] for row in connection.execute(
+                "SELECT DISTINCT sender FROM relay_tests WHERE confirmed=1 "
+                "AND revision=(SELECT revision FROM relay_settings WHERE id=1)"
+            )}
+            tests = {
+                email: [dict(test) for test in connection.execute(
+                    'SELECT id,accepted,confirmed,created FROM relay_tests '
+                    'WHERE sender=? AND revision=(SELECT revision FROM relay_settings WHERE id=1) '
+                    'ORDER BY created DESC LIMIT 5', (email,),
+                )] for email in rows
             }
         return [
             {
                 **rows[email],
                 "credentials_present": email in credentials,
                 "storage_present": email in storage,
-                "outbound_readiness": "confirmed" if rows[email]["outbound_test"] else "unverified",
+                "outbound_readiness": ('confirmed' if email in confirmed_senders
+                                       else 'awaiting receipt' if any(
+                                           test['accepted'] for test in tests[email])
+                                       else 'failed' if tests[email] else 'unverified'),
+                'sender_tests': tests[email],
             }
-            for email in sorted(credentials | storage)
+            for email in sorted(
+                credentials | storage, key=lambda email: (-rows[email]["created"], email),
+            )
         ]
+
+    def details(self, email: str) -> dict[str, Any]:
+        normalized = address(email)
+        for mailbox in self.inventory():
+            if mailbox["email"] == normalized:
+                with self.database.transaction() as connection:
+                    revision = connection.execute(
+                        "SELECT revision FROM relay_settings WHERE id=1"
+                    ).fetchone()
+                    mailbox["current_relay_revision"] = revision[0] if revision else 0
+                    mailbox["sender_history"] = [dict(row) for row in connection.execute(
+                        "SELECT id,revision,connection_ok,accepted,confirmed,created "
+                        "FROM relay_tests WHERE sender=? ORDER BY created DESC LIMIT 20",
+                        (normalized,),
+                    )]
+                return mailbox
+        raise ServiceError("account_not_found", 404)
 
     def create(self, payload: dict[str, str]) -> dict[str, Any]:
         email = new_address(payload["email"])
@@ -125,6 +162,18 @@ class Mailboxes:
         ):
             raise ServiceError("account_not_found", 404)
         return normalized
+
+    def update_metadata(self, email: str, payload: dict[str, str]) -> dict[str, str]:
+        normalized = self.existing(email)
+        name = bounded_text(payload['display_name'], 256)
+        notes = bounded_text(payload['notes'], 2048)
+        with self.database.transaction() as connection:
+            connection.execute(
+                'UPDATE mailboxes SET display_name=?,notes=?,updated=? WHERE email=?',
+                (name, notes, self.clock(), normalized),
+            )
+            self._audit(connection, ('mailbox-metadata', 'complete', str(uuid.uuid4())))
+        return {'email': normalized, 'display_name': name, 'notes': notes}
 
     def _audit(self, connection: Any, event: tuple[str, str, str]) -> None:
         connection.execute(

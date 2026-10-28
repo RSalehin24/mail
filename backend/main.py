@@ -13,7 +13,9 @@ from fastapi.staticfiles import StaticFiles
 from backend.boundary import HttpBoundary
 from backend.retention import cleanup
 from backend.routes_auth import protected, public
+from backend.routes_backups import router as backups_router
 from backend.routes_mail import router
+from backend.routes_recovery import router as recovery_router
 from backend.routes_relay import router as relay_router
 from backend.services import Services
 from shared.errors import ServiceError
@@ -74,7 +76,7 @@ def create_app(context: Services | None = None) -> FastAPI:
     application.add_middleware(HttpBoundary, settings=context.settings)
     application.add_exception_handler(ServiceError, service_error)
     application.add_exception_handler(RequestValidationError, invalid_request)
-    for routes in (public, protected, router, relay_router):
+    for routes in (public, protected, router, relay_router, recovery_router, backups_router):
         application.include_router(routes)
     assets = context.settings.static_directory / "assets"
     if assets.is_dir():
@@ -90,6 +92,13 @@ def _fallback(application: FastAPI, context: Services) -> None:
 
     @application.get("/{path:path}")
     async def frontend(path: str) -> FileResponse:
+        if path in {"favicon.svg", "icon.svg", "manifest.webmanifest"}:
+            asset = context.settings.static_directory / path
+            if not asset.is_file():
+                raise ServiceError("asset_not_found", 404)
+            return FileResponse(asset, headers={"Cache-Control": "public, max-age=3600"})
+        if "." in path.rsplit("/", 1)[-1] and not path.startswith("mailboxes/"):
+            raise ServiceError("asset_not_found", 404)
         index = context.settings.static_directory / "index.html"
         if not index.is_file():
             raise ServiceError("frontend_unavailable", 503)

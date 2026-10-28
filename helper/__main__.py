@@ -4,9 +4,12 @@ import os
 import time
 from pathlib import Path
 
+from helper.backup_control import BackupControl
 from helper.deletion import DeletionGuard, DeletionPaths
 from helper.journal import Journal
 from helper.maddy import DockerMaddy
+from helper.recovery import RecoveryControl
+from helper.recovery_records import RecoveryRecords
 from helper.server import HelperServer, SocketPolicy
 from helper.service import HelperDependencies, HostHelper
 from helper.status import host_status
@@ -39,6 +42,10 @@ def main() -> None:
         LockPolicy(inputs["lock_wait_seconds"]),
         time.time,
         host_status,
+        RecoveryControl(Path('/var/lib/mail-admin-helper'),
+                        RecoveryRecords(Path('/var/lib/mail-admin-helper/recovery.db')))
+        if Path('/var/lib/mail-admin-helper/recovery-policy.json').is_file() else None,
+        BackupControl(Path('/var/lib/mail-admin-helper')),
     )
     policy = SocketPolicy(
         inputs["service_uid"], inputs["service_gid"], inputs["operation_timeout_seconds"]

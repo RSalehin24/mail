@@ -52,6 +52,11 @@ class ResetMailbox(RequestModel):
     password: str = Field(max_length=72)
 
 
+class MailboxMetadata(RequestModel):
+    display_name: str = Field(max_length=256)
+    notes: str = Field(max_length=2048)
+
+
 class DeleteMailbox(RequestModel):
     request_id: str = Field(max_length=36)
     confirmation: str = Field(max_length=256)

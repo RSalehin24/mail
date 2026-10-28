@@ -6,13 +6,14 @@ import shutil
 import tarfile
 import uuid
 from collections.abc import Callable
-from contextlib import AbstractContextManager
+from contextlib import AbstractContextManager, ExitStack
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
 from helper.journal import Journal
+from host.locks import HostLock, LockPolicy
 from shared.errors import ServiceError
 from shared.files import atomic_json, protected_json, sync_directory
 
@@ -88,7 +89,14 @@ class SnapshotCapture:
         self._validate_sources()
         snapshot = self.paths.staging / str(uuid.uuid4())
         snapshot.mkdir(mode=0o700)
-        with self.dependencies.coordination.consistent():
+        with ExitStack() as locks:
+            helper = self.paths.sources.get('helper')
+            recovery_lock = helper / 'recovery-worker.lock' if helper is not None else None
+            if recovery_lock is not None and recovery_lock.exists():
+                # Worker -> renewal -> mailbox is the shared acquisition order.
+                # This also excludes ledger claiming/checkpoint writes during copy.
+                locks.enter_context(HostLock(recovery_lock, LockPolicy(1, os.geteuid())))
+            locks.enter_context(self.dependencies.coordination.consistent())
             inventory = self.dependencies.services.inventories()
             journal = self.dependencies.coordination.journal
             if journal is not None:

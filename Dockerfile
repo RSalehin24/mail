@@ -44,5 +44,6 @@ COPY tools /app/tools
 COPY docs/mail-admin-implementation /app/docs/mail-admin-implementation
 COPY Dockerfile docker-compose.yml requirements.lock requirements-dev.lock pyproject.toml Makefile /app/
 COPY frontend/src /app/frontend/src
+COPY frontend/public /app/frontend/public
 COPY frontend/package.json frontend/package-lock.json frontend/tsconfig.json frontend/index.html /app/frontend/
 CMD ["python", "tools/run_tests.py", "unit"]

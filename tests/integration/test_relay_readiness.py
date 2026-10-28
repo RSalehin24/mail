@@ -62,7 +62,7 @@ class RelayReadinessApiTests(ApiTestCase):
         self.assertTrue(all(row['outbound_readiness'] == 'unverified'
                             for row in (await self.rows()).values()))
         identifier = await self.delivery('/api/accounts/' + first + '/test-sender')
-        self.assertEqual((await self.rows())[first]['outbound_readiness'], 'unverified')
+        self.assertEqual((await self.rows())[first]['outbound_readiness'], 'awaiting receipt')
         await self.confirm(identifier)
         rows = await self.rows()
         self.assertEqual(rows[first]['outbound_readiness'], 'confirmed')

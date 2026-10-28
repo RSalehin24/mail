@@ -21,6 +21,15 @@ from shared.errors import ServiceError
 
 
 class ExistingMaddy(DockerMaddy):
+    def expected_cli_version(self) -> str:
+        configuration = {
+            **self.deployment,
+            'maddy_cli_version': self.deployment.get(
+                'baseline_maddy_cli_version', self.deployment.get('maddy_cli_version', '0.9.5'),
+            ),
+        }
+        return DockerMaddy(configuration, self.executable).expected_cli_version()
+
     def expected_mounts(self) -> dict[str, str]:
         return dict(self.deployment["maddy_mounts"])
 
@@ -62,6 +71,10 @@ class BaselineServices:
         self.deployment = deployment
         self.source_names = source_names
         configuration = {**deployment, "maddy_mounts": deployment["baseline_maddy_mounts"]}
+        if 'baseline_maddy_image_id' in deployment:
+            configuration['inputs'] = {
+                **deployment['inputs'], 'maddy_image_id': deployment['baseline_maddy_image_id'],
+            }
         self.maddy = ExistingMaddy(configuration, docker.executable)
 
     def inventories(self) -> dict[str, list[str]]:

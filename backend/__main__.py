@@ -31,7 +31,9 @@ def main() -> None:
         server_header=False,
         headers=[("Cache-Control", "no-store")],
         ws="none",
-        limit_concurrency=settings.http_concurrency,
+        # ASGI admission bounds active requests. Allow bounded idle browser sockets
+        # separately: Uvicorn counts keep-alive connections against this limit.
+        limit_concurrency=2 * settings.http_concurrency,
         backlog=2 * settings.http_concurrency,
         timeout_keep_alive=5,
     )

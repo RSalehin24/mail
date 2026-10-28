@@ -1,6 +1,9 @@
 import json
 import os
 import unittest
+from email import policy
+from email.parser import BytesParser
+from email.utils import parsedate_to_datetime
 from unittest.mock import patch
 
 from backend.relay import Relay, RelayDependencies, SmtpTransport
@@ -51,12 +54,25 @@ class SmtpDeliveryTests(unittest.TestCase):
         self.assertTrue(delivery["smtp_accepted"])
         self.assertFalse(relay.otp_ready())
         self.assertIn(delivery["test_id"].encode(), peer.messages[0])
+        message = BytesParser(policy=policy.default).parsebytes(peer.messages[0])
+        self.assertEqual(message['Subject'], '[Mail Admin] Email delivery test')
+        self.assertEqual(message.get_content_type(), 'text/plain')
+        self.assertIsNotNone(parsedate_to_datetime(message['Date']).tzinfo)
+        self.assertTrue(str(message['Message-ID']).endswith('@mail.rsalehin24.me>'))
+        self.assertIn('Test ID: ' + delivery['test_id'], message.get_content().splitlines())
+        self.assertNotIn('\\n', message.get_content())
         self.assertNotIn(b"fixture-secret", peer.messages[0])
         self.assertIn(("sender", "FROM:<mail@rsalehin24.me>"), peer.events)
         self.assertIn(("recipient", "TO:<rsalehin24@gmail.com>"), peer.events)
         self.assertTrue(all(secured for name, secured in peer.events if name == "authentication"))
         relay.confirm(delivery["test_id"])
         self.assertTrue(relay.otp_ready())
+        relay.send_otp('074921')
+        otp = BytesParser(policy=policy.default).parsebytes(peer.messages[-1])
+        self.assertEqual(otp['Subject'], '[Mail Admin] Your verification code')
+        self.assertNotIn('074921', otp['Subject'])
+        self.assertIn('074921', otp.get_content().splitlines())
+        self.assertIn('expires in 5 minutes', otp.get_content())
         self.relay()
         self.assertFalse(relay.otp_ready())
         with self.assertRaises(ServiceError):

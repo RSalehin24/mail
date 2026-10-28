@@ -1,6 +1,7 @@
 """Reviewed case assertions; absent entries stay not_run, regardless of other test counts."""
 
 MADDY_TESTS = "tests.maddy.test_real_maddy.RealMaddyTests"
+SECURITY_UPGRADE_TESTS = 'tests.maddy.test_security_upgrade.SecurityUpgradeTests'
 VALIDATION_TESTS = "tests.unit.test_validation.ValidationTests"
 SETUP_TESTS = "tests.integration.test_setup.SetupApiTests"
 RUNTIME_TESTS = "tests.runtime.test_container.RuntimeTests"
@@ -145,6 +146,18 @@ CASE_TESTS: dict[str, tuple[str, ...]] = {
         'test_initial_install_and_running_or_stopped_upgrades_enforce_actual_state_sources',
         'tests.maddy.test_restic_restore.NativeResticRestoreTests.'
         'test_actual_mail_and_enrolled_dashboard_restore_from_a_deduplicated_repository',
+        f'{SECURITY_UPGRADE_TESTS}.test_01_eight_baseline_pairs_and_real_delivery',
+        f'{SECURITY_UPGRADE_TESTS}.test_02_reset_keeps_established_session_and_rejects_old_new_login',
+        f'{SECURITY_UPGRADE_TESTS}.test_03_raw_password_upsert_and_helper_existing_only_guard',
+        f'{SECURITY_UPGRADE_TESTS}.test_04_nobody_denied_and_daemon_launcher_umask_is_0077',
+        f'{SECURITY_UPGRADE_TESTS}.'
+        'test_offline_previous_database_preserves_mail_and_the_original_rollback_copy',
+        f'{SECURITY_UPGRADE_TESTS}.'
+        'test_utf8_72_byte_password_keeps_spaces_and_73_bytes_cannot_reach_cli',
+        f'{SECURITY_UPGRADE_TESTS}.'
+        'test_real_zero_exit_password_sql_error_keeps_old_password_and_requires_reconciliation',
+        f'{SECURITY_UPGRADE_TESTS}.'
+        'test_real_special_folder_warning_keeps_created_storage_and_credentials',
     ),
     'T01.04': (
         'tests.integration.test_rollout_gates.RolloutGateTests.'

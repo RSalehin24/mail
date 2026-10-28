@@ -178,7 +178,9 @@ A real R2 sharing/retention probe passed. Root recovery commands restore verifie
 into a new directory and close restored authentication before SSH recovery. Full
 replacement-host recovery and boot passed for an earlier prototype; the final
 candidate still requires matching recovery evidence. Read the
-[backup design](verification/backup-design.md); no live backup schedule is enabled.
+[backup design](verification/backup-design.md). The production backup schedule is now
+active; the [current continuation record](verification/mail-admin-completion.md)
+supersedes historical deployment and recovery status in older handovers.
 
 `tools/run_mock_host.py` manages a software-emulated Linux mock with its own kernel,
 systemd, Docker daemon and disk. Build its separate tool image with

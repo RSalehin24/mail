@@ -9,7 +9,7 @@ from host.alerts import Alerts
 from host.certificates import served_certificate
 from host.rollout import timestamp
 from shared.errors import ServiceError
-from shared.files import protected_json
+from shared.files import atomic_json, protected_json
 from shared.validation import MAIL_HOST
 
 
@@ -31,8 +31,10 @@ def expiry_condition(record: dict[str, Any], now: float) -> str:
 
 class Monitor:
     def __init__(
-        self, alerts: Alerts, dependencies: tuple[dict[str, Any], Callable[[], float]]
+        self, alerts: Alerts, dependencies: tuple[dict[str, Any], Callable[[], float]],
+        reports: Path | None = None,
     ) -> None:
+        self.reports = reports
         self.alerts = alerts
         self.configuration, self.clock = dependencies
 
@@ -48,6 +50,7 @@ class Monitor:
         self.alerts.observe("host_capacity", condition)
         self._backup()
         self._certificate()
+        self._report("monitor-observation.json", {"outcome": "checks_completed"})
         self.alerts.flush()
 
     def _backup(self) -> None:
@@ -81,11 +84,25 @@ class Monitor:
             self.alerts.observe("certificate_activation", "unknown")
 
     def external(self) -> None:
+        consumers: dict[str, Any] = {}
         for port in (993, 443):
             try:
                 certificate = served_certificate((MAIL_HOST, port))
                 condition = expiry_condition(certificate, self.clock())
+                consumers["maddy" if port == 993 else "mail-admin"] = {
+                    "state": "tls_verified", "served_expiry": certificate["expiry"],
+                    "served_sha256": certificate.get("served_sha256"),
+                }
             except (OSError, ValueError, KeyError, TypeError, ServiceError):
                 condition = "unreachable_or_untrusted"
+                consumers["maddy" if port == 993 else "mail-admin"] = {
+                    "state": "unknown", "reason": condition,
+                }
             self.alerts.observe(f"external_tls_{port}", condition)
+        self._report("served-certificates.json", {"consumers": consumers})
         self.alerts.flush()
+
+
+    def _report(self, name: str, record: dict[str, Any]) -> None:
+        if self.reports is not None:
+            atomic_json(self.reports / name, {**record, "observed_at": self.clock()})

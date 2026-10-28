@@ -70,7 +70,7 @@ class QualificationBundle:
 
 def _source_member(name: str) -> bool:
     return name.startswith(("backend/", "shared/", "helper/", "host/", "tests/", "tools/",
-                            "frontend/src/")) or name in {
+                            "frontend/src/", "frontend/public/")) or name in {
         "Dockerfile", "docker-compose.yml", "Makefile", "pyproject.toml",
         "requirements.lock", "requirements-dev.lock", "frontend/package.json",
         "frontend/package-lock.json", "frontend/tsconfig.json", "frontend/index.html",

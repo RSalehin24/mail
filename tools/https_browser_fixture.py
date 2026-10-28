@@ -2,6 +2,7 @@
 
 import argparse
 import base64
+import dataclasses
 import hashlib
 import json
 import os
@@ -29,6 +30,10 @@ class BrowserFixture(RuntimeFixture):
     def __init__(self):
         self.api_call_times = []
         super().__init__()
+        from tests.telemetry_support import synthetic_resources
+        self.host.helper.dependencies = dataclasses.replace(
+            self.host.helper.dependencies, status=synthetic_resources,
+        )
 
     def command(self, arguments):
         if arguments[0] == 'create':

@@ -15,8 +15,20 @@ from shared.validation import BODY_LIMIT
 class HttpBoundary:
     def __init__(self, app: ASGIApp, settings: Settings) -> None:
         self.application, self.settings = app, settings
+        self.capacity = asyncio.Semaphore(settings.http_concurrency)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.application(scope, receive, send)
+            return
+        if self.capacity.locked():
+            scope.setdefault("state", {})["request_id"] = str(uuid.uuid4())
+            await self._error(scope, send, (503, "work_overloaded"))
+            return
+        async with self.capacity:
+            await self._admitted(scope, receive, send)
+
+    async def _admitted(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.application(scope, receive, send)
             return
@@ -108,7 +120,8 @@ class HttpBoundary:
             {
                 "type": "http.response.start",
                 "status": status,
-                "headers": [(b"content-type", b"application/json")] + self._headers(scope),
+                "headers": [(b"content-type", b"application/json")] + self._headers(scope)
+                + ([(b"retry-after", b"1")] if status == 503 else []),
             }
         )
         await send(

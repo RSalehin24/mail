@@ -49,6 +49,7 @@ export function Reauthenticate({ onVerified, onCancel }: { onVerified: () => voi
   const [password, setPassword] = useState('');
   const [challenge, setChallenge] = useState('');
   const [factor, setFactor] = useState<'totp' | 'recovery' | 'email'>('totp');
+  const [emailAvailable, setEmailAvailable] = useState(false);
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -56,8 +57,8 @@ export function Reauthenticate({ onVerified, onCancel }: { onVerified: () => voi
     setBusy(true); setError('');
     try {
       if (!challenge) {
-        const result = await api<{ challenge: string }>('/security/reauth', { email: 'rsalehin24@gmail.com', password });
-        setChallenge(result.challenge); setPassword('');
+        const result = await api<{ challenge: string; email_otp_available: boolean }>('/security/reauth', { email: 'rsalehin24@gmail.com', password });
+        setChallenge(result.challenge); setEmailAvailable(result.email_otp_available); setPassword('');
       } else {
         await api('/security/reauth/verify', { challenge, factor, code });
         setCode(''); onVerified();
@@ -67,7 +68,7 @@ export function Reauthenticate({ onVerified, onCancel }: { onVerified: () => voi
   }
   return <Dialog open fullWidth maxWidth="xs" onClose={busy ? undefined : onCancel} aria-labelledby="reauth-title">
     <DialogTitle id="reauth-title">Verify it’s you</DialogTitle>
-    <DialogContent><Stack spacing={2} sx={{ pt: 1 }}>
+    <DialogContent><Stack spacing={2} sx={{ pt: 1 }} onKeyDown={event => { if (event.key === 'Enter' && !busy && (!challenge ? !!password : !!code.trim())) { event.preventDefault(); void verify(); } }}>
       <Typography color="text.secondary">Sensitive actions need your password and an existing second factor. Verification lasts five minutes.</Typography>
       {error && <Alert severity="error">{error}</Alert>}
       {!challenge ? <TextField label="Master password" type="password" value={password} autoFocus autoComplete="current-password"
@@ -76,10 +77,10 @@ export function Reauthenticate({ onVerified, onCancel }: { onVerified: () => voi
           <Button onClick={() => { setFactor('recovery'); setCode(''); }}>Recovery code</Button></Stack>
         {factor === 'recovery' ? <TextField label="Recovery code" value={code} autoComplete="off" onChange={event => setCode(event.target.value)}/>
           : <CodeInput value={code} onChange={setCode}/>}
-        <Button onClick={async () => {
+        {emailAvailable ? <Button disabled={busy} onClick={async () => {
           try { await api('/2fa/send-otp', { challenge, purpose: 'reauth' }); setFactor('email'); setCode(''); }
           catch (failure) { setError((failure as Error).message); }
-        }}>Send email code if configured</Button>
+        }}>Send email code</Button> : <Typography variant="caption" color="text.secondary">Email codes require enabled email authentication and a confirmed delivery test from the administrator sender. Use your authenticator or a recovery code.</Typography>}
       </>}
     </Stack></DialogContent>
     <DialogActions><Button onClick={onCancel} disabled={busy}>Cancel</Button><Button variant="contained" onClick={verify}

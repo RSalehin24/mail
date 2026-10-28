@@ -1,0 +1,8 @@
+[Unit]
+Description=Process queued mailbox recovery operations and expiry
+[Timer]
+OnBootSec=30sec
+OnUnitInactiveSec=2sec
+Unit=mail-admin-recovery.service
+[Install]
+WantedBy=timers.target

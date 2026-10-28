@@ -11,3 +11,27 @@
 - Prove restoration in an isolated environment using the recorded runtime version, all required databases/message files, and the matching keys. Verify account inventory, fixture messages, admin login/2FA, and decryption of relay settings. Block permanent deletion until this procedure has passed and a qualifying backup is available.
 - Include recovery from failed storage deletion: restore fixture message bodies and their database references, not merely an account row. Prove that recovery preserves other accounts/newer mail and makes the selected backup cutoff explicit. Do not assume a rolled-back SQL transaction implies that message files survived.
 - Before reopening any restored dashboard, invalidate all restored sessions, setup/login/reauthentication/replacement challenges, Email OTP records, and recent-reauthentication grants; replace the entire recovery-code set and invalidate relay/OTP readiness until retested. Verify the database/installation marker and runtime/schema/protocol match, restore restrictive permissions, and reconcile helper operation state against actual Maddy inventories before enabling mutations. Post-restore reconciliation is observational: do not automatically replay old create/reset/delete requests; require fresh authorization for still-desired changes. A backup can predate password/factor changes, so establish the intended master password and TOTP seed with the operator; use the SSH-only recovery utility to replace them if their trusted state cannot be established. Do not reset active TOTP replay protection or reuse consumed recovery codes as a shortcut to regain access. Test that cookies and codes invalidated after the backup cannot authenticate after restoration.
+
+The production Restic policy keeps the latest verified snapshot for each calendar
+day in Asia/Dhaka within the rolling seven-day window. The existing 03:00 Dhaka
+schedule is unchanged. Manual backups replace an earlier same-day restore point
+only after full extraction and integrity verification. Unresolved restores pin
+both their source and verified safety snapshot. Successful restoration requires a
+verified post-restore backup before safety copies can be retired.
+
+Verification records and complete retention decisions live under the root-owned
+Restic state directory's `retention/` subdirectory. Cleanup failures are recorded
+separately from successful backup publication. Native `forget` and `prune` run
+under the shared backup and recovery locks; never delete R2 objects directly.
+The explicitly requested initial cleanup uses `python3 -m host.initial_cleanup`
+from the installed host tools and refuses while any recovery work is unresolved.
+It freshly restores/verifies the newest snapshot, audits retired staging and
+repository IDs in `retired-references.json`, and retains exactly that snapshot.
+Keep this audit record with the repository state: it retires obsolete baseline
+and rollback pins without altering historical qualification evidence.
+
+Settings contains Security, Outgoing mail provider, and Backup & Recovery.
+Deletion policy and protections are on Deleted Mailboxes under Configure and
+Protected Mailboxes; the default tab lists deleted mailboxes. Backup & Recovery
+opens Backups, with complete operation history in Logs. URL tab parameters
+survive refresh; legacy deletion/protection Settings links redirect.

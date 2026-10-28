@@ -1,0 +1,20 @@
+[Unit]
+Description=Process administrator mailbox recovery operations
+After=docker.service mail-admin-helper.service
+Requires=docker.service
+[Service]
+Type=oneshot
+WorkingDirectory=/usr/local/lib/mail-admin
+ExecStart=/usr/bin/python3 -m host.mailbox_recovery
+MemoryMax=128M
+CPUQuota=50%
+TasksMax=64
+TimeoutStartSec=540
+TimeoutStopSec=45
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/mail-admin-helper /opt/maddy/data /opt/mail-admin/data /var/lib/mail-admin-certificates /run/lock
+LogNamespace=mail-admin

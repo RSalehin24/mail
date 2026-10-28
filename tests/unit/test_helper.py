@@ -155,6 +155,20 @@ class HelperTests(unittest.TestCase):
                       self.assertRaisesRegex(ServiceError, 'maddy_version_mismatch')):
                     maddy.validate_cli_version()
 
+    def test_selected_security_release_requires_exact_version_and_rejects_unreviewed_versions(self):
+        deployment = {'inputs': {'operation_timeout_seconds': 5}, 'maddy_cli_version': '0.9.6'}
+        maddy = DockerMaddy(deployment)
+        with patch.object(maddy, 'change', return_value=CommandResult(0, '0.9.6 linux/amd64')):
+            maddy.validate_cli_version()
+        for rejected in ('0.9.5', '0.9.60', '0.9.6+foreign', '0.9.7'):
+            with (self.subTest(version=rejected),
+                  patch.object(maddy, 'change', return_value=CommandResult(0, rejected)),
+                  self.assertRaisesRegex(ServiceError, 'maddy_version_mismatch')):
+                maddy.validate_cli_version()
+        deployment['maddy_cli_version'] = '0.9.7'
+        with self.assertRaisesRegex(ServiceError, 'maddy_version_unsupported'):
+            maddy.validate_cli_version()
+
     def test_zero_exit_unavailable_update_pipe_is_a_cli_failure_before_inventory_or_mutation(self):
         output = ('Failed to initialize update pipe, do not remove messages from mailboxes '
                   'open by clients: dial unix /run/maddy/sql-fixture.sock: connection refused\n')

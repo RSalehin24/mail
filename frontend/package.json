@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
+    "test:reads": "tsc --ignoreConfig --target ES2022 --module ES2022 --outDir ../build/read-tests src/api.ts src/format.ts && node ../tools/check_reads.mjs",
     "lint": "tsc --noEmit --noUnusedLocals --noUnusedParameters",
     "dev": "vite --host 127.0.0.1"
   },

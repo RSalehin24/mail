@@ -1,13 +1,12 @@
 """Mailbox routes enforce the capability gate before invoking their helper adapter."""
 
-import asyncio
 import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 
 from backend.authorization import authenticated, recent, services
-from backend.requests import CreateMailbox, DeleteMailbox, ResetMailbox
+from backend.requests import CreateMailbox, DeleteMailbox, MailboxMetadata, ResetMailbox
 from shared.errors import ServiceError
 
 router = APIRouter(prefix="/api", dependencies=[Depends(authenticated)])
@@ -17,6 +16,12 @@ router = APIRouter(prefix="/api", dependencies=[Depends(authenticated)])
 async def accounts(request: Request) -> list[dict[str, Any]]:
     application = services(request)
     return await application.io.run(application.mailboxes.inventory)
+
+
+@router.get("/accounts/{email}")
+async def account(email: str, request: Request) -> dict[str, Any]:
+    application = services(request)
+    return await application.io.run(lambda: application.mailboxes.details(email))
 
 
 @router.post("/accounts/create")
@@ -33,6 +38,14 @@ async def reset(email: str, body: ResetMailbox, request: Request) -> dict[str, A
     return await application.io.run(lambda: application.mailboxes.reset(email, body.model_dump()))
 
 
+@router.patch('/accounts/{email}/metadata', dependencies=[Depends(recent)])
+async def metadata(email: str, body: MailboxMetadata, request: Request) -> dict[str, str]:
+    application = services(request)
+    return await application.io.run(
+        lambda: application.mailboxes.update_metadata(email, body.model_dump()),
+    )
+
+
 @router.delete("/accounts/{email}", dependencies=[Depends(recent)])
 async def delete(email: str, body: DeleteMailbox, request: Request) -> dict[str, Any]:
     application = services(request)
@@ -45,11 +58,10 @@ async def delete(email: str, body: DeleteMailbox, request: Request) -> dict[str,
 @router.get("/diagnostics")
 async def diagnostics(request: Request) -> dict[str, Any]:
     application = services(request)
-    observed, dns, relay = await asyncio.gather(
-        _host_observation(request),
-        application.io.run(application.dns),
-        application.io.run(application.relay.masked),
-    )
+    def observe() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+        return (_read_host(request, "status"), application.dns(), application.relay.masked())
+
+    observed, dns, relay = await application.io.run(observe)
     return {
         "host": observed,
         "dns_mx": dns,
@@ -67,13 +79,20 @@ async def diagnostics(request: Request) -> dict[str, Any]:
     }
 
 
-async def _host_observation(request: Request) -> dict[str, Any]:
+@router.get("/telemetry")
+async def telemetry(request: Request) -> dict[str, Any]:
+    return await _host_observation(request, "telemetry")
+
+
+async def _host_observation(request: Request, operation: str = "status") -> dict[str, Any]:
     application = services(request)
+    return await application.io.run(lambda: _read_host(request, operation))
+
+
+def _read_host(request: Request, operation: str) -> dict[str, Any]:
     try:
-        return await application.io.run(
-            lambda: application.mailboxes.helper.call(
-                {"operation": "status", "request_id": str(uuid.uuid4())}
-            )
+        return services(request).mailboxes.helper.call(
+            {"operation": operation, "request_id": str(uuid.uuid4())}
         )
     except ServiceError as error:
         return {"state": "unknown", "reason": error.code}

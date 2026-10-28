@@ -13,6 +13,7 @@ from backend.quota import read_quota
 from backend.relay_state import otp_ready
 from backend.secrets import SecretKeys
 from shared.errors import ServiceError
+from shared.mail_templates import delivery_test, verification_code
 from shared.smtp import SMTP_HOST, OutboundMessage, SmtpCredentials, authenticated, send_message
 from shared.validation import ADMIN_EMAIL, OTP_SENDER, address, bounded_text, utf8_size
 
@@ -138,8 +139,9 @@ class Relay:
             tests = [
                 dict(test)
                 for test in connection.execute(
-                    "SELECT * FROM relay_tests WHERE revision=? ORDER BY created DESC LIMIT 10",
-                    (row["revision"],),
+                    "SELECT * FROM relay_tests WHERE revision=? AND sender=? "
+                    "ORDER BY created DESC LIMIT 10",
+                    (row["revision"], OTP_SENDER),
                 )
             ]
             confirmed = otp_ready(connection)
@@ -176,10 +178,7 @@ class Relay:
         message = (
             OutboundMessage(
                 sender,
-                "Mail Admin delivery test " + identifier,
-                "Delivery test: "
-                + identifier
-                + "\nConfirm this identifier in Mail Admin after receipt.",
+                *delivery_test(identifier),
             )
             if mode == "delivery"
             else None
@@ -253,6 +252,6 @@ class Relay:
         self.dependencies.transport.perform(
             configuration,
             OutboundMessage(
-                OTP_SENDER, "Mail Admin verification code", "Your five-minute code: " + code
+                OTP_SENDER, *verification_code(code)
             ),
         )

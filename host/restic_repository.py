@@ -188,7 +188,7 @@ class ResticRepository:
             if target.exists():
                 shutil.rmtree(target)
 
-    def prune(self, protected: set[str]) -> list[str]:
+    def prune(self, protected: set[str], selected: list[str] | None = None) -> list[str]:
         snapshots = self.snapshots()
         known = {row.identifier for row in snapshots}
         if not protected or not protected <= known:
@@ -198,6 +198,10 @@ class ResticRepository:
         self.process.run(("check", "--read-data"))
         expired = [row.identifier for row in snapshots if row.identifier not in protected
                    and row.cutoff <= self.clock() - self.options.retention_seconds]
+        if selected is not None:
+            if not set(selected) <= known - protected:
+                raise ServiceError("invalid_retention_selection", 503)
+            expired = selected
         self._budget(8 * 1024 * 1024)
         if expired:
             self.process.run(("forget", *expired))

@@ -27,3 +27,27 @@ requires postcondition reconciliation. Special-folder failures can also return
 zero and use `Failed to create … folder` text; they must not count as fully
 provisioned accounts. These compatibility guards do not fix the upstream storage
 semantics or replace the security-release decision.
+
+## Production security-upgrade selection — 26 October 2026
+
+The operator explicitly selected **qualify a security upgrade first**. Upstream
+[0.9.6](https://github.com/foxcpp/maddy/releases/tag/v0.9.6) is the selected security
+release. Its downloaded amd64 image is pinned through
+`ghcr.io/foxcpp/maddy@sha256:e1074e92a452b84d1135ebe8ab831c5f541d33dcbd39e38fab740a53bbf2f97c`;
+the binary reports `0.9.6 linux/amd64 go1.26.8`. The previous assessment above is
+retained as historical context, not the current selection.
+
+The helper now supports an explicit, exact 0.9.6 CLI selection while retaining the
+original image/version for the pre-upgrade baseline. Unselected and suffix/lookalike
+versions are rejected. Eight isolated real-Maddy compatibility checks passed:
+eight matching mailbox pairs and delivery, password reset/session behavior,
+existing-only guards, permissions/umask, UTF-8 password bounds, failure handling,
+and an offline 0.9.5 database upgrade with its independent rollback copy readable.
+The first offline-restart observation failed because its fixture reused a dynamic
+host port after Docker restart; the test now observes the reassigned port. That
+failed report remains preserved and the fresh eight-test run passed.
+
+This is development compatibility evidence. New source/artifacts still require
+frozen qualification and production backup/restore, deployment and target acceptance.
+Production continues running its unchanged 0.9.5 image until those prerequisites
+pass. No security upgrade has yet been applied to production.

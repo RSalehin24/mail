@@ -111,7 +111,10 @@ class RealHelperProtocolTests(unittest.TestCase):
         request = {'protocol': 1, 'operation': 'status', 'request_id': str(uuid.uuid4())}
         response = self.socket.client(request)
         self.assertEqual(set(response), {'ok', 'protocol', 'summary', 'maddy', 'unresolved'})
-        self.assertEqual(set(response['maddy']), {'state', 'credential_count', 'storage_count'})
+        self.assertEqual(set(response['maddy']),
+                         {'state', 'credential_count', 'storage_count', 'observed_at'})
+        self.assertIsInstance(response['maddy']['observed_at'], (int, float))
+        self.assertLessEqual(abs(time.time() - response['maddy']['observed_at']), 10)
         self.assertEqual(response['summary']['consumers']['maddy'],
                          {'intent': 'expected_running', 'state': 'active'})
         self.assertTrue('fixture-private' not in json.dumps(response))

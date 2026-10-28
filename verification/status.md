@@ -1,3 +1,13 @@
+# Current production state — 27 October 2026
+
+Settings and backup/recovery controls are live as `mail-admin-settings-d7dec30d3de3`.
+Recoverable mailbox deletion is enabled; permanent deletion remains disabled.
+Read the [current implementation and verification record](mail-admin-completion.md)
+for pagination coverage, restore behavior, evidence, rollback state and remaining
+full-server recovery/reboot limitations. Statements below are historical.
+
+---
+
 # Implementation and verification status
 
 The dashboard, API, persistent authentication, root helper, relay services and host
@@ -8,6 +18,18 @@ has been performed by the implementation run. Only explicitly authorized synthet
 fixtures have been added to the existing host.
 
 For the active Linux checkout, see the [continuation checkpoint](linux-continuation.md).
+Production deployment is now authorized, with up to 600 seconds of interruption
+and the required reboot, after qualification of the selected Maddy 0.9.6 security
+upgrade. The new frozen source `9f17f117` includes exact upgrade/baseline version
+checks and improved email subjects, line breaks, timestamps and message IDs. Its
+eight real upgrade compatibility checks and 474 unit / 72 integration checks pass;
+new frozen catalogue and disposable-host evidence are in progress. Brevo delivery
+is confirmed, and Google-hosted availability checks are configured with alerts
+disabled until readiness. The production dashboard is not yet installed; live mail
+still runs its unchanged original 0.9.5 image.
+
+The prior candidate result below remains valid only for its frozen source.
+
 The latest Linux frozen source `76307198` passed **111 / 111 catalogue cases**,
 with **0 failed and 0 not run**. The candidate evidence checker passed on 26 October
 2026. Supporting checks passed 472 unit and 72 integration tests. A fresh Docker

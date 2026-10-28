@@ -73,7 +73,10 @@ class DockerMaddy:
         self.validate_cli_version()
 
     def expected_cli_version(self) -> str:
-        return '0.9.5'
+        version = self.deployment.get('maddy_cli_version', '0.9.5')
+        if version not in ('0.9.5', '0.9.6'):
+            raise ServiceError('maddy_version_unsupported', 503)
+        return str(version)
 
     def validate_cli_version(self) -> None:
         result = self.change(("version",))

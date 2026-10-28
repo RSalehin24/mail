@@ -68,7 +68,9 @@ class SmtpTests(unittest.TestCase):
         self.client.starttls.assert_not_called()
         envelope = self.client.send_message.call_args.args[0]
         self.assertEqual(envelope["To"], "rsalehin24@gmail.com")
-        self.assertIn("backup", envelope["Subject"])
+        self.assertIn("backup", envelope["Subject"].lower())
+        self.assertTrue(envelope["Subject"].startswith('[Mail Admin] Action required:'))
+        self.assertIn('Check: Backup\nStatus: Failed\n', envelope.get_content())
         self.assertNotIn("fixture-secret", str(envelope))
 
     def test_another_alert_recipient_is_refused_before_network_access(self):

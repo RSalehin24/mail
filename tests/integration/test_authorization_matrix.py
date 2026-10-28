@@ -15,10 +15,12 @@ class AuthorizationMatrixTests(ApiTestCase):
             ("POST", "/api/accounts/create", create),
             ("POST", f"/api/accounts/{email}/password",
              {"request_id": str(uuid.uuid4()), "password": MAILBOX_PASSWORD}),
+            ("PATCH", f"/api/accounts/{email}/metadata", {"display_name": "Example", "notes": ""}),
             ("DELETE", f"/api/accounts/{email}", {"request_id": str(uuid.uuid4()),
              "confirmation": email, "cutoff": "untrusted", "acknowledged": True}),
             ("POST", "/api/settings/relay/reveal", {}),
             ("POST", "/api/settings/relay/test", {"mode": "delivery"}),
+            ("GET", f"/api/accounts/{email}", None),
         )
 
     async def assert_protected_routes_denied(self):

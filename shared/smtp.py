@@ -6,9 +6,10 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from email.message import EmailMessage
+from email.utils import formatdate, make_msgid
 
 from shared.errors import ServiceError
-from shared.validation import ADMIN_EMAIL
+from shared.validation import ADMIN_EMAIL, MAIL_HOST
 
 SMTP_HOST = "smtp-relay.brevo.com"
 
@@ -53,6 +54,8 @@ def send_message(connection: smtplib.SMTP, message: OutboundMessage) -> None:
     envelope = EmailMessage()
     envelope["From"], envelope["To"] = message.sender, ADMIN_EMAIL
     envelope["Subject"] = message.subject
+    envelope["Date"] = formatdate(usegmt=True)
+    envelope["Message-ID"] = make_msgid(domain=MAIL_HOST)
     envelope.set_content(message.body)
     rejected = connection.send_message(envelope, from_addr=message.sender, to_addrs=[ADMIN_EMAIL])
     if rejected:

@@ -24,6 +24,20 @@ class BaselinePolicyTests(unittest.TestCase):
         self.assertEqual(services.inventories(), {"credentials": [], "storage": []})
         services.maddy.validate.assert_called_once()
 
+    def test_security_upgrade_baseline_retains_original_image_and_cli(self):
+        deployment = {
+            'inputs': {'operation_timeout_seconds': 5, 'maddy_image_id': 'new-image'},
+            'maddy_cli_version': '0.9.6',
+            'baseline_maddy_image_id': 'original-image',
+            'baseline_maddy_cli_version': '0.9.5',
+            'baseline_maddy_mounts': {'/data': '/original'},
+        }
+        services = BaselineServices(MagicMock(), deployment, {'maddy'})
+        self.assertEqual(services.maddy.deployment['inputs']['maddy_image_id'], 'original-image')
+        self.assertEqual(services.maddy.expected_cli_version(), '0.9.5')
+        self.assertEqual(deployment['inputs']['maddy_image_id'], 'new-image')
+        self.assertEqual(services.maddy.expected_mounts(), {'/data': '/original'})
+
     def test_an_existing_dashboard_requires_every_full_state_source_before_capture_or_pause(self):
         services = self.services(True, set(FULL_STATE_SOURCES))
         services.inventories()

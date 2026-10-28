@@ -29,11 +29,19 @@ class BackupOperations:
             manifest = self.backup.transfer(self.backup.capture())
             protected = self._protected(manifest)
             if isinstance(self.backup, RepositoryBackup):
-                self.backup.prune(protected)
-            retention = BackupRetention(self.backup.paths.staging, (
-                Path("/var/lib/mail-admin-backup/retention.json"), self.lock_policy,
-                self.deployment["backup_local_retention_seconds"],
-            ))
+                try:
+                    self.backup.prune(protected)
+                    manifest["cleanup"] = {"state": "complete", "error": ""}
+                except (OSError, ServiceError):
+                    manifest["cleanup"] = {"state": "failed", "error": "retention_cleanup_failed"}
+            retention = BackupRetention(
+                self.backup.paths.staging,
+                (
+                    Path("/var/lib/mail-admin-backup/retention.json"),
+                    self.lock_policy,
+                    self.deployment["backup_local_retention_seconds"],
+                ),
+            )
             retention.record(manifest)
             retention.prune((time.time(), protected))
             return manifest
@@ -50,9 +58,22 @@ class BackupOperations:
         protected = {manifest["snapshot_id"], *self.deployment["rollback_snapshot_ids"]}
         baseline = self.baseline_manifest()
         if baseline is None:
-            return protected
+            return protected - self._retired()
         try:
             operational_guard(self.deployment).checkpoint("G08")
         except (OSError, ServiceError):
             protected.add(baseline["snapshot_id"])
-        return protected
+        return protected - self._retired()
+
+    def _retired(self) -> set[str]:
+        if not isinstance(self.backup, RepositoryBackup):
+            return set()
+        path = self.backup.repository.process.paths.state / "retention" / "retired-references.json"
+        if not path.exists():
+            return set()
+        record = protected_json(path, self.backup.repository.process.owner)
+        if record.get("reason") != "operator_requested_initial_cleanup" or not record.get(
+            "verified_retained"
+        ):
+            raise ServiceError("invalid_retired_reference_record", 503)
+        return set(record["retired_staging_ids"])

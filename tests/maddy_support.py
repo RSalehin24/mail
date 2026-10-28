@@ -71,6 +71,11 @@ class FixtureMaddy(DockerMaddy):
 
 
 class RealMaddyFixture:
+    maddy_class = FixtureMaddy
+
+    def image_reference(self):
+        return fixture_reference()
+
     def __init__(self, configuration=CONFIGURATION):
         self.docker = shutil.which("docker")
         if not self.docker:
@@ -165,7 +170,7 @@ class RealMaddyFixture:
             + (
                 "--entrypoint",
                 "/usr/local/libexec/mail-admin-maddy",
-                fixture_reference(),
+                self.image_reference(),
                 "-config",
                 "/data/maddy.conf",
                 "run",
@@ -183,7 +188,7 @@ class RealMaddyFixture:
         inspected = self.launch()
         image = inspected["Image"]
         mounts = {mount["Destination"]: mount["Source"] for mount in inspected["Mounts"]}
-        self.maddy = FixtureMaddy(
+        self.maddy = self.maddy_class(
             {
                 "inputs": {"maddy_image_id": image, "operation_timeout_seconds": 10},
                 "maddy_mounts": mounts,

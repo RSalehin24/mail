@@ -86,7 +86,10 @@ class HostContext:
             sources,
             tuple(self.deployment["maddy_message_paths"]),
         )
-        services = DockerSnapshots((self.docker, DockerMaddy(self.deployment), self.generations))
+        services = DockerSnapshots(
+            (Docker(timeout=30), DockerMaddy(self.deployment), self.generations),
+            startup_timeout=15,
+        )
         capture = SnapshotCapture(
             paths, CaptureDependencies(self.coordination, services, time.time),
         )

@@ -44,7 +44,8 @@ def source_identities(root: Path | None = None) -> dict[str, str]:
         for path in (root / directory).rglob("*")
         if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
     }
-    files.update(path for path in (root / "frontend/src").rglob("*") if path.is_file())
+    for directory in ("frontend/src", "frontend/public"):
+        files.update(path for path in (root / directory).rglob("*") if path.is_file())
     files.update(
         root / name
         for name in (

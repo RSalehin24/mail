@@ -89,7 +89,7 @@ export function DeleteDialog({ mailbox, cutoff, ...common }: Common & { mailbox:
 type Connection = { host: string; port: number; security: string; username: string; password: string };
 const clients = ['Apple Mail', 'Gmail', 'Thunderbird / Outlook', 'Nextcloud', 'Raw details'];
 
-export function ClientConfig({ mailbox, onClose, authorize, notify }: Common & { mailbox: Mailbox }) {
+export function ClientConfig({ mailbox, onClose, authorize, notify, embedded = false }: Common & { mailbox: Mailbox; embedded?: boolean }) {
   const [configuration, setConfiguration] = useState<{ incoming: Connection; outgoing: Connection } | null>(null);
   const [tab, setTab] = useState(0);
   const [secret, setSecret] = useState('');
@@ -101,10 +101,12 @@ export function ClientConfig({ mailbox, onClose, authorize, notify }: Common & {
       .catch(failure => { if (active) setError((failure as Error).message); });
     return () => { active = false; };
   }, [mailbox.email]);
-  return <Dialog open fullScreen={useMediaQuery('(max-width:599px)')} fullWidth maxWidth="md" onClose={onClose} aria-labelledby="client-title">
+  const fullScreen = useMediaQuery('(max-width:599px)');
+  const content = <>
     <DialogTitle id="client-title">Connect {mailbox.email}</DialogTitle>
     <DialogContent>
       {error && <Alert severity="error">{error}</Alert>}
+      <Typography sx={{ mb: 2 }}>IMAP uses this mailbox’s address and incoming password. SMTP uses the shared Brevo login and key for all mailboxes; your From address is {mailbox.email}.</Typography>
       <Tabs value={tab} onChange={(_, value: number) => setTab(value)} variant="scrollable" scrollButtons="auto" aria-label="Mail client">{clients.map(client => <Tab label={client} key={client}/>)}</Tabs>
       <Typography sx={{ mt: 2 }} variant="body2">{tab === 0 ? 'In Mail settings, add an Other Mail Account. Enter the incoming and outgoing settings separately.' : tab === 1 ? 'Choose Other (IMAP) in the Gmail app. For Gmail web “Send As”, use the outgoing SMTP details. Do not use the mailbox password for SMTP.' : tab === 2 ? 'Choose manual setup, IMAP for incoming mail, and a separate outgoing SMTP server and login.' : tab === 3 ? 'In Nextcloud Mail, use manual configuration and supply separate IMAP and SMTP credentials.' : 'Use these values in any IMAP client with separate incoming and outgoing authentication.'}</Typography>
       {configuration && <Box className="client-pair">{(['incoming', 'outgoing'] as const).map(direction => <Box key={direction}>
@@ -123,6 +125,7 @@ export function ClientConfig({ mailbox, onClose, authorize, notify }: Common & {
         const result = await api<{ credential: string }>('/settings/relay/reveal', {});
         await navigator.clipboard.writeText(result.credential); notify('Outgoing key copied');
       })}>Copy outgoing key</Button></Stack>
-    </DialogContent><DialogActions><Button onClick={() => { setSecret(''); onClose(); }}>Close</Button></DialogActions>
-  </Dialog>;
+    </DialogContent>{!embedded && <DialogActions><Button onClick={() => { setSecret(''); onClose(); }}>Close</Button></DialogActions>}
+  </>;
+  return embedded ? content : <Dialog open fullScreen={fullScreen} fullWidth maxWidth="md" onClose={onClose} aria-labelledby="client-title">{content}</Dialog>;
 }

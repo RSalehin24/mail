@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any
 
 from host.backup import BackupPaths, SnapshotCapture, backup_manifest
+from host.daily_retention import RetentionLedger
+from host.locks import HostLock, LockPolicy
 from host.restic_repository import ResticRepository
 from shared.errors import ServiceError
 from shared.files import atomic_json, protected_json
@@ -29,6 +31,7 @@ class RepositoryBackup:
     def transfer(self, snapshot: Path) -> dict[str, Any]:
         publication = self.repository.publish(snapshot)
         self.repository.verify(publication)
+        RetentionLedger(self.repository).verified(publication["repository_snapshot"])
         manifest = backup_manifest(snapshot, publication, self.repository.clock())
         atomic_json(self.paths.manifest, manifest)
         return manifest
@@ -50,7 +53,34 @@ class RepositoryBackup:
         identities = {row.path.name: row.identifier for row in snapshots}
         if not protected <= identities.keys():
             raise ServiceError("protected_backup_snapshot_unavailable", 503)
-        expired = self.repository.prune({identities[name] for name in protected})
+        retained = {identities[name] for name in protected}
+        control_path = self.paths.sources.get("helper", Path("/nonexistent")) / "backup-control.db"
+        if control_path.is_file():
+            from helper.backup_control import BackupControl
+
+            with BackupControl(control_path.parent).connect() as connection:
+                for row in connection.execute(
+                    "SELECT result FROM jobs WHERE kind='restore' "
+                    "AND state IN ('queued','running','reconciliation_required')"
+                ):
+                    import json
+
+                    safety = json.loads(row[0]).get("safety_repository_snapshot")
+                    if safety:
+                        retained.add(safety)
+                retained.update(
+                    row[0]
+                    for row in connection.execute(
+                        "SELECT DISTINCT snapshot FROM jobs WHERE snapshot<>'' "
+                        "AND state IN ('queued','running','reconciliation_required')"
+                    )
+                )
+        helper = self.paths.sources.get("helper")
+        if helper is not None and (helper / "recovery-worker.lock").exists():
+            with HostLock(helper / "recovery-worker.lock", LockPolicy(1)):
+                expired = RetentionLedger(self.repository).reconcile(retained)
+        else:
+            expired = RetentionLedger(self.repository).reconcile(retained)
         # Remote pruning cannot authorize removing any unrelated staging entry.
         for identifier in expired:
             path = next(row.path for row in snapshots if row.identifier == identifier)

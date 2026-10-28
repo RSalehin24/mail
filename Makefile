@@ -34,6 +34,8 @@ linux-check: maddy-integration runtime-integration acme-integration
 browser: build
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) tools/export_frontend.py
 	node tools/check_browser.mjs
-check: lint typecheck unit integration
+reads:
+	cd frontend && npm run test:reads
+check: lint typecheck reads unit integration
 plan:
 	PYTHONDONTWRITEBYTECODE=1 python3 docs/mail-admin-implementation/tools/verify_plan.py --run-tests --check-examples

@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 from host.locks import HostLock, LockPolicy
 from shared.errors import ServiceError
 from shared.files import atomic_json, protected_bytes, protected_json
+from shared.mail_templates import operational_alert
 from shared.smtp import SMTP_HOST, OutboundMessage, SmtpCredentials, authenticated, send_message
 from shared.validation import ADMIN_EMAIL, OTP_SENDER, bounded_text, utf8_size
 
@@ -38,10 +39,10 @@ class SmtpAlertTransport:
         connection_details = SmtpCredentials(
             SMTP_HOST, self.configuration["port"], username, credential
         )
-        name, condition = bounded_text(event["name"], 128), bounded_text(event["condition"], 128)
-        message = OutboundMessage(
-            OTP_SENDER, f"Mail Admin: {name} — {condition}", json.dumps(event, sort_keys=True)
-        )
+        bounded_text(event["name"], 128)
+        bounded_text(event["condition"], 128)
+        subject, body = operational_alert(event)
+        message = OutboundMessage(OTP_SENDER, subject, body)
         try:
             with authenticated(connection_details, 5) as connection:
                 send_message(connection, message)

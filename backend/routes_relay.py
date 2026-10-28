@@ -7,7 +7,8 @@ from pydantic import Field
 
 from backend.authorization import authenticated, peer, recent, services
 from backend.requests import RequestModel
-from shared.validation import MAIL_HOST, OTP_SENDER
+from shared.errors import ServiceError
+from shared.validation import MAIL_HOST, OTP_SENDER, address
 
 router = APIRouter(prefix="/api", dependencies=[Depends(authenticated)])
 
@@ -98,3 +99,28 @@ async def client_configuration(email: str, request: Request) -> dict[str, Any]:
             "credential_scope": "Shared Brevo SMTP key",
         },
     }
+
+
+@router.get("/relay-tests")
+async def history(
+    request: Request, sender: str, page: int = 1, page_size: int = 10
+) -> dict[str, Any]:
+    normalized = address(sender)
+    if page < 1 or page_size not in {5, 10, 20, 50}:
+        raise ServiceError("invalid_pagination", 400)
+    application = services(request)
+
+    def read() -> dict[str, Any]:
+        with application.relay.database.transaction() as connection:
+            total = connection.execute(
+                "SELECT count(*) FROM relay_tests WHERE sender=?", (normalized,)
+            ).fetchone()[0]
+            current = min(page, max(1, (total + page_size - 1) // page_size))
+            rows = connection.execute(
+                "SELECT id,revision,sender,connection_ok,accepted,confirmed,created "
+                "FROM relay_tests WHERE sender=? ORDER BY created DESC,id DESC LIMIT ? OFFSET ?",
+                (normalized, page_size, (current - 1) * page_size),
+            ).fetchall()
+        return {"items": [dict(row) for row in rows], "total": total, "page": current}
+
+    return await application.io.run(read)

@@ -290,3 +290,111 @@ A read-only production preflight check remains blocked at
 The independent synthetic qualification password does not fill that production
 reference. The recovered fresh guest remains running for inspection; the source
 and interrupted replacement are stopped with their private disks retained.
+
+## Production deployment preparation: 26 October 2026
+
+The operator authorized deployment and selected the existing local-state R2
+credentials and independently retained Restic password for production use.
+`verification/operator-inputs.json` now sets `backup_key_reference` to
+`/home/rsalehin24/Documents/mail/local-state/qualification-restic-password.key`.
+Both credential source files are nonempty and mode 0600. No secret value is in the
+tracked configuration. The password reference identifies the recoverable workstation
+copy; the planned runtime password path is `/etc/mail-admin/secrets/restic-password.key`.
+The S3-only credential file is planned for `/etc/mail-admin/secrets/r2-credentials.json`.
+
+`~/mail.sh` confirms `deployer@35.237.68.175`. An authenticated read-only preflight
+observed cloud instance `1084246032840499912` in project `rsalehin24-mail`, zone
+`us-east1-c`, and verified the negotiated ed25519 SSH key against existing trust.
+The server still runs Maddy 0.9.5 with eight matching credential/storage accounts;
+no dashboard is installed. Its existing certificate covers `mail.rsalehin24.me`.
+There is about 8.99 GB free disk and 570 MB available RAM in this observation;
+these observations are not qualified deployment resource limits. A reboot is required.
+
+The private deployment draft, authenticated target identity, pending inputs and
+credential transfer plan are under `build/deployment-preparation/`. The original
+111/111 candidate bundle is unchanged; changing its deployment configuration will
+require matching qualification rather than editing its immutable evidence.
+
+Production rollout remains before maintenance while the independent alert
+credentials/provider, maintenance/reboot window and explicit Maddy security-release
+disposition are pending. These are required preflight inputs in the authoritative
+rollout. The operator has been asked for them. Before installation, the qualified release
+and selected credential files were staged at
+`/var/lib/mail-admin-release-staging/deployment-e2c856b1-0189-4c91-93e8-80019ea80e5a`.
+The transfer checksum matches and the candidate evidence checker passes on the
+production server. Staged credentials are root-owned with file mode 0600 inside
+a mode-0700 private directory. The staging receipt is
+`build/deployment-preparation/server-staging-receipt.json`.
+No application installation, container restart, mail mutation or DNS change has
+occurred. The production application is not yet available for use.
+
+## Brevo credential preflight
+
+The operator supplied `local-state/mail-sending-credentials.json`. Its mode was
+restricted from 0644 to 0600 inside the existing mode-0700 local-state directory.
+The SMTP login/key were normalized privately into
+`local-state/brevo-alert-credentials.json`, staged root-owned at mode 0600 in the
+production release staging directory, and referenced by the deployment draft.
+Only the provider/channel description was added to tracked operator inputs.
+Neither credential values nor authentication command payloads were printed.
+
+Production TLS negotiation to `smtp-relay.brevo.com:587` succeeded, but SMTP AUTH
+returned code 525. A bounded diagnostic confirmed the server response explicitly
+contains “Unauthorized IP”. The authenticated cloud metadata reports public IP
+`35.237.68.175`; the operator has been asked to authorize that IP in Brevo.
+Observations are retained privately in
+`build/deployment-preparation/brevo-authentication-observation.json` and
+`build/deployment-preparation/brevo-ip-authorization-observation.json`.
+No email was sent, and notification delivery remains unqualified. Test-email
+permission, the maintenance/reboot window and Maddy security disposition are also
+pending. The dashboard is not installed or available yet; production mail is
+unchanged. The original candidate evidence remains immutable and passing.
+
+### Brevo IP authorization recheck
+
+After the operator requested a recheck, production SMTP AUTH over verified
+STARTTLS passed on 26 October 2026. The new passing observation is retained as
+`build/deployment-preparation/brevo-authentication-pass-*.json`; the original
+SMTP 525 failure remains in its initial observation and preparation log.
+The IP restriction no longer blocks authentication. No email was sent. Explicit
+test-message authorization/delivery confirmation, maintenance/reboot timing and
+the Maddy security-release decision remain pending before production installation.
+
+## Active production candidate and approved rollout
+
+The operator approved immediate maintenance with a maximum 600 seconds of mail
+interruption, the required reboot and one alert test email, and explicitly chose
+**qualify a security upgrade first**. That one Brevo test was accepted and the
+operator confirmed receipt (test ID `645de220-929e-49d7-8463-1004353ed0f0`).
+No further test email has been sent. New production email templates have clear
+subjects and readable plain-text sections, proper line breaks, Date and Message-ID
+headers. SMTP integration checks verify received MIME contents and keep OTPs out
+of subjects. Unsent examples are in `build/deployment-preparation/email-previews/`.
+
+The new frozen bundle is `build/release-candidate-production-maddy096/`, source
+`9f17f117dd34a82c86a75c91a052be18860f145823309b3fa8f0bfcb25c6730e`,
+artifact set `02978eee455aa417a17326c3a3d0317aa81420d8047f465617597b3c1415ecdb`.
+It includes the complete selected production profile. Its frozen HTTPS browser
+check passed. The new native catalogue and host/replacement qualification are
+running; the earlier 111/111 source does not qualify these changes. Supporting
+checks passed 474 unit and 72 integration tests, lint, mypy and frontend checks.
+
+The SSH directory contains the existing production key only. The operator completed
+Google Cloud browser authentication using a checksum-verified CLI 590.0.1, with
+credentials isolated in ignored `local-state/gcloud/`. No account token or password
+was printed or copied into tracked files. This resolved the VM token's limited
+Monitoring scope. Independent Cloud Monitoring HTTPS/TLS 443 and TCP 993 uptime
+checks and email-channel policies were created in the existing project. Alerts
+remain disabled until application readiness. TCP 993 is an availability check;
+both actual served TLS certificates must also be verified independently during
+production acceptance. Resource identities are retained in
+`build/deployment-preparation/cloud-monitoring-provisioning-receipt.json`.
+
+The selected production R2 repository has been initialized with the existing
+independently retained password. No production mail has yet been captured. The
+original Maddy image, Compose and renewal unit/script copies are staged for rollback
+and an independently verified image archive is retained locally. These do not
+replace the required quiesced baseline capture and isolated restoration proof.
+Live production services remain unchanged, and the downtime allowance has not
+been used. The disposable source guest has been upgraded to 0.9.6 for the new
+release's host and recovery observations; it is separate from production.

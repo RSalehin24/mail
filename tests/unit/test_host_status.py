@@ -59,10 +59,65 @@ class HostStatusTests(unittest.TestCase):
                   'available': True, 'cutoff': '2027-01-15T08:00:00+00:00'}
         self.assertEqual(self.observe(record), record)
 
-    def test_missing_future_and_stale_observations_stay_unknown_at_the_exact_boundary(self):
-        for observed in (0, self.fixture.now + 1, self.fixture.now - 300.001):
-            with self.subTest(observed=observed):
-                self.assertEqual(self.observe({'observed_at': observed, 'outcome': 'active'}),
-                                 {'state': 'unknown', 'reason': 'stale'})
+    def test_old_observations_retain_redacted_values_and_the_original_timestamp(self):
+        observed = self.fixture.now - 301
+        result = self.observe({'observed_at': observed, 'outcome': 'active',
+                               'credential': 'private', 'verified': True})
+        self.assertEqual(result, {'observed_at': observed, 'outcome': 'active',
+                                  'verified': True, 'state': 'stale', 'reason': 'stale'})
+        for invalid in (0, self.fixture.now + 1):
+            self.assertEqual(self.observe({'observed_at': invalid, 'outcome': 'active'}),
+                             {'state': 'unknown', 'reason': 'invalid_observation_time'})
         record = {'observed_at': self.fixture.now - 300, 'outcome': 'active'}
         self.assertEqual(self.observe(record), record)
+
+    def test_thresholds_expose_only_configured_numeric_limits(self):
+        from helper.status import _thresholds
+        inputs = {'disk_free_minimum_bytes': 1024, 'inode_free_minimum': 10,
+                  'recovery_point_seconds': 93600, 'credential': 'private'}
+        with patch('helper.status.protected_json', return_value={'inputs': inputs}):
+            result = _thresholds()
+        self.assertEqual(set(result), {'disk_free_minimum_bytes', 'inode_free_minimum',
+                                       'recovery_point_seconds'})
+        for value in (True, -1, '1024', None):
+            with self.subTest(value=value), patch('helper.status.protected_json', return_value={
+                'inputs': {**inputs, 'disk_free_minimum_bytes': value},
+            }):
+                self.assertEqual(_thresholds(), {'state': 'unavailable'})
+
+
+class CpuSamplerTests(unittest.TestCase):
+    def test_shared_deltas_missing_reset_and_stale(self):
+        from helper.status import CpuSampler
+        sampler = CpuSampler()
+        def reading(total, idle):
+            return {'cpu_total_ticks': total, 'cpu_idle_ticks': idle, 'cpu_logical_count': 2}
+        with patch('helper.status.time.monotonic', side_effect=[0, 1, 1.5, 2, 3, 4, 8]), \
+                patch('helper.status.time.time', return_value=123), \
+                patch('helper.status._cpu_ticks', side_effect=[
+                    reading(100, 50), reading(200, 75), {}, reading(20, 10),
+                    reading(120, 60), reading(220, 110),
+                ]) as read:
+            self.assertNotIn('cpu_utilization_percent', sampler.read())
+            sample = sampler.read()
+            self.assertEqual(sample['cpu_utilization_percent'], 75)
+            self.assertEqual(sample['cpu_sample_interval_seconds'], 1)
+            self.assertEqual(sample['cpu_sampled_at'], 123)
+            self.assertEqual(sampler.read(), sample)
+            self.assertEqual(read.call_count, 2)
+            self.assertNotIn('cpu_utilization_percent', sampler.read())
+            self.assertNotIn('cpu_utilization_percent', sampler.read())
+            self.assertEqual(sampler.read()['cpu_utilization_percent'], 50)
+            self.assertNotIn('cpu_utilization_percent', sampler.read())
+
+    def test_counter_reset_reestablishes_baseline(self):
+        from helper.status import CpuSampler
+        sampler = CpuSampler()
+        with patch('helper.status.time.monotonic', side_effect=[0, 1, 2]), \
+                patch('helper.status._cpu_ticks', side_effect=[
+                    {'cpu_total_ticks': total, 'cpu_idle_ticks': idle, 'cpu_logical_count': 1}
+                    for total, idle in [(100, 50), (20, 10), (120, 60)]
+                ]):
+            sampler.read()
+            self.assertNotIn('cpu_utilization_percent', sampler.read())
+            self.assertEqual(sampler.read()['cpu_utilization_percent'], 50)
