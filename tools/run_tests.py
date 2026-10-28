@@ -128,8 +128,12 @@ class RecordingResult(unittest.TextTestResult):
     def _observe(self, test: unittest.TestCase, outcome: str) -> None:
         if self.progress is None:
             return
-        record = {"test": test.id(), "outcome": outcome, "observed_at_utc": timestamp(),
-                  "controller_memory": controller_memory()}
+        record = {
+            "test": test.id(),
+            "outcome": outcome,
+            "observed_at_utc": timestamp(),
+            "controller_memory": controller_memory(),
+        }
         append_progress(self.progress, record)
 
     def addSuccess(self, test: unittest.TestCase) -> None:
@@ -162,6 +166,32 @@ class RecordingResult(unittest.TextTestResult):
             self.records[test.id()] = "fail"
 
 
+def export_report_owner(directory: Path, files: tuple[Path, ...]) -> None:
+    """Export only generated reports to the invoking user, keeping fixtures private."""
+    owner = os.environ.get("MAIL_ADMIN_REPORT_UID")
+    group = os.environ.get("MAIL_ADMIN_REPORT_GID")
+    if owner is None and group is None:
+        return
+    if owner is None or group is None or not owner.isdecimal() or not group.isdecimal():
+        raise ValueError("Invalid report ownership")
+    uid, gid = int(owner), int(group)
+    if uid < 0 or gid < 0 or directory.is_symlink():
+        raise ValueError("Invalid report ownership")
+    root = ROOT / "build"
+    if not directory.resolve().is_relative_to(root.resolve()):
+        raise ValueError("Report directory must remain in build")
+    for path in files:
+        if path.parent != directory or path.is_symlink() or not path.is_file():
+            raise ValueError("Unsafe report export")
+        path.chmod(0o600)
+        os.chown(path, uid, gid)
+    parent = directory
+    while parent != root:
+        parent.chmod(0o700)
+        os.chown(parent, uid, gid)
+        parent = parent.parent
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("suite", choices=("unit", "integration", "maddy", "runtime", "acme"))
@@ -174,12 +204,17 @@ def main() -> int:
     directory = report_directory(arguments.report_directory, arguments.module)
     progress = directory / (f"{arguments.suite}-progress-" + str(uuid.uuid4()) + ".jsonl")
     progress.touch(mode=0o600, exist_ok=False)
-    append_progress(progress, {
-        "scope": "application test progress; incomplete until the final result exists",
-        "suite": arguments.suite, "source_sha256": identity, "started_at_utc": started,
-        "qualification_image": os.environ.get("MAIL_ADMIN_QUALIFICATION_IMAGE"),
-        "runtime_image": os.environ.get("MAIL_ADMIN_RUNTIME_IMAGE"),
-    })
+    append_progress(
+        progress,
+        {
+            "scope": "application test progress; incomplete until the final result exists",
+            "suite": arguments.suite,
+            "source_sha256": identity,
+            "started_at_utc": started,
+            "qualification_image": os.environ.get("MAIL_ADMIN_QUALIFICATION_IMAGE"),
+            "runtime_image": os.environ.get("MAIL_ADMIN_RUNTIME_IMAGE"),
+        },
+    )
     suite = test_selection(arguments.suite, arguments.module)
     runner = unittest.TextTestRunner(
         verbosity=2, resultclass=partial(RecordingResult, progress=progress)
@@ -216,9 +251,9 @@ def main() -> int:
     prefix = os.environ.get("MAIL_ADMIN_REPORT_PREFIX", "")
     if prefix not in {"", "linux-"}:
         raise ValueError("Invalid local report prefix")
-    (directory / f"{prefix}{arguments.suite}-checks.json").write_text(
-        json.dumps(report, indent=2) + "\n"
-    )
+    report_path = directory / f"{prefix}{arguments.suite}-checks.json"
+    report_path.write_text(json.dumps(report, indent=2) + "\n")
+    export_report_owner(directory, (progress, report_path))
     return 0 if passed else 1
 
 

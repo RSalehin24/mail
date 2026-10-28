@@ -1,0 +1,35 @@
+{
+  "state": "pass",
+  "snapshot_id": "61381f3f-a11c-41f9-900c-fab9e1296297",
+  "repository_snapshot": "0b7e10a132dec5c0426728d5075087d7dc941a690bb3553bcc9d590aa60c9ab2",
+  "cutoff": "2026-10-28T11:46:29.321431+00:00",
+  "queue_and_all_sent_folders_in_snapshot": true,
+  "final_helper_code_in_snapshot": true,
+  "incomplete_backup_operations": 0,
+  "timers": {
+    "mail-admin-backup.timer": "active",
+    "mail-admin-backup-control.timer": "active",
+    "mail-admin-recovery.timer": "active"
+  },
+  "tls_consumers": "active",
+  "full_server_boot_recovery_tested": false,
+  "scope": "SMTP submission rollout; full-server boot recovery is not claimed",
+  "live_test": {
+    "identifier": "673fcce5-a900-4904-b8d7-ef9c77e063fc",
+    "subject": "Maddy SMTP submission verification 673fcce5-a900-4904-b8d7-ef9c77e063fc",
+    "sender": "submission-check-20261028@rsalehin24.me",
+    "recipient": "rsalehin24@gmail.com",
+    "public_starttls_verified": true,
+    "smtp_accepted": true,
+    "sent_copies": 1,
+    "visible_from_second_session": true,
+    "inbox_message_ids": "",
+    "recipient_receipt_confirmed": true,
+    "receipt_evidence": "Recipient explicitly confirmed Received in this session"
+  },
+  "live_relay_accepted": true,
+  "existing_pairs_preserved": 8,
+  "protected_mailboxes": 9,
+  "source_sha256": "4d881d8b3ee5499064b16a7514dda5cbb39f739d6a707d64f14afe7af807f9c6",
+  "runtime_image": "sha256:10c1823276b8dac8d0269a4c6c44a6dff40d2e73745dca73d9e817745842edfd"
+}

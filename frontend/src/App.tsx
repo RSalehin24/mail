@@ -15,6 +15,7 @@ import { navigate, usePath } from './navigation';
 import { MailboxPage } from './MailboxPage';
 import { DeletedMailboxes } from './DeletedMailboxes';
 import { ServerPage } from './ServerPage';
+import { Forwarding } from './Forwarding';
 
 export function App() {
   const [dark, setDark] = useState(false);
@@ -22,7 +23,7 @@ export function App() {
   const [ready, setReady] = useState(false);
   const [sessionError, setSessionError] = useState('');
   const path = usePath();
-  const view = path === '/settings' ? 'settings' : path === '/server' ? 'server' : path === '/deleted' ? 'deleted' : 'mailboxes';
+  const view = path === '/forwarding' ? 'forwarding' : path === '/settings' ? 'settings' : path === '/server' ? 'server' : path === '/deleted' ? 'deleted' : 'mailboxes';
   const match = /^\/mailboxes\/([^/]+)\/(details|configuration|connections)$/.exec(path);
   const [message, setMessage] = useState('');
   const [codes, setCodes] = useState<string[]>([]);
@@ -72,8 +73,8 @@ export function App() {
     <AppBar position="sticky" color="inherit" elevation={0} sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
       <Container maxWidth="lg"><Toolbar disableGutters sx={{ minHeight: 78, flexWrap: 'wrap', py: 1 }}>
         <Box component="a" href="/" onClick={event => { if (authenticated) { event.preventDefault(); navigate('/'); setNavigation(false); } }} aria-label="RSalehin24 Mail Admin home" sx={{ display: 'flex', flexGrow: 1, alignItems: 'center', gap: 1.5, color: 'inherit', textDecoration: 'none', borderRadius: 1, '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 4 } }}><Box className="brand-mark"><MailOutline/></Box><Box><Typography sx={{ fontWeight: 700 }}>RSalehin24 Mail Admin</Typography><Typography variant="caption" color="text.secondary">rsalehin24.me</Typography></Box></Box>
-        {authenticated && <Stack direction="row" sx={{ display: { xs: 'none', sm: 'flex' } }}><Button color={view === 'mailboxes' ? 'primary' : 'inherit'} onClick={() => navigate('/')}>Mailboxes</Button><Button color={view === 'deleted' ? 'primary' : 'inherit'} onClick={() => navigate('/deleted')}>Deleted</Button><Button color={view === 'settings' ? 'primary' : 'inherit'} onClick={() => navigate('/settings')}>Settings</Button><Button color={view === 'server' ? 'primary' : 'inherit'} onClick={() => navigate('/server')}>Server</Button></Stack>}
-        {authenticated && <IconButton aria-label="Open navigation" sx={{ display: { xs: 'inline-flex', sm: 'none' } }} onClick={() => setNavigation(true)}><MenuOutlined/></IconButton>}
+        {authenticated && <Stack direction="row" sx={{ display: { xs: 'none', md: 'flex' } }}><Button color={view === 'mailboxes' ? 'primary' : 'inherit'} onClick={() => navigate('/')}>Mailboxes</Button><Button color={view === 'deleted' ? 'primary' : 'inherit'} onClick={() => navigate('/deleted')}>Deleted</Button><Button color={view === 'forwarding' ? 'primary' : 'inherit'} onClick={() => navigate('/forwarding')}>Forwarding</Button><Button color={view === 'settings' ? 'primary' : 'inherit'} onClick={() => navigate('/settings')}>Settings</Button><Button color={view === 'server' ? 'primary' : 'inherit'} onClick={() => navigate('/server')}>Server</Button></Stack>}
+        {authenticated && <IconButton aria-label="Open navigation" sx={{ display: { xs: 'inline-flex', md: 'none' } }} onClick={() => setNavigation(true)}><MenuOutlined/></IconButton>}
         <IconButton aria-label="Toggle dark mode" onClick={() => setDark(!dark)}><DarkModeOutlined/></IconButton>
         {authenticated && <IconButton aria-label="Sign out" onClick={() => { void execute(async () => { await api('/logout', {}); revoke([]); }); }}><LogoutOutlined/></IconButton>}
       </Toolbar></Container>
@@ -82,11 +83,12 @@ export function App() {
       <Stack spacing={1} sx={{ width: 260, p: 3 }}><Typography variant="h6">RSalehin24 Mail Admin</Typography>
         <Button onClick={() => { navigate('/'); setNavigation(false); }}>Mailboxes</Button>
         <Button onClick={() => { navigate('/deleted'); setNavigation(false); }}>Deleted mailboxes</Button>
+        <Button onClick={() => { navigate('/forwarding'); setNavigation(false); }}>Forwarding</Button>
         <Button onClick={() => { navigate('/settings'); setNavigation(false); }}>Settings</Button><Button onClick={() => { navigate('/server'); setNavigation(false); }}>Server</Button>
       </Stack>
     </Drawer>
     {!ready ? <Box className="page"><Typography>Checking your session…</Typography></Box> : sessionError ? <Box className="page"><Alert severity="error" action={<Button onClick={() => { void checkSession(); }}>Retry</Button>}>Session check unavailable: {sessionError}</Alert></Box> : !authenticated ? <AuthView onLogin={() => { setAuthenticated(true); }} onCodes={setCodes}/>
-      : <Box className="page">{match ? <MailboxPage key={match[1]} encodedEmail={match[1]} tab={match[2]} authorize={authorize} notify={setMessage}/> : view === 'deleted' ? <DeletedMailboxes authorize={authorize} notify={setMessage}/> : view === 'server' ? <ServerPage/> : view === 'settings' ? <SettingsView authorize={authorize} notify={setMessage} onRevoked={revoke}/> : path === '/' ? <Dashboard authorize={authorize} notify={setMessage}/> : <Alert severity="warning">Page not found. <Button onClick={() => navigate('/')}>Go to mailboxes</Button></Alert>}</Box>}
+      : <Box className="page">{match ? <MailboxPage key={match[1]} encodedEmail={match[1]} tab={match[2]} authorize={authorize} notify={setMessage}/> : view === 'deleted' ? <DeletedMailboxes authorize={authorize} notify={setMessage}/> : view === 'forwarding' ? <Forwarding authorize={authorize} notify={setMessage}/> : view === 'server' ? <ServerPage/> : view === 'settings' ? <SettingsView authorize={authorize} notify={setMessage} onRevoked={revoke}/> : path === '/' ? <Dashboard authorize={authorize} notify={setMessage}/> : <Alert severity="warning">Page not found. <Button onClick={() => navigate('/')}>Go to mailboxes</Button></Alert>}</Box>}
     {reauth && <Reauthenticate onCancel={() => { pending.current = null; setReauth(false); }} onVerified={() => {
       setReauth(false); const operation = pending.current; pending.current = null; if (operation) void execute(operation);
     }}/>}

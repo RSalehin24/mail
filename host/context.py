@@ -88,7 +88,7 @@ class HostContext:
         )
         services = DockerSnapshots(
             (Docker(timeout=30), DockerMaddy(self.deployment), self.generations),
-            startup_timeout=15,
+            startup_timeout=30,
         )
         capture = SnapshotCapture(
             paths, CaptureDependencies(self.coordination, services, time.time),

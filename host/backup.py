@@ -91,6 +91,11 @@ class SnapshotCapture:
         snapshot.mkdir(mode=0o700)
         with ExitStack() as locks:
             helper = self.paths.sources.get('helper')
+            forwarding_lock = helper / 'forwarding-sync.lock' if helper is not None else None
+            if forwarding_lock is not None and forwarding_lock.exists():
+                # The provider worker owns this lock before taking renewal/mail locks.
+                # Exclude its SQLite verification writes from the immutable capture.
+                locks.enter_context(HostLock(forwarding_lock, LockPolicy(30, os.geteuid())))
             recovery_lock = helper / 'recovery-worker.lock' if helper is not None else None
             if recovery_lock is not None and recovery_lock.exists():
                 # Worker -> renewal -> mailbox is the shared acquisition order.

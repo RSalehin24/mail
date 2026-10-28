@@ -23,7 +23,7 @@ export function SettingsView({ authorize, notify, onRevoked }: Props) {
       <Tab value="backups" label="Backup & Recovery" id="settings-backups" aria-controls="panel-backups"/>
     </Tabs>
     <Box role="tabpanel" id={`panel-${tab}`} aria-labelledby={`settings-${tab}`}>
-      {tab === 'security' && <SecuritySettings authorize={authorize} onRevoked={onRevoked}/>}
+      {tab === 'security' && <SecuritySettings authorize={authorize} onRevoked={onRevoked} onDeliverySettings={() => { setTab('outgoing'); const url = new URL(location.href); url.searchParams.set('tab', 'outgoing'); history.replaceState(null, '', url); }}/>}
       {tab === 'outgoing' && <OutgoingSettings authorize={authorize} notify={notify}/>}
       {tab === 'backups' && <BackupSettings authorize={authorize} notify={notify}/>}
     </Box>
@@ -33,14 +33,14 @@ export function SettingsView({ authorize, notify, onRevoked }: Props) {
 function OutgoingSettings({ authorize, notify }: Pick<Props, 'authorize' | 'notify'>) {
   const [relay, setRelay] = useState<RelaySettings | null>(() => cached<RelaySettings>('/settings/relay') ?? null);
   const [username, setUsername] = useState(() => cached<RelaySettings>('/settings/relay')?.username ?? '');
-  const [port, setPort] = useState(() => cached<RelaySettings>('/settings/relay')?.port ?? 587);
+  const port = 587;
   const [credential, setCredential] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
   const [quota, setQuota] = useState('Add a Brevo API key to view remaining credits. SMTP sending does not require it.');
   async function load() {
-    try { const value = await api<RelaySettings>('/settings/relay'); setRelay(value); setUsername(value.username); setPort(value.port); }
+    try { const value = await api<RelaySettings>('/settings/relay'); setRelay(value); setUsername(value.username); }
     catch (failure) { setError((failure as Error).message); }
   }
   useEffect(() => { void load(); }, []);
@@ -52,11 +52,10 @@ function OutgoingSettings({ authorize, notify }: Pick<Props, 'authorize' | 'noti
       <Box><Typography variant="h6">Outgoing mail provider</Typography><Typography variant="body2" color="text.secondary">{relay ? `${relay.otp_ready ? 'Administrator email delivery verified' : 'Administrator email delivery needs verification'}` : 'Loading saved relay settings…'}</Typography></Box>
       <Typography variant="caption" color="text.secondary">{relay ? `Saved revision ${relay.revision}` : ''}</Typography>
       <TextField label="SMTP host" value="smtp-relay.brevo.com" disabled/>
-      <Stack direction="row" spacing={1}><Button variant={port === 587 ? 'contained' : 'outlined'} onClick={() => { setPort(587); setDirty(true); }}>587 · STARTTLS</Button>
-        <Button variant={port === 465 ? 'contained' : 'outlined'} onClick={() => { setPort(465); setDirty(true); }}>465 · TLS</Button></Stack>
+      <TextField label="SMTP security" value="587 · STARTTLS" disabled/>
       <TextField label="Brevo SMTP login" value={username} onChange={event => { setUsername(event.target.value); setDirty(true); }}/>
       <TextField label="Brevo SMTP key" type="password" autoComplete="new-password" value={credential} onChange={event => { setCredential(event.target.value); setDirty(true); }} helperText={relay?.configured ? 'Configured and masked. Leave blank to preserve it.' : 'Required for first save.'}/>
-      <TextField label="Optional Brevo API key" type="password" autoComplete="new-password" value={apiKey} onChange={event => { setApiKey(event.target.value); setDirty(true); }} helperText="Encrypted separately; never returned by the reveal action."/>
+      <TextField label="Optional Brevo API key" type="password" autoComplete="new-password" value={apiKey} onChange={event => { setApiKey(event.target.value); setDirty(true); }} helperText="Encrypted separately and kept on the server."/>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}>
         <Button disabled={dirty || !relay?.configured} onClick={async () => {
           try { const result = await api<{ state: string; plans: { plan: string; credits: number; credits_type: string }[] }>('/settings/relay/quota');

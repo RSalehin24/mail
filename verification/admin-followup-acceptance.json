@@ -1,0 +1,73 @@
+{
+  "state": "pass",
+  "version": "admin-af2d455d1922",
+  "image_id": "sha256:254751d849537852efed0249a6e7a02cba3d822c91668bfbea278b626b3091bb",
+  "source_sha256": "af2d455d192273cfd5eefd0720ad573c9c713f01c6f8740518088c1e2c292b08",
+  "host_followup": {
+    "files": {
+      "host/backup.py": "fb68812e45faf4785eb64946bf987c64628af0d6b6de212e0763ef268b673df9"
+    },
+    "scope": "Serialize Cloudflare synchronization state with immutable host capture"
+  },
+  "account_pairs": 9,
+  "original_eight_credentials_and_accounts_preserved": true,
+  "protected_addresses": 9,
+  "unresolved_operations": 0,
+  "cloudflare_sync": "connected",
+  "local_delivery_mailboxes": 9,
+  "external_forwarding_mailboxes": [
+    "mail@rsalehin24.me",
+    "website@rsalehin24.me"
+  ],
+  "snapshot_id": "efba8515-d393-4f51-be4f-fda9821b8a35",
+  "repository_snapshot": "be0a4755d29940b0c14563eb5b8b18c16d7dd1f9441cbb4b6ffa80b8abf5775e",
+  "cutoff": "2026-10-28T13:28:09.730304+00:00",
+  "snapshot_verified": true,
+  "forwarding_credentials_rules_queue_and_all_sent_folders_captured": true,
+  "timers": {
+    "mail-admin-backup.timer": "active",
+    "mail-admin-backup-control.timer": "active",
+    "mail-admin-recovery.timer": "active",
+    "mail-admin-forwarding.timer": "active",
+    "mail-admin-independent-monitor.timer": "active"
+  },
+  "receipt_evidence": {
+    "administrator_test": "f867193c-f1b8-4291-bb32-074701ea4ba6",
+    "administrator_received": true,
+    "forwarding_received": true,
+    "gmail_folder": "Spam",
+    "forwarding_test_candidates": [
+      "cb799474-8431-41d9-b571-f229dd37d07b",
+      "29f20a7b-b493-440f-b5db-11c36ec31d9f"
+    ],
+    "forwarding_receipt_scope": "Recipient confirmed finding a forwarding test in Spam; the exact one of the two was not specified."
+  },
+  "email_codes_enabled": false,
+  "recovery_boot_test": {
+    "state": "pass",
+    "phase": "boot",
+    "production_snapshot": "0b7e10a132dec5c0426728d5075087d7dc941a690bb3553bcc9d590aa60c9ab2",
+    "guest_instance": "aa07a899-704b-4535-8c26-a2e242ffd78d",
+    "boot_id": "47b6eb21-4f93-4dcd-b688-1a9035880d86",
+    "boot_id_before": "47ebc848-1f93-47ec-910c-a04c596f8cb9",
+    "real_kernel_reboot": true,
+    "https_authenticated": true,
+    "recovered_account_pairs": 8,
+    "all_message_bodies_match_snapshot": true,
+    "sent_folders": 8,
+    "original_credentials_preserved": true,
+    "recovered_authentication_replaced": true,
+    "provider_network_isolated": true,
+    "services_started_by_observer": false
+  },
+  "checks": {
+    "unit_tests": 531,
+    "api_tests": 93,
+    "maddy_tests": 87,
+    "runtime_tests": 21,
+    "acme_tests": 14,
+    "authenticated_https_browser": "pass",
+    "responsive_light_dark_checks": 18,
+    "forwarding_snapshot_lock_regression": "pass"
+  }
+}

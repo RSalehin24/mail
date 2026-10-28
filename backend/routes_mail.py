@@ -74,7 +74,7 @@ async def diagnostics(request: Request) -> dict[str, Any]:
         },
         "capabilities": {
             "permanent_deletion": application.settings.permanent_deletion_enabled,
-            "email_otp": application.settings.email_otp_enabled,
+            "email_otp": await application.io.run(application.authentication.email_available),
         },
     }
 

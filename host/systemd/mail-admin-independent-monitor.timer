@@ -1,0 +1,8 @@
+[Unit]
+Description=Periodically confirm independent availability alerts
+[Timer]
+OnBootSec=1min
+OnUnitInactiveSec=15min
+AccuracySec=30s
+[Install]
+WantedBy=timers.target

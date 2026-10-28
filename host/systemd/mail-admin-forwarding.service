@@ -1,0 +1,20 @@
+[Unit]
+Description=Synchronize mailbox delivery and forwarding with Cloudflare
+After=docker.service mail-admin-helper.service network-online.target
+Requires=docker.service
+[Service]
+Type=oneshot
+WorkingDirectory=/usr/local/lib/mail-admin
+ExecStart=/usr/bin/python3 -m host.cloudflare_forwarding
+User=root
+UMask=0077
+MemoryMax=96M
+CPUQuota=25%
+TasksMax=64
+TimeoutStartSec=240
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/mail-admin-helper /run/lock
+LogNamespace=mail-admin

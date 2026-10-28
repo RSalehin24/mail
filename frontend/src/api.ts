@@ -2,6 +2,7 @@ export const adminEmail = 'rsalehin24@gmail.com';
 export const domain = 'rsalehin24.me';
 
 const errorMessages: Record<string, string> = {
+  email_delivery_confirmation_required: 'Confirm receipt of an administrator delivery test before enabling email codes.',
   invalid_master_password: 'Invalid master password.',
   authentication_failed: 'Authentication failed. Check your details and try again.',
   invalid_verification_code: 'Invalid verification code.',
@@ -138,7 +139,7 @@ export interface Diagnostics {
     observed_at: number; scope: string; cpu_utilization_percent?: number; cpu_sample_interval_seconds?: number; cpu_sampled_at?: number; cpu_total_ticks?: number; cpu_idle_ticks?: number; cpu_logical_count?: number; memory_available_bytes?: number; memory_total_bytes?: number; disk_free_bytes?: number; disk_total_bytes?: number; disk_used_bytes?: number; disk_reserved_bytes?: number; inodes_free?: number; thresholds?: { disk_free_minimum_bytes?: number; inode_free_minimum?: number; recovery_point_seconds?: number };
     backup?: { cutoff?: string; verified?: boolean; available?: boolean; state?: string; observed_at?: number; availability_observed_at?: number; restore_passed?: boolean; reason?: string };
     monitoring?: { state?: string; outcome?: string; observed_at?: number; reason?: string };
-    external_monitoring?: { state?: string; outcome?: string; enabled?: boolean; provider?: string; observed_at?: number; reason?: string };
+    external_monitoring?: { state?: string; outcome?: string; enabled?: boolean | null; provider?: string; configured?: boolean; last_verified_at?: number; observed_at?: number; reason?: string };
     certificates?: { served_sha256?: string; renewal_observed_at?: number; reason?: string; expiry?: number; outcome?: string; state?: string; observed_at?: number; consumers?: Record<string, { state?: string; reason?: string; served_sha256?: string; served_expiry?: number }> };
   }; unresolved?: unknown[] };
   dns_mx: { state: string; configured_mode: string; records?: string[] };

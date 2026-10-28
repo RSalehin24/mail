@@ -14,6 +14,7 @@ from backend.boundary import HttpBoundary
 from backend.retention import cleanup
 from backend.routes_auth import protected, public
 from backend.routes_backups import router as backups_router
+from backend.routes_forwarding import router as forwarding_router
 from backend.routes_mail import router
 from backend.routes_recovery import router as recovery_router
 from backend.routes_relay import router as relay_router
@@ -76,7 +77,15 @@ def create_app(context: Services | None = None) -> FastAPI:
     application.add_middleware(HttpBoundary, settings=context.settings)
     application.add_exception_handler(ServiceError, service_error)
     application.add_exception_handler(RequestValidationError, invalid_request)
-    for routes in (public, protected, router, relay_router, recovery_router, backups_router):
+    for routes in (
+        public,
+        protected,
+        router,
+        relay_router,
+        recovery_router,
+        backups_router,
+        forwarding_router,
+    ):
         application.include_router(routes)
     assets = context.settings.static_directory / "assets"
     if assets.is_dir():

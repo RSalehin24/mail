@@ -27,20 +27,46 @@ print(json.dumps({'source_sha256':source_digest(), 'suite':suite,
 def module_inventory(image: str, docker, suite: str = "maddy") -> dict:
     if suite not in {"maddy", "runtime", "acme"}:
         raise ValueError("Unsupported isolated module suite")
-    response = docker((
-        "run", "--rm", "--platform", "linux/amd64", "--network", "none", "--read-only",
-        "--cap-drop", "ALL", "--memory", "64m", "--memory-swap", "64m", "--pids-limit", "32",
-        "--label", "mail-admin.fixture=true", "-e", "MAIL_ADMIN_MODULE_SUITE=" + suite,
-        image, "python", "-c", INVENTORY,
-    ))
+    response = docker(
+        (
+            "run",
+            "--rm",
+            "--platform",
+            "linux/amd64",
+            "--network",
+            "none",
+            "--read-only",
+            "--cap-drop",
+            "ALL",
+            "--memory",
+            "64m",
+            "--memory-swap",
+            "64m",
+            "--pids-limit",
+            "32",
+            "--label",
+            "mail-admin.fixture=true",
+            "-e",
+            "MAIL_ADMIN_MODULE_SUITE=" + suite,
+            image,
+            "python",
+            "-c",
+            INVENTORY,
+        )
+    )
     inventory = json.loads(response)
     if inventory.get("suite", "maddy") != suite:
         raise ValueError("Module inventory suite mismatch")
     modules = inventory["modules"]
-    if not isinstance(modules, list) or not 1 <= len(modules) <= 128 or (
-        len(set(modules)) != len(modules)
-    ) or any(not isinstance(name, str) or re.fullmatch(r"test_[a-z0-9_]+", name) is None
-             for name in modules):
+    if (
+        not isinstance(modules, list)
+        or not 1 <= len(modules) <= 128
+        or (len(set(modules)) != len(modules))
+        or any(
+            not isinstance(name, str) or re.fullmatch(r"test_[a-z0-9_]+", name) is None
+            for name in modules
+        )
+    ):
         raise ValueError("Invalid isolated Maddy module inventory")
     return dict(inventory)
 
@@ -59,8 +85,18 @@ def run_modules(command: tuple[str, ...], context: tuple[Path, str], docker) -> 
         selected = Path("build") / directory.name / name
         print("Isolated " + suite + " module: " + name, flush=True)
         result = subprocess.run(  # noqa: S603, S607 -- validated module, pinned fixture argv.
-            ("docker",) + command + ("python", "tools/run_tests.py", suite, "--module", name,
-                                    "--report-directory", str(selected)), check=False,
+            ("docker",)
+            + command
+            + (
+                "python",
+                "tools/run_tests.py",
+                suite,
+                "--module",
+                name,
+                "--report-directory",
+                str(selected),
+            ),
+            check=False,
             timeout=MODULE_TIMEOUT_SECONDS,
         )
         outcomes[name] = result.returncode
@@ -87,30 +123,53 @@ def read_module(path: Path) -> dict:
 def aggregate_modules(directory: Path, execution: tuple[dict, dict, str]) -> dict:
     inventory, outcomes, started = execution
     suite = inventory.get("suite", "maddy")
-    modules = {name: read_module(directory / name / report_name(suite))
-               for name in inventory["modules"]}
+    modules = {
+        name: read_module(directory / name / report_name(suite)) for name in inventory["modules"]
+    }
     valid = module_bindings(modules, inventory)
-    tests = {identifier: outcome for report in modules.values()
-             for identifier, outcome in report.get("tests", {}).items()}
+    tests = {
+        identifier: outcome
+        for report in modules.values()
+        for identifier, outcome in report.get("tests", {}).items()
+    }
     duplicate = len(tests) != sum(len(report.get("tests", {})) for report in modules.values())
-    passed = valid and not duplicate and set(outcomes) == set(modules) and all(
-        outcomes[name] == 0 and report.get("result") == "pass" and report.get("tests")
-        and all(value == "pass" for value in report["tests"].values())
-        for name, report in modules.items()
+    passed = (
+        valid
+        and not duplicate
+        and set(outcomes) == set(modules)
+        and all(
+            outcomes[name] == 0
+            and report.get("result") == "pass"
+            and report.get("tests")
+            and all(value == "pass" for value in report["tests"].values())
+            for name, report in modules.items()
+        )
     )
     return {
-        **module_metadata(modules), "schema_version": 1, "suite": suite, "module": None,
+        **module_metadata(modules),
+        "schema_version": 1,
+        "suite": suite,
+        "module": None,
         "scope": suite + " application modules in sequential controllers; not qualification",
-        "source_sha256": inventory["source_sha256"], "started_at_utc": started,
-        "completed_at_utc": timestamp(), "result": "pass" if passed else "fail",
-        "tests": tests, "module_reports": module_references(directory, outcomes, suite),
+        "source_sha256": inventory["source_sha256"],
+        "started_at_utc": started,
+        "completed_at_utc": timestamp(),
+        "result": "pass" if passed else "fail",
+        "tests": tests,
+        "module_reports": module_references(directory, outcomes, suite),
         "production_qualification": "blocked",
     }
 
 
 def module_bindings(modules: dict, inventory: dict) -> bool:
-    keys = ("python", "system", "machine", "qualification_image", "runtime_image",
-            "docker_engine_architecture")
+    keys = (
+        "python",
+        "system",
+        "machine",
+        "qualification_image",
+        "runtime_image",
+        "docker_engine_architecture",
+    )
     first = next(iter(modules.values()))
     if first.get("system") != "Linux" or first.get("machine") not in {"x86_64", "amd64"}:
         return False
@@ -130,16 +189,25 @@ def module_bindings(modules: dict, inventory: dict) -> bool:
 
 def module_metadata(modules: dict) -> dict:
     first = next(iter(modules.values()))
-    keys = ("python", "system", "machine", "qualification_image", "runtime_image",
-            "docker_engine_architecture")
+    keys = (
+        "python",
+        "system",
+        "machine",
+        "qualification_image",
+        "runtime_image",
+        "docker_engine_architecture",
+    )
     memory = [report.get("controller_memory", {}) for report in modules.values()]
     observed = all(record.get("state") == "observed" for record in memory)
-    return {**{key: first.get(key) for key in keys}, "controller_memory": {
-        "state": "observed" if observed else "unavailable",
-        "limit_bytes": memory[0].get("limit_bytes") if observed else None,
-        "peak_bytes": max(record["peak_bytes"] for record in memory) if observed else None,
-        "scope": "maximum among sequential qualification controllers; not whole host",
-    }}
+    return {
+        **{key: first.get(key) for key in keys},
+        "controller_memory": {
+            "state": "observed" if observed else "unavailable",
+            "limit_bytes": memory[0].get("limit_bytes") if observed else None,
+            "peak_bytes": max(record["peak_bytes"] for record in memory) if observed else None,
+            "scope": "maximum among sequential qualification controllers; not whole host",
+        },
+    }
 
 
 def report_name(suite: str) -> str:
@@ -150,7 +218,15 @@ def module_references(directory: Path, outcomes: dict, suite: str = "maddy") -> 
     references = {}
     for name, code in outcomes.items():
         path = directory / name / report_name(suite)
-        references[name] = {"report": str(path), "controller_exit_code": code,
-                            "sha256": hashlib.sha256(path.read_bytes()).hexdigest()
-                            if path.is_file() else None}
+        try:
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            diagnostic = ""
+        except OSError as error:
+            digest, diagnostic = None, type(error).__name__
+        references[name] = {
+            "report": str(path),
+            "controller_exit_code": code,
+            "sha256": digest,
+            **({"diagnostic": diagnostic} if diagnostic else {}),
+        }
     return references

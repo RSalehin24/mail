@@ -36,7 +36,7 @@ class MailboxRecovery:
         self.bodies = self.data / "messages"
         self.maddy = DockerMaddy(context.deployment)
         self.writers = DockerSnapshots((Docker(timeout=30), self.maddy, context.generations),
-                                       startup_timeout=15)
+                                       startup_timeout=30)
 
     def run(self) -> None:
         lock = self.root / "recovery-worker.lock"

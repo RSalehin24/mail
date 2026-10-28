@@ -54,6 +54,8 @@ class RelayDependencies:
     keys: SecretKeys
     transport: RelayTransport
     clock: Callable[[], float]
+    synchronize: Callable[[dict[str, Any]], None] | None = None
+    reconcile: Callable[[], None] | None = None
 
 
 class Relay:
@@ -75,34 +77,46 @@ class Relay:
         username = bounded_text(payload["username"], 256)
         if not username:
             raise ServiceError("relay_username_required", 400)
-        with self.database.transaction() as connection:
-            previous = connection.execute("SELECT * FROM relay_settings WHERE id=1").fetchone()
-            credential = payload.get("credential")
-            if credential is None and previous:
-                credential = self.keys.open(previous["credential"], "relay-credential")
-            if not isinstance(credential, str) or not 1 <= utf8_size(credential) <= 4096:
-                raise ServiceError("relay_credential_required", 400)
-            api_key = payload.get("api_key")
-            if api_key is None:
-                api_key = self.keys.open(previous["api_key"], "relay-api") if previous else ""
-            if not isinstance(api_key, str):
-                raise ServiceError("invalid_relay_api_key", 400)
-            bounded_text(api_key, 4096)
-            revision = previous["revision"] + 1 if previous else 1
-            connection.execute(
-                "INSERT OR REPLACE INTO relay_settings VALUES(1,?,?,?,?,?,?,NULL)",
-                (
-                    SMTP_HOST,
-                    payload["port"],
-                    username,
-                    self.keys.seal(credential, "relay-credential"),
-                    self.keys.seal(api_key, "relay-api"),
-                    revision,
-                ),
-            )
-            connection.execute("UPDATE mailboxes SET outbound_test=NULL")
-            connection.execute("DELETE FROM otp_codes")
-            audit(connection, (self.dependencies.clock(), "relay-settings", "saved"))
+        try:
+            with self.database.transaction() as connection:
+                previous = connection.execute("SELECT * FROM relay_settings WHERE id=1").fetchone()
+                credential = payload.get("credential")
+                if credential is None and previous:
+                    credential = self.keys.open(previous["credential"], "relay-credential")
+                if not isinstance(credential, str) or not 1 <= utf8_size(credential) <= 4096:
+                    raise ServiceError("relay_credential_required", 400)
+                api_key = payload.get("api_key")
+                if api_key is None:
+                    api_key = self.keys.open(previous["api_key"], "relay-api") if previous else ""
+                if not isinstance(api_key, str):
+                    raise ServiceError("invalid_relay_api_key", 400)
+                bounded_text(api_key, 4096)
+                revision = previous["revision"] + 1 if previous else 1
+                connection.execute(
+                    "INSERT OR REPLACE INTO relay_settings VALUES(1,?,?,?,?,?,?,NULL)",
+                    (
+                        SMTP_HOST,
+                        payload["port"],
+                        username,
+                        self.keys.seal(credential, "relay-credential"),
+                        self.keys.seal(api_key, "relay-api"),
+                        revision,
+                    ),
+                )
+                connection.execute("UPDATE mailboxes SET outbound_test=NULL")
+                connection.execute("DELETE FROM otp_codes")
+                if self.dependencies.synchronize is not None:
+                    if payload["port"] != 587:
+                        raise ServiceError("submission_requires_starttls_587", 400)
+                    self.dependencies.synchronize({"username": username, "credential": credential,
+                                                   "revision": revision})
+                audit(connection, (self.dependencies.clock(), "relay-settings", "saved"))
+        except (OSError, ServiceError):
+            if self.dependencies.reconcile is not None:
+                self.dependencies.reconcile()
+            raise
+        if self.dependencies.reconcile is not None:
+            self.dependencies.reconcile()
         return self.masked()
 
     def _configuration(self) -> SavedRelay:

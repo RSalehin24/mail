@@ -11,7 +11,7 @@ from shared.files import protected_json
 OBSERVATION_FIELDS = frozenset({
     'observed_at', 'outcome', 'cutoff', 'verified', 'available', 'restore_passed', 'expiry',
     'desired_generation', 'availability_observed_at', 'served_sha256', 'enabled', 'provider',
-    'renewal_observed_at',
+    'renewal_observed_at', 'configured', 'last_verified_at',
 })
 CONSUMER_FIELDS = frozenset({
     'intent', 'state', 'reason', 'active_generation', 'served_sha256', 'served_expiry',

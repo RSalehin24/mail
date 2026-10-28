@@ -6,10 +6,12 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from helper.backup_control import BackupControl
+from helper.forwarding import ForwardingControl
 from helper.journal import Journal
 from helper.maddy import MaddyAccess, cli_reported_error, cli_succeeded, provisioning_warning
 from helper.protocol import HelperRequest
 from helper.recovery import RecoveryControl
+from helper.submission import SubmissionControl
 from host.locks import HostLock, LockPolicy
 from shared.errors import ServiceError
 from shared.validation import HELPER_PROTOCOL
@@ -31,6 +33,8 @@ class HelperDependencies:
     status: Callable[[], dict[str, Any]]
     recovery: RecoveryControl | None = None
     backups: BackupControl | None = None
+    forwarding: ForwardingControl | None = None
+    submission: SubmissionControl | None = None
 
 
 class HostHelper:
@@ -39,6 +43,30 @@ class HostHelper:
         self.maddy, self.journal = dependencies.maddy, dependencies.journal
 
     def handle(self, request: HelperRequest) -> dict[str, Any]:
+        if request.operation in {"submission_sync", "submission_reconcile"}:
+            if self.dependencies.submission is None or request.recovery is None:
+                raise ServiceError("submission_unavailable", 503)
+            with HostLock(self.dependencies.lock, self.dependencies.lock_policy):
+                self.maddy.validate()
+                if request.operation == "submission_reconcile":
+                    self.dependencies.submission.reconcile()
+                    return {"protocol": HELPER_PROTOCOL, "reconciled": True}
+                return {"protocol": HELPER_PROTOCOL,
+                        **self.dependencies.submission.synchronize(request.recovery)}
+        if request.operation.startswith("forwarding_"):
+            if self.dependencies.forwarding is None or request.recovery is None:
+                raise ServiceError("forwarding_unavailable", 503)
+            with HostLock(self.dependencies.lock, self.dependencies.lock_policy):
+                return {
+                    "protocol": HELPER_PROTOCOL,
+                    "request_id": request.request_id,
+                    **self.dependencies.forwarding.handle(
+                        request.operation,
+                        request.request_id,
+                        request.recovery,
+                        self.dependencies.clock(),
+                    ),
+                }
         if request.operation.startswith("backup_"):
             if self.dependencies.backups is None or request.recovery is None:
                 raise ServiceError("backup_control_unavailable", 503)

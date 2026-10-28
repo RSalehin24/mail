@@ -38,15 +38,24 @@ def pinned_runtime_image(image_id: str) -> Iterator[str]:
 
 
 def suite_command(
-    suite: str, evidence: Path | None, module: str | None = None,
+    suite: str,
+    evidence: Path | None,
+    module: str | None = None,
 ) -> tuple[str, ...]:
     validate_module(suite, module)
     if module is not None:
         if evidence is not None:
             raise ValueError("Partial module checks cannot consume qualification evidence")
         report = "build/" + suite + "-partial-" + str(uuid.uuid4()) + "/" + module
-        return ("python", "tools/run_tests.py", suite, "--module", module,
-                "--report-directory", report)
+        return (
+            "python",
+            "tools/run_tests.py",
+            suite,
+            "--module",
+            module,
+            "--report-directory",
+            report,
+        )
     if suite != "qualification":
         if evidence is not None:
             raise ValueError("An evidence bundle is only accepted for catalogue qualification")
@@ -56,22 +65,26 @@ def suite_command(
     selected = evidence.resolve()
     if not selected.is_relative_to(ROOT / "build"):
         raise ValueError("Qualification bundle must be inside the mounted build directory")
-    return ("python", "tools/run_qualification.py",
-            str(Path("/app/build") / selected.relative_to(ROOT / "build")))
+    return (
+        "python",
+        "tools/run_qualification.py",
+        str(Path("/app/build") / selected.relative_to(ROOT / "build")),
+    )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--suite", choices=("unit", "integration", "maddy", "runtime", "acme", "qualification"),
-        default="maddy"
+        "--suite",
+        choices=("unit", "integration", "maddy", "runtime", "acme", "qualification"),
+        default="maddy",
     )
     parser.add_argument("--evidence", type=Path)
     parser.add_argument("--module", help="Run one Maddy/runtime/ACME module; partial suite")
     parser.add_argument("--resume", type=Path, help="Resume a matching interrupted catalogue")
     arguments = parser.parse_args()
-    if arguments.resume is not None and arguments.suite != 'qualification':
-        parser.error('--resume requires --suite qualification')
+    if arguments.resume is not None and arguments.suite != "qualification":
+        parser.error("--resume requires --suite qualification")
     entrypoint = suite_command(arguments.suite, arguments.evidence, arguments.module)
     require_fixture_disk(ROOT)
     context = json.loads(docker(("context", "inspect")))[0]
@@ -82,8 +95,10 @@ def main() -> None:
 
     image = json.loads(docker(("image", "inspect", "mail-admin:qualification")))[0]
     runtime = json.loads(docker(("image", "inspect", "mail-admin:candidate")))[0]
-    verify_images({'mail-admin:qualification': image['Id'],
-                   'mail-admin:candidate': runtime['Id']}, transferred_source(ROOT))
+    verify_images(
+        {"mail-admin:qualification": image["Id"], "mail-admin:candidate": runtime["Id"]},
+        transferred_source(ROOT),
+    )
     volume = "mail-admin-qualification-" + str(uuid.uuid4())
     docker(("volume", "create", "--label", "mail-admin.fixture=true", volume))
     mountpoint = json.loads(docker(("volume", "inspect", volume)))[0]["Mountpoint"]
@@ -117,6 +132,10 @@ def main() -> None:
             "-e",
             "MAIL_ADMIN_FIXTURE_ROOT=/fixtures",
             "-e",
+            "MAIL_ADMIN_REPORT_UID=" + str(os.getuid()),
+            "-e",
+            "MAIL_ADMIN_REPORT_GID=" + str(os.getgid()),
+            "-e",
             "TMPDIR=/fixtures",
             "-e",
             "MAIL_ADMIN_FIXTURE_DAEMON_ROOT=" + mountpoint,
@@ -132,20 +151,30 @@ def main() -> None:
             else "MAIL_ADMIN_REPORT_PREFIX=",
         )
         # Stream assertion output; fixture secrets are only passed to non-TTY CLI stdin.
-        with pinned_runtime_image(runtime["Id"]) as reference:
+        with (
+            pinned_runtime_image(runtime["Id"]) as reference,
+            pinned_runtime_image(image["Id"]) as controller_reference,
+        ):
             command += (
                 "-e",
                 "MAIL_ADMIN_RUNTIME_REFERENCE=" + reference,
-                image["Id"],
+                controller_reference,
             )
             if arguments.suite == "maddy" and arguments.module is None:
                 code = run_maddy(command, root, docker)
             elif arguments.suite in {"runtime", "acme"} and arguments.module is None:
                 code = run_modules(command, (root, arguments.suite), docker)
-            elif arguments.suite == 'qualification':
-                code = run_catalogue(command, (
-                    root, arguments.evidence, entrypoint, arguments.resume,
-                ), docker)
+            elif arguments.suite == "qualification":
+                code = run_catalogue(
+                    command,
+                    (
+                        root,
+                        arguments.evidence,
+                        entrypoint,
+                        arguments.resume,
+                    ),
+                    docker,
+                )
             else:
                 result = subprocess.run(  # noqa: S603, S607 -- fixed pinned fixture command.
                     ("docker",) + command + entrypoint, check=False
@@ -158,11 +187,11 @@ def main() -> None:
 
 
 def transferred_source(root: Path) -> str | None:
-    if (root / 'Dockerfile').is_file():
+    if (root / "Dockerfile").is_file():
         return None
-    value = json.loads((root / 'images.json').read_bytes())['source_sha256']
+    value = json.loads((root / "images.json").read_bytes())["source_sha256"]
     if not isinstance(value, str):
-        raise ValueError('Invalid transferred qualification source identity')
+        raise ValueError("Invalid transferred qualification source identity")
     return value
 
 

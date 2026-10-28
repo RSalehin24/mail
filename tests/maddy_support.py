@@ -71,6 +71,7 @@ class FixtureMaddy(DockerMaddy):
 
 
 class RealMaddyFixture:
+    additional_arguments = ()
     maddy_class = FixtureMaddy
 
     def image_reference(self):
@@ -166,6 +167,7 @@ class RealMaddyFixture:
         )
         result = self.command(
             arguments
+            + self.additional_arguments
             + mounts
             + (
                 "--entrypoint",

@@ -1,3 +1,4 @@
+import { Forwarding } from './Forwarding';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Box, Breadcrumbs, Button, Chip, Paper, Stack, Tab, Tabs, Typography } from '@mui/material';
 import { api, cached, type Authorize, type Mailbox, type Notify } from './api';
@@ -54,6 +55,7 @@ export function MailboxPage({ encodedEmail, tab, authorize, notify }: {
         {tab === 'configuration' && <Stack spacing={3}>
           <MailboxDetails key={mailbox.updated ?? mailbox.display_name + mailbox.notes} mailbox={mailbox} {...common} embedded/>
           <Button variant="outlined" sx={{ alignSelf: 'start' }} onClick={() => setDialog('password')}>Change incoming password</Button>
+          <Forwarding mailbox={mailbox.email} authorize={authorize} notify={notify}/>
           <Box component="section" sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 3 }}><Typography variant="h6" sx={{ mb: 2 }}>Delete Mailbox</Typography><Button color="error" variant="outlined" sx={{ alignSelf: 'start' }} onClick={() => setDialog('delete')}>Delete mailbox</Button></Box>
         </Stack>}
         {tab === 'connections' && <ClientConfig mailbox={mailbox} {...common} embedded/>}

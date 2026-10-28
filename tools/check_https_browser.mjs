@@ -67,7 +67,7 @@ async function inertMailbox(connection) {
   await connection.fill('Username prefix', 'https-browser');
   await connection.fill('Display name', text);
   await connection.fill('Notes / purpose', text);
-  await connection.fill('Incoming mailbox password', material.mailbox_password);
+  await connection.fill('Mailbox password', material.mailbox_password);
   assert.equal(await connection.read(`document.querySelector('input[autocomplete="new-password"]').type`), 'password');
   await connection.click({ tag: 'button', name: 'Create mailbox' });
   await connection.until(`document.querySelector('[role=dialog]') === null && document.querySelectorAll('.desktop-table tbody tr').length === 1`);
@@ -106,10 +106,10 @@ async function relay(connection) {
   await connection.until(`document.querySelector('#client-title') !== null`);
   assert.equal(await connection.read(`document.body.textContent.includes(${JSON.stringify(material.relay_key)})`), false);
   await connection.until(`document.querySelector('.client-pair') !== null`);
-  await connection.click({ tag: 'button', name: 'Reveal outgoing key' });
-  await reauthenticate(connection);
-  // Reauthentication closes before the resumed reveal request completes.
-  await connection.until(`document.body.textContent.includes(${JSON.stringify(material.relay_key)})`);
+  assert.equal(await connection.read(`document.body.textContent.includes('Reveal outgoing key') || document.body.textContent.includes('Copy outgoing key')`), false);
+  assert.equal(await connection.read(`document.body.textContent.includes('server IMAP Sent folder')`), true);
+  assert.equal(await connection.read(`document.body.textContent.includes('STARTTLS') && document.body.textContent.includes('587')`), true);
+  report.assertions.client_credentials_private_and_sent_guidance = true;
   await connection.click({ tag: 'a', name: 'RSalehin24 Mail Admin home' });
   await connection.until(`document.querySelector('h1')?.textContent === 'Mailboxes'`);
   assert.equal(await connection.read(`document.body.textContent.includes(${JSON.stringify(material.relay_key)})`), false);
@@ -126,6 +126,7 @@ async function mailboxDetails(connection) {
   await connection.fill('Display name', 'Operations team');
   await connection.fill('Notes / purpose', 'Mailbox details updated in place');
   await connection.click({ tag: 'button', name: 'Save details' });
+  await reauthenticate(connection);
   await connection.until(`document.querySelector('[role=dialog]') === null && document.body.textContent.includes('Operations team')`);
   await connection.call('Page.reload', { ignoreCache: true });
   await connection.until(`document.querySelector('h1')?.textContent === 'https-browser@rsalehin24.me' && document.body.textContent.includes('Operations team')`);
@@ -153,6 +154,29 @@ async function mailboxDetails(connection) {
   await connection.until(`Number(document.querySelector('[data-sample-count]')?.getAttribute('data-sample-count')) >= 3`);
   assert.equal(await connection.read(`document.body.textContent.includes('Host telemetry observed')`), false);
   report.assertions.actionable_service_status = true;
+}
+
+async function forwardingAndEmailPreferences(connection) {
+  await connection.click({ tag: 'button', name: 'Forwarding' });
+  await connection.until(`document.querySelector('h1')?.textContent === 'Forwarding' && document.querySelector('[role=combobox]') !== null && !document.body.textContent.includes('Loading forwarding settings')`);
+  await connection.read(`document.querySelector('[role=combobox]').dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0}))`);
+  await connection.until(`document.querySelector('[role=listbox]') !== null`);
+  await connection.read(`[...document.querySelectorAll('[role=option]')].find(x=>x.textContent==='https-browser@rsalehin24.me').click()`);
+  await connection.until(`document.querySelector('[role=listbox]') === null`);
+  await connection.fill('Forward to', 'verified-recipient@example.com');
+  await connection.until(`[...document.querySelectorAll('button')].some(x=>x.textContent==='Add forwarding' && !x.disabled)`);
+  await connection.click({ tag: 'button', name: 'Add forwarding' });
+  await connection.until(`document.body.textContent.includes('verified-recipient@example.com') && document.querySelector('.desktop-table tbody button') !== null`);
+  assert.equal(await connection.read(`document.body.textContent.includes('Always kept')`), true);
+  await connection.click({ tag: 'button', name: 'Verify destination' });
+  await connection.until(`[...document.querySelectorAll('button')].find(x=>x.textContent==='Verify destination')?.disabled === true`);
+  await connection.call('Page.reload');
+  await connection.until(`document.body.textContent.includes('verified-recipient@example.com')`);
+  await connection.click({ tag: 'button', name: 'Settings' });
+  await connection.click({ tag: 'button', name: 'Security' });
+  await connection.until(`document.body.textContent.includes('Email verification codes')`);
+  await connection.until(`[...document.querySelectorAll('input[type=checkbox]')].some(x=>x.disabled)`);
+  report.assertions.forwarding_and_email_settings_over_https = true;
 }
 
 async function safeErrors(connection) {
@@ -207,6 +231,7 @@ try {
   await inertMailbox(connection);
   await relay(connection);
   await mailboxDetails(connection);
+  await forwardingAndEmailPreferences(connection);
   await safeErrors(connection);
   await persistence(connection);
   assert.ok(responses.length >= 10);

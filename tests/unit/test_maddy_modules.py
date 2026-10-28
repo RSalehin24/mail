@@ -16,11 +16,19 @@ class MaddyModuleTests(unittest.TestCase):
         self.root = self.fixture.root.resolve()
         self.inventory = {"source_sha256": "a" * 64, "modules": ["test_first", "test_second"]}
         self.template = {
-            "suite": "maddy", "source_sha256": "a" * 64, "result": "pass",
-            "python": "3.11.17", "system": "Linux", "machine": "x86_64",
-            "qualification_image": "sha256:" + "b" * 64, "runtime_image": "sha256:" + "c" * 64,
-            "docker_engine_architecture": "aarch64", "controller_memory": {
-                "state": "observed", "limit_bytes": 192 * 1024**2, "peak_bytes": 100 * 1024**2,
+            "suite": "maddy",
+            "source_sha256": "a" * 64,
+            "result": "pass",
+            "python": "3.11.17",
+            "system": "Linux",
+            "machine": "x86_64",
+            "qualification_image": "sha256:" + "b" * 64,
+            "runtime_image": "sha256:" + "c" * 64,
+            "docker_engine_architecture": "aarch64",
+            "controller_memory": {
+                "state": "observed",
+                "limit_bytes": 192 * 1024**2,
+                "peak_bytes": 100 * 1024**2,
             },
         }
         for name in self.inventory["modules"]:
@@ -31,10 +39,14 @@ class MaddyModuleTests(unittest.TestCase):
         (self.root / name / "maddy-checks.json").write_text(json.dumps(report))
 
     def aggregate(self, outcomes=None):
-        return aggregate_modules(self.root, (
-            self.inventory, outcomes or {name: 0 for name in self.inventory["modules"]},
-            "2026-01-01T00:00:00+00:00",
-        ))
+        return aggregate_modules(
+            self.root,
+            (
+                self.inventory,
+                outcomes or {name: 0 for name in self.inventory["modules"]},
+                "2026-01-01T00:00:00+00:00",
+            ),
+        )
 
     def test_all_modules_are_required_and_original_reports_remain_intact(self):
         before = {p: p.read_bytes() for p in self.root.rglob("maddy-checks.json")}
@@ -53,15 +65,28 @@ class MaddyModuleTests(unittest.TestCase):
 
     def test_source_image_limit_skip_and_duplicate_outcomes_all_block_aggregation(self):
         for change in (
-            {"source_sha256": "d" * 64}, {"runtime_image": "sha256:" + "e" * 64},
+            {"source_sha256": "d" * 64},
+            {"runtime_image": "sha256:" + "e" * 64},
             {"tests": {"test_second.case": "skipped"}},
             {"tests": {"test_first.case": "pass"}},
-            {"controller_memory": {"state": "observed", "limit_bytes": 256 * 1024**2,
-                                   "peak_bytes": 100 * 1024**2}},
+            {
+                "controller_memory": {
+                    "state": "observed",
+                    "limit_bytes": 256 * 1024**2,
+                    "peak_bytes": 100 * 1024**2,
+                }
+            },
         ):
             with self.subTest(change=change):
-                self.write("test_second", {**copy.deepcopy(self.template),
-                    "module": "test_second", "tests": {"test_second.case": "pass"}, **change})
+                self.write(
+                    "test_second",
+                    {
+                        **copy.deepcopy(self.template),
+                        "module": "test_second",
+                        "tests": {"test_second.case": "pass"},
+                        **change,
+                    },
+                )
                 self.assertEqual(self.aggregate()["result"], "fail")
 
     def test_malformed_report_or_invalid_inventory_is_an_explicit_failure(self):
@@ -70,15 +95,23 @@ class MaddyModuleTests(unittest.TestCase):
         for names in ([], ["test_duplicate", "test_duplicate"], ["../outside"], ["test[pattern]"]):
             with self.subTest(names=names):
                 with self.assertRaises(ValueError):
-                    module_inventory("pinned-image", lambda _, selected=names: json.dumps({
-                        "modules": selected,
-                    }))
+                    module_inventory(
+                        "pinned-image",
+                        lambda _, selected=names: json.dumps(
+                            {
+                                "modules": selected,
+                            }
+                        ),
+                    )
 
     def test_partial_selection_cannot_overwrite_the_full_suite_report(self):
         with self.assertRaisesRegex(ValueError, "distinct"):
             report_directory(None, "test_first")
-        for suite, module in (("unit", "test_runner"), ("maddy", "../outside"),
-                              ("maddy", "test_missing_module")):
+        for suite, module in (
+            ("unit", "test_runner"),
+            ("maddy", "../outside"),
+            ("maddy", "test_missing_module"),
+        ):
             with self.subTest(suite=suite, module=module):
                 with self.assertRaises(ValueError):
                     test_selection(suite, module)
@@ -89,3 +122,42 @@ class MaddyModuleTests(unittest.TestCase):
                 report_directory(Path("build"), "test_first")
             with self.assertRaises(ValueError):
                 report_directory(Path("../outside"), "test_first")
+
+    def test_unreadable_report_is_a_failure_without_crashing_aggregation(self):
+        from tools.maddy_modules import module_references
+
+        with patch("pathlib.Path.read_bytes", side_effect=PermissionError("private")):
+            result = module_references(self.root, {"test_first": 0})
+        self.assertIsNone(result["test_first"]["sha256"])
+        self.assertEqual(result["test_first"]["diagnostic"], "PermissionError")
+
+    def test_report_export_keeps_private_fixture_files_untouched(self):
+        import os
+
+        from tools.run_tests import export_report_owner
+
+        parent = self.root / "build/module"
+        directory = parent / "test_case"
+        directory.mkdir(parents=True)
+        report = directory / "maddy-checks.json"
+        report.write_text("{}")
+        private = self.root / "build/private-fixture"
+        private.mkdir(mode=0o700)
+        secret = private / "key"
+        secret.write_text("private fixture")
+        secret.chmod(0o600)
+        with (
+            patch("tools.run_tests.ROOT", self.root),
+            patch.dict(
+                "os.environ",
+                {
+                    "MAIL_ADMIN_REPORT_UID": str(os.getuid()),
+                    "MAIL_ADMIN_REPORT_GID": str(os.getgid()),
+                },
+            ),
+            patch("tools.run_tests.os.chown") as chown,
+        ):
+            export_report_owner(directory, (report,))
+        self.assertEqual(report.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(directory.stat().st_mode & 0o777, 0o700)
+        self.assertNotIn(secret, [call.args[0] for call in chown.call_args_list])

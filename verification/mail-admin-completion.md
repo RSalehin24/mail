@@ -1,8 +1,152 @@
-# Mail admin production state — 27 October 2026
+# Mail admin production state — 28 October 2026
 
 This record supersedes older production-state summaries in the handover files.
 
-## Current deployment
+## Forwarding and administration rollout — 28 October 2026
+
+Current live version: `admin-af2d455d1922`.
+Runtime image:
+`sha256:254751d849537852efed0249a6e7a02cba3d822c91668bfbea278b626b3091bb`.
+The runtime artifact source is
+`af2d455d192273cfd5eefd0720ad573c9c713f01c6f8740518088c1e2c292b08`;
+root `application_release.host_followup` separately records the verified backup
+lock integration added for Cloudflare synchronization state.
+
+Forwarding is live in the navigation and each mailbox's Configuration tab.
+Settings → Security has the recently authenticated email-code switch, and Server
+shows current independent-monitor verification/freshness. The administrator's
+explicit delivery test was received and revision-confirmed; email-code login
+remains off until the administrator enables it. Existing authenticator and
+recovery-code access were preserved.
+
+Cloudflare main-domain MX records remain unchanged. Nine verified local delivery
+aliases feed the existing Maddy host through `delivery.rsalehin24.me`; the
+inbound-only recipient rewrite keeps the canonical mailbox addresses. All nine
+mailboxes now receive locally. `mail@` and `website@` also forward natively to
+`rsalehin24@gmail.com`; sender, subject and body are preserved, without attachment
+wrapping or administrator resending. The owner confirmed the forwarding test in
+Gmail Spam. Existing Gmail routes were retained until this verification passed.
+The temporary cloud@ forwarding rule was removed afterward.
+
+New mailboxes are registered automatically by the root synchronization timer.
+Each new local incoming destination needs one Cloudflare email-link confirmation
+in its IMAP inbox; routing activates automatically after confirmation. The app
+shows pending verification/synchronization and actual connected/failed/stale
+states. External destinations have an explicit verification action. Removing a
+forwarding rule retains local incoming mail and existing stored messages.
+
+A local `website@` mailbox was added; its generated password was not retained.
+Reset that password in the app before first IMAP client use. The eight original
+mailbox credential/storage pairs, their password hashes and account rows, nine
+protections, administrator authentication and root recovery policy/key remain.
+
+The complete native suite aggregation now passes: 87 mail/recovery tests in 31
+modules, 21 runtime tests in eight modules, and 14 certificate/ACME tests in seven
+modules. Reports are exported privately to the invoking user; missing/inaccessible
+reports cannot become passes. Both runtime and controller images are pinned for
+suite lifetime. Checks also passed 531 unit and 93 API tests, the feature/worker
+and backup-lock regressions, synthetic browser workflows and actual authenticated
+HTTPS/non-root/Unix-helper browser workflows. Earlier failed runner attempts are
+retained with their causes rather than relabeled as passes.
+
+Production snapshot `0b7e10a132dec5c0426728d5075087d7dc941a690bb3553bcc9d590aa60c9ab2`
+(cutoff `2026-10-28T11:46:29.321431+00:00`, before this rollout) passed isolated
+startup and a real kernel reboot in disposable VM
+`aa07a899-704b-4535-8c26-a2e242ffd78d`. Fresh HTTPS authentication succeeded after
+reboot, all eight original mailbox credentials and message bodies matched, and
+all eight Sent folders survived. Copied authentication was closed and replaced;
+provider networking and timers were isolated. This verifies the identified
+snapshot's isolated boot recovery, not public DNS/failover or all provider flows.
+Production was never rebooted or restored by that test. The VM is stopped.
+
+Detailed behavior and evidence: [forwarding rollout](forwarding-implementation-status.md),
+`build/admin-followup/`, and its `ui-deployment-final.log`, `live-observation.json`,
+`live-assets.json`, native complete reports, authenticated HTTPS observation,
+`recovery-boot.log`, and `verified-backup.log`.
+Immediate application rollback is retained in
+`/var/lib/mail-admin-application-releases/admin-af2d455d192273cf`; the previous
+Maddy container/configuration and Cloudflare rule observations are also retained.
+
+
+Final encrypted off-host snapshot:
+`be0a4755d29940b0c14563eb5b8b18c16d7dd1f9441cbb4b6ffa80b8abf5775e`,
+cutoff `2026-10-28T13:28:09.730304+00:00`. Publication, extraction/integrity and
+retention completed. The captured tree contains the exact final host code,
+Cloudflare credentials/configuration, root forwarding rules, outbound queue and
+all nine Sent folders. The capture now also takes the forwarding synchronization
+lock before recovery/renewal/mail locks, so provider verification writes cannot
+race the immutable copy; a real contention regression and native snapshot test
+passed. All five backup/recovery/forwarding/monitoring timers are active and no
+operation remains unresolved. See `verification/admin-followup-acceptance.json`.
+
+## SMTP submission rollout — 28 October 2026
+
+Authenticated SMTP submission is deployed on `mail.rsalehin24.me:587` with required
+STARTTLS. Clients use their full mailbox address and existing mailbox password for
+both SMTP and IMAP 993/TLS. Envelope, From and Sender identities are restricted to
+the authenticated mailbox. Maddy's durable outbound queue relays to Brevo on
+587 with certificate-verified STARTTLS. Provider secrets are root-owned mode 0600;
+recently authenticated provider saves synchronize through the restricted helper,
+with revision-based interruption reconciliation and a durable rollback include.
+
+Runtime image: `sha256:10c1823276b8dac8d0269a4c6c44a6dff40d2e73745dca73d9e817745842edfd`.
+The isolated submission release source is
+`4d881d8b3ee5499064b16a7514dda5cbb39f739d6a707d64f14afe7af807f9c6`;
+additional verified host changes extend startup verification to 30 seconds and
+make provider-sync cleanup durable. Their hashes are recorded in the root
+`application_release.host_followup` record. Unrelated uncommitted forwarding and
+security work in the workstation was preserved and excluded from this rollout.
+
+Clients must enable saving sent messages to the account's server IMAP Sent folder.
+Maddy does not create a second copy. Sent records submission to the local queue;
+it does not prove recipient delivery. Connection instructions no longer reveal
+or copy the Brevo key. See [client and recovery details](smtp-submission.md).
+
+Public 587 STARTTLS, rejection before authentication, certificate trust and existing
+25/993 services passed. A single explicit live test, identifier
+`673fcce5-a900-4904-b8d7-ef9c77e063fc`, was submitted by temporary mailbox
+`submission-check-20261028@rsalehin24.me` to `rsalehin24@gmail.com`. Brevo accepted
+it on the first attempt and the recipient explicitly confirmed receipt. Exactly
+one client-created Sent copy was visible from a second public IMAP session. The
+temporary mailbox was removed. All eight original credential/storage pairs and
+credential hashes were preserved; nine protections, recovery policy and key were
+preserved. No unresolved helper operation or provider synchronization remains.
+
+Queue data is covered by the complete Maddy directory backup. `maddy_message_paths`
+remains `['messages']`, because mailbox recovery interprets it as the IMAP body
+store, not as a list of all backup directories. Recovery artifacts include the
+current Maddy/dashboard images, host code, helper unit and restricted include.
+Full-server boot recovery is not established by this rollout.
+
+Verification includes 523 workstation unit tests and 92 API tests before the
+small final host-only fixes, 508 isolated-release unit and 90 API checks, six
+real Maddy 0.9.6 submission/relay/Sent checks, eight mail/recovery checks, nine
+HTTPS runtime/recovery checks, browser checks, and fresh startup, synchronization
+and real mail-data recovery regression checks after the host fixes. The controlled
+relay exercised success, 451 queue persistence across restart, permanent rejection,
+missing STARTTLS and certificate failure; the Sent flow includes offline restoration.
+
+Rollback containers `maddy-submission-rollback` and `mail-admin-submission-rollback`,
+previous configuration, host files, compatible dashboard database and quiesced mail
+safety copy are retained under
+`/var/lib/mail-admin-application-releases/submission-4d881d8b3ee54990-r4`.
+Deployment preflights and the failed short-readiness backup remain in the evidence;
+the latter was reconciled without replaying a mail-data mutation before retry.
+
+Final encrypted off-host snapshot
+`0b7e10a132dec5c0426728d5075087d7dc941a690bb3553bcc9d590aa60c9ab2`
+(cutoff `2026-10-28T11:46:29.321431+00:00`) passed restore/integrity verification.
+Its captured tree includes the queue, all eight Sent folders and the exact final
+helper code. Both TLS consumers and all three backup/recovery timers are active;
+no backup operation remains queued, running or awaiting reconciliation.
+
+Evidence: `build/submission/`, including `deployment-r4.log`, `public-services.json`,
+`live-result.json`, `live-relay.json`, `live-cleanup.log`, `live-provider-sync.log`,
+`live-observation-final.json`, `final-recovery-regressions.log` and
+`verified-final-backup.log`. The Google Cloud rule is
+`mail-admin-submission-587`; existing 25/993 rules and Cloudflare routing were preserved.
+
+## Deployment before the submission rollout
 
 - URL: https://mail.rsalehin24.me
 - Version: `mail-admin-ui-5ab98ed4b639`

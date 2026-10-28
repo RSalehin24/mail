@@ -15,7 +15,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/run/mail-admin-helper /run/lock /var/lib/mail-admin-helper
+ReadWritePaths=/run/mail-admin-helper /run/lock /var/lib/mail-admin-helper /opt/maddy/data
 LogNamespace=mail-admin
 
 [Install]

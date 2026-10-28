@@ -6,12 +6,14 @@ from fastapi import APIRouter, Depends, Request, Response
 
 from backend.auth import Credentials, Verification
 from backend.authorization import COOKIE_NAME, authenticated, peer, recent, services, session
+from backend.email_auth import EmailAuthentication
 from backend.enrollment import Enrollment
 from backend.requests import (
     FactorRequest,
     LoginRequest,
     OtpRequest,
     PasswordRequest,
+    RequestModel,
     SetupRequest,
     TotpRequest,
 )
@@ -48,10 +50,10 @@ async def login(body: LoginRequest, request: Request) -> dict[str, Any]:
             Credentials(body.email, body.password, peer(request))
         )
     )
-    available = await application.io.run(application.relay.otp_ready)
+    available = await application.io.run(application.authentication.email_available)
     return {
         "challenge": challenge,
-        "email_otp_available": bool(application.settings.email_otp_enabled and available),
+        "email_otp_available": available,
     }
 
 
@@ -76,8 +78,6 @@ async def verify_login(
 @public.post("/2fa/send-otp")
 async def send_otp(body: OtpRequest, request: Request) -> dict[str, str]:
     application = services(request)
-    if not application.settings.email_otp_enabled:
-        raise ServiceError("email_otp_unavailable", 403)
     binding = session(request) if body.purpose == "reauth" else None
     if body.purpose == "reauth" and not binding:
         raise ServiceError("authentication_required", 401)
@@ -110,10 +110,10 @@ async def reauth(body: LoginRequest, request: Request) -> dict[str, Any]:
             Credentials(body.email, body.password, peer(request)), session(request)
         )
     )
-    available = await application.io.run(application.relay.otp_ready)
+    available = await application.io.run(application.authentication.email_available)
     return {
         "challenge": challenge,
-        "email_otp_available": bool(application.settings.email_otp_enabled and available),
+        "email_otp_available": available,
     }
 
 
@@ -169,3 +169,23 @@ async def replace_totp(body: TotpRequest, request: Request, response: Response) 
 @protected.get("/session")
 def inspect_session() -> dict[str, bool]:
     return {"authenticated": True}
+
+
+class EmailAuthenticationRequest(RequestModel):
+    enabled: bool
+
+
+@protected.get("/security/email-authentication")
+async def email_authentication_status(request: Request) -> dict[str, Any]:
+    application = services(request)
+    return await application.io.run(EmailAuthentication(application.authentication).status)
+
+
+@protected.put("/security/email-authentication", dependencies=[Depends(recent)])
+async def save_email_authentication(
+    body: EmailAuthenticationRequest, request: Request
+) -> dict[str, Any]:
+    application = services(request)
+    return await application.io.run(
+        lambda: EmailAuthentication(application.authentication).save(session(request), body.enabled)
+    )

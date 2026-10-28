@@ -1,0 +1,63 @@
+{
+  "state": "deployed_and_verified",
+  "release": {
+    "image_id": "sha256:7773bb71d16ec86fb69a565cadf5e777e18b6cab2dd3e6279b357a5a15353e63",
+    "source_sha256": "9f0214958d3839cd94c6a3960d6b8675b0be9185f1cd0c5d21621f22416e1c55",
+    "previous_image": "sha256:254751d849537852efed0249a6e7a02cba3d822c91668bfbea278b626b3091bb",
+    "host_files": [
+      "helper/forwarding.py"
+    ],
+    "files": {
+      "image.tar": "c8275ae4e67d1d5c594aa350210a08bb00abc8fe3f631abcd643b285d4b8a8c2",
+      "host-source-final.tar.gz": "e8a400a39ed9a94cbef4f70e5d2d90baa4f6608a8c0825a213947ba4e18b8bf5",
+      "install-ui.py": "7d1bef5a7b654e8ba6c7018c0da05746bc2c8fe9d70dec7b5a3a4c6c45fcd0dd"
+    }
+  },
+  "browser": {
+    "scope": "local synthetic UI checks; not HTTPS or release qualification",
+    "started_at_utc": "2026-10-28T14:02:10.323Z",
+    "result": "pass",
+    "source_sha256": "2b9e16c9cfa81a4f7b05e9fe2d6997e2302744fc496e0203444880626ec26002",
+    "frontend_image_id": "sha256:7773bb71d16ec86fb69a565cadf5e777e18b6cab2dd3e6279b357a5a15353e63",
+    "completed_at_utc": "2026-10-28T14:02:34.585Z"
+  },
+  "public": {
+    "assets_match": true,
+    "anonymous_api_rejected": true,
+    "imap_993_tls": true,
+    "smtp_587_starttls": true,
+    "incoming_25": true,
+    "image_id": "sha256:7773bb71d16ec86fb69a565cadf5e777e18b6cab2dd3e6279b357a5a15353e63"
+  },
+  "live": [
+    {
+      "state": "healthy",
+      "version": "admin-9f0214958d38",
+      "image_id": "sha256:7773bb71d16ec86fb69a565cadf5e777e18b6cab2dd3e6279b357a5a15353e63",
+      "account_pairs": 9,
+      "protected_addresses": 9,
+      "forwarding": "connected",
+      "local_delivery_mailboxes": 9,
+      "gmail_forwarding": [
+        "mail@rsalehin24.me",
+        "website@rsalehin24.me"
+      ],
+      "email_codes_enabled": false,
+      "administrator_delivery_verified": true,
+      "monitoring_verified": true,
+      "cloudflare_credentials": "root:0600",
+      "unresolved_helper_operations": 0
+    },
+    {
+      "release_artifacts_updated": true,
+      "image_id": "sha256:7773bb71d16ec86fb69a565cadf5e777e18b6cab2dd3e6279b357a5a15353e63"
+    }
+  ],
+  "tests": {
+    "forwarding_unit_api_provider": 16,
+    "ruff": "pass",
+    "mypy": "pass",
+    "frontend_lint_build": "pass"
+  },
+  "offsite_snapshot": "No new snapshot claimed; existing backup timers remain active."
+}

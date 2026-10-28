@@ -1,18 +1,21 @@
-import { useState } from 'react';
-import { Alert, Avatar, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, TextField, Typography } from '@mui/material';
+import { useEffect, useState } from 'react';
+import { Alert, Avatar, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, Switch, FormControlLabel, TextField, Typography } from '@mui/material';
 import LockOutlined from '@mui/icons-material/LockOutlined';
 import ShieldOutlined from '@mui/icons-material/ShieldOutlined';
 import KeyOutlined from '@mui/icons-material/KeyOutlined';
 import { ApiError, api, type Authorize, type Enrollment } from './api';
 import { CodeInput, EnrollmentMaterial } from './components';
 
-export function SecuritySettings({ authorize, onRevoked }: { authorize: Authorize; onRevoked: (codes: string[]) => void }) {
+export function SecuritySettings({ authorize, onRevoked, onDeliverySettings }: { onDeliverySettings: () => void; authorize: Authorize; onRevoked: (codes: string[]) => void }) {
   const [dialog, setDialog] = useState<'password' | 'authenticator' | 'recovery' | null>(null);
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [material, setMaterial] = useState<Enrollment | null>(null);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
+  const [emailAuth, setEmailAuth] = useState<{ enabled: boolean; delivery_verified: boolean; available: boolean; sender: string; recipient: string } | null>(null);
+  const [emailError, setEmailError] = useState('');
+  useEffect(() => { void api<NonNullable<typeof emailAuth>>('/security/email-authentication').then(setEmailAuth).catch(failure => setEmailError((failure as Error).message)); }, []);
   const [error, setError] = useState('');
   const validPassword = [...password].length >= 16 && new TextEncoder().encode(password).length <= 1024 && password === confirmation;
   function close() { if (busy) return; setDialog(null); setPassword(''); setConfirmation(''); setMaterial(null); setCode(''); setError(''); }
@@ -42,6 +45,24 @@ export function SecuritySettings({ authorize, onRevoked }: { authorize: Authoriz
         <Button variant="outlined" sx={{ mt: 'auto' }} onClick={() => { setError(''); setDialog(card.id); }}>{card.action}</Button>
       </Paper>)}
     </Box>
+    <Paper variant="outlined" sx={{ mt: 3, p: 3, borderRadius: 3 }}><Stack spacing={2}>
+      <Typography variant="h6" component="h3">Email verification codes</Typography>
+      <Typography variant="body2" color="text.secondary">Use an email code as a second factor after your master password. Your authenticator and recovery codes remain available.</Typography>
+      {emailError && <Alert severity="error">{emailError}</Alert>}
+      {!emailAuth && !emailError && <Typography role="status">Loading email authentication settings…</Typography>}
+      {emailAuth && <>
+        <Typography variant="body2">Codes are sent from {emailAuth.sender} to {emailAuth.recipient}.</Typography>
+        <Alert severity={emailAuth.delivery_verified ? 'success' : 'info'}>{emailAuth.delivery_verified ? 'Administrator email delivery is verified for the current provider settings.' : 'Send an administrator delivery test and confirm its receipt before enabling email codes.'}</Alert>
+        <FormControlLabel label="Allow email verification codes" control={<Switch checked={emailAuth.enabled} disabled={busy || (!emailAuth.enabled && !emailAuth.delivery_verified)} onChange={(_, checked) => authorize(async () => {
+          setBusy(true); setEmailError('');
+          try { setEmailAuth(await api<NonNullable<typeof emailAuth>>('/security/email-authentication', { enabled: checked }, 'PUT')); }
+          catch (failure) { if (failure instanceof ApiError && ['recent_authentication_required', 'authentication_required'].includes(failure.code)) throw failure; setEmailError((failure as Error).message); }
+          finally { setBusy(false); }
+        })}/>}/>
+        {emailAuth.enabled && !emailAuth.available && <Typography color="warning.main" variant="body2">Email codes are unavailable until delivery is verified again.</Typography>}
+      </>}
+      <Button variant="outlined" sx={{ alignSelf: 'start' }} onClick={onDeliverySettings}>Verify administrator email delivery</Button>
+    </Stack></Paper>
     <Dialog open={dialog !== null} onClose={busy ? undefined : close} fullWidth maxWidth="sm" aria-labelledby="security-dialog-title">
       <DialogTitle id="security-dialog-title">{dialog === 'password' ? 'Change master password' : dialog === 'authenticator' ? 'Replace authenticator app' : 'Replace recovery codes'}</DialogTitle>
       <DialogContent><Stack spacing={2.5} sx={{ pt: 1 }}>

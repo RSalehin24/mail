@@ -1,0 +1,18 @@
+[Unit]
+Description=Verify independent Google uptime checks and alert policies
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+WorkingDirectory=/usr/local/lib/mail-admin
+ExecStart=/usr/bin/python3 -m host.independent_monitor
+User=root
+UMask=0077
+MemoryMax=128M
+TimeoutStartSec=2min
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/mail-admin-alerts
+LogNamespace=mail-admin

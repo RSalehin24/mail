@@ -1,0 +1,8 @@
+[Unit]
+Description=Apply saved Cloudflare forwarding changes
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=30s
+AccuracySec=3s
+[Install]
+WantedBy=timers.target

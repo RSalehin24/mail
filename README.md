@@ -6,6 +6,14 @@ A root Unix-socket helper owns mailbox changes; root host tools own TLS, backups
 and recovery. Production deployment requires complete qualification, operator
 inputs, and explicit approval. Remote fixture testing is a separate operation.
 
+Mail clients use `mail.rsalehin24.me` for IMAP 993/TLS and SMTP 587/STARTTLS,
+with the full mailbox address and mailbox password for both. Enable saving sent
+messages in the server IMAP Sent folder. See [SMTP submission and Sent storage](verification/smtp-submission.md).
+
+Forwarding controls are in the main navigation and mailbox Configuration pages.
+New mailbox delivery registration is automatic; confirm Cloudflare's one-time
+verification email in the IMAP inbox. See [forwarding and administration rollout](verification/forwarding-implementation-status.md).
+
 Paths: `frontend/` (React/MUI), `backend/` (API/domain/data), `shared/` (validators),
 `helper/` (private Unix service), `host/` (operator lifecycle), `tests/` (application
 assertions), `tools/` (build and evidence adapters).

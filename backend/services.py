@@ -2,6 +2,7 @@
 
 import os
 import time
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -66,6 +67,15 @@ class Services:
         helper = HelperClient(
             Path("/run/mail-admin-helper/control.sock"), settings.operation_timeout
         )
+        def synchronize(values: dict[str, Any]) -> None:
+            result = helper.call({"operation": "submission_sync", "request_id": str(uuid.uuid4()),
+                                  **values})
+            if result.get("synchronized") is not True:
+                raise ServiceError("submission_synchronization_failed", 503)
+
+        def reconcile() -> None:
+            helper.call({"operation": "submission_reconcile", "request_id": str(uuid.uuid4())})
+
         return cls(
             settings,
             authentication,
@@ -74,7 +84,8 @@ class Services:
             WorkPool(settings.http_concurrency, settings.operation_timeout),
             Relay(
                 RelayDependencies(
-                    database, keys, SmtpTransport(settings.operation_timeout), time.time
+                    database, keys, SmtpTransport(settings.operation_timeout),
+                    time.time, synchronize, reconcile
                 )
             ),
         )

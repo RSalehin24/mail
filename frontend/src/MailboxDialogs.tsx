@@ -31,16 +31,16 @@ export function PasswordDialog({ mode, mailbox, onClose, onChanged, notify, auth
     finally { setBusy(false); }
   }
   return <Dialog open fullScreen={fullScreen} fullWidth maxWidth="sm" onClose={busy ? undefined : onClose} aria-labelledby="mailbox-dialog-title">
-    <DialogTitle id="mailbox-dialog-title">{mode === 'create' ? 'Create a mailbox' : 'Reset incoming password'}</DialogTitle>
+    <DialogTitle id="mailbox-dialog-title">{mode === 'create' ? 'Create a mailbox' : 'Reset mailbox password'}</DialogTitle>
     <DialogContent><Stack spacing={2.5} sx={{ pt: 1 }}>
       {error && <Alert severity="warning">{error}</Alert>}
-      {mode === 'reset' && <Alert severity="info">{mailbox?.email}<br/>This changes future IMAP logins. Existing sessions may remain active. Ask the operator for immediate disconnection if needed. Brevo credentials are separate.</Alert>}
+      {mode === 'reset' && <Alert severity="info">{mailbox?.email}<br/>This changes future IMAP and SMTP logins. Existing sessions may remain active. Ask the operator for immediate disconnection if needed.</Alert>}
       {mode === 'create' && <>
         <TextField label="Username prefix" value={local} onChange={event => setLocal(event.target.value.toLowerCase())} helperText={`@${domain}`} disabled={busy || uncertain}/>
         <TextField label="Display name" value={displayName} onChange={event => setDisplayName(event.target.value)} disabled={busy || uncertain}/>
         <TextField label="Notes / purpose" multiline minRows={2} value={notes} onChange={event => setNotes(event.target.value)} disabled={busy || uncertain}/>
       </>}
-      <TextField label="Incoming mailbox password" type={visible ? 'text' : 'password'} autoComplete="new-password" value={password}
+      <TextField label="Mailbox password" type={visible ? 'text' : 'password'} autoComplete="new-password" value={password}
         disabled={busy || uncertain} onChange={event => setPassword(event.target.value)}
         helperText="At least 16 characters, at most 72 UTF-8 bytes. Spaces are preserved."/>
       <Stack direction="row" spacing={1}><Button onClick={() => { setPassword(generatePassword()); setVisible(true); }} disabled={busy || uncertain}>Generate 24-character password</Button>
@@ -89,10 +89,9 @@ export function DeleteDialog({ mailbox, cutoff, ...common }: Common & { mailbox:
 type Connection = { host: string; port: number; security: string; username: string; password: string };
 const clients = ['Apple Mail', 'Gmail', 'Thunderbird / Outlook', 'Nextcloud', 'Raw details'];
 
-export function ClientConfig({ mailbox, onClose, authorize, notify, embedded = false }: Common & { mailbox: Mailbox; embedded?: boolean }) {
+export function ClientConfig({ mailbox, onClose, notify, embedded = false }: Common & { mailbox: Mailbox; embedded?: boolean }) {
   const [configuration, setConfiguration] = useState<{ incoming: Connection; outgoing: Connection } | null>(null);
   const [tab, setTab] = useState(0);
-  const [secret, setSecret] = useState('');
   const [error, setError] = useState('');
   useEffect(() => {
     let active = true;
@@ -106,26 +105,20 @@ export function ClientConfig({ mailbox, onClose, authorize, notify, embedded = f
     <DialogTitle id="client-title">Connect {mailbox.email}</DialogTitle>
     <DialogContent>
       {error && <Alert severity="error">{error}</Alert>}
-      <Typography sx={{ mb: 2 }}>IMAP uses this mailbox’s address and incoming password. SMTP uses the shared Brevo login and key for all mailboxes; your From address is {mailbox.email}.</Typography>
+      <Typography sx={{ mb: 2 }}>Use {mailbox.email} and your mailbox password for both IMAP and SMTP. Your From address must match this mailbox.</Typography>
       <Tabs value={tab} onChange={(_, value: number) => setTab(value)} variant="scrollable" scrollButtons="auto" aria-label="Mail client">{clients.map(client => <Tab label={client} key={client}/>)}</Tabs>
-      <Typography sx={{ mt: 2 }} variant="body2">{tab === 0 ? 'In Mail settings, add an Other Mail Account. Enter the incoming and outgoing settings separately.' : tab === 1 ? 'Choose Other (IMAP) in the Gmail app. For Gmail web “Send As”, use the outgoing SMTP details. Do not use the mailbox password for SMTP.' : tab === 2 ? 'Choose manual setup, IMAP for incoming mail, and a separate outgoing SMTP server and login.' : tab === 3 ? 'In Nextcloud Mail, use manual configuration and supply separate IMAP and SMTP credentials.' : 'Use these values in any IMAP client with separate incoming and outgoing authentication.'}</Typography>
+      <Typography sx={{ mt: 2 }} variant="body2">{tab === 0 ? 'In Mail settings, add an Other Mail Account. Enter the incoming and outgoing settings separately.' : tab === 1 ? 'Choose Other (IMAP) in the Gmail app. For Gmail web “Send As”, use the outgoing SMTP details and mailbox password. Gmail web saves its own sent copy in Gmail; use an IMAP client to save to this server’s Sent folder.' : tab === 2 ? 'Choose manual setup, IMAP for incoming mail, and the outgoing SMTP settings below.' : tab === 3 ? 'In Nextcloud Mail, use manual configuration and use the same mailbox credentials for IMAP and SMTP.' : 'Use these values in any IMAP client with separate incoming and outgoing authentication.'}</Typography>
       {configuration && <Box className="client-pair">{(['incoming', 'outgoing'] as const).map(direction => <Box key={direction}>
-        <Typography variant="h6">{direction === 'incoming' ? 'Incoming · IMAP' : 'Outgoing · Brevo SMTP'}</Typography>
+        <Typography variant="h6">{direction === 'incoming' ? 'Incoming · IMAP' : 'Outgoing · SMTP'}</Typography>
         {Object.entries(configuration[direction]).map(([key, value]) => <Box key={key} className="connection-field">
           <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}><Box sx={{ minWidth: 0 }}>
-            <Typography variant="caption" color="text.secondary">{key === 'password' ? direction === 'incoming' ? 'Account password' : 'Shared outgoing key' : key}</Typography>
-            <Typography sx={{ overflowWrap: 'anywhere' }}>{key === 'password' && direction === 'outgoing' ? secret || value : String(value)}</Typography>
+            <Typography variant="caption" color="text.secondary">{key === 'password' ? 'Mailbox password' : key}</Typography>
+            <Typography sx={{ overflowWrap: 'anywhere' }}>{String(value)}</Typography>
           </Box>{key !== 'password' && <Tooltip title={`Copy ${direction} ${key}`}><Button size="small" aria-label={`Copy ${direction} ${key}`} onClick={async () => { await navigator.clipboard.writeText(String(value)); notify('Copied'); }}><ContentCopyOutlined fontSize="small"/></Button></Tooltip>}</Stack>
         </Box>)}
       </Box>)}</Box>}
-      <Alert severity="info" sx={{ mt: 3 }}>Existing incoming passwords cannot be recovered from Maddy hashes. Use your known password or reset it. The shared Brevo key may authorize other senders; do not distribute it to untrusted mailbox users.</Alert>
-      <Stack direction="row" spacing={1} sx={{ mt: 2 }}><Button onClick={() => authorize(async () => {
-        const result = await api<{ credential: string }>('/settings/relay/reveal', {}); setSecret(result.credential);
-      })}>Reveal outgoing key</Button><Button onClick={() => authorize(async () => {
-        const result = await api<{ credential: string }>('/settings/relay/reveal', {});
-        await navigator.clipboard.writeText(result.credential); notify('Outgoing key copied');
-      })}>Copy outgoing key</Button></Stack>
-    </DialogContent>{!embedded && <DialogActions><Button onClick={() => { setSecret(''); onClose(); }}>Close</Button></DialogActions>}
+      <Alert severity="info" sx={{ mt: 3 }}>Use your known mailbox password or reset it; stored password hashes cannot be recovered. Enable saving sent messages to this account’s server IMAP Sent folder. Maddy does not create an automatic Sent copy. Sent means successful submission to Maddy’s queue, not confirmed recipient delivery. Clients that disable saving sent messages will not retain a sent copy.</Alert>
+    </DialogContent>{!embedded && <DialogActions><Button onClick={onClose}>Close</Button></DialogActions>}
   </>;
   return embedded ? content : <Dialog open fullScreen={fullScreen} fullWidth maxWidth="md" onClose={onClose} aria-labelledby="client-title">{content}</Dialog>;
 }

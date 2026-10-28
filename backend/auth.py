@@ -249,6 +249,12 @@ class Authentication:
         raise ServiceError("otp_generation_failed", 503)
 
     def _email_ready(self, connection: sqlite3.Connection) -> bool:
-        if not self.dependencies.email_enabled:
+        from backend.email_auth import enabled
+
+        if not enabled(connection, self.dependencies.email_enabled):
             return False
         return otp_ready(connection)
+
+    def email_available(self) -> bool:
+        with self.database.transaction() as connection:
+            return self._email_ready(connection)

@@ -30,10 +30,30 @@ class BrowserFixture(RuntimeFixture):
     def __init__(self):
         self.api_call_times = []
         super().__init__()
+        from types import SimpleNamespace
+
+        from tests.forwarding_support import configure_forwarding
         from tests.telemetry_support import synthetic_resources
+
         self.host.helper.dependencies = dataclasses.replace(
             self.host.helper.dependencies, status=synthetic_resources,
+            submission=SimpleNamespace(synchronize=lambda _: {"synchronized": True},
+                                       reconcile=lambda: None),
         )
+        control = configure_forwarding(self)
+        change = self.host.maddy.change
+
+        def change_and_track(arguments, password=""):
+            result = change(arguments, password)
+            if arguments[:2] == ("imap-acct", "create") and result.code == 0:
+                import sqlite3
+
+                with sqlite3.connect(control.data / "imapsql.db") as connection:
+                    connection.execute("INSERT OR IGNORE INTO users(username) VALUES(?)",
+                                       (arguments[-1],))
+            return result
+
+        self.host.maddy.change = change_and_track
 
     def command(self, arguments):
         if arguments[0] == 'create':

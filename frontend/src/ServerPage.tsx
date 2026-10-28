@@ -117,7 +117,7 @@ export function ServerPage() {
     </Box>
     <Panel title="Monitoring"><Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
       <Observation title="Host Checks" value={host?.monitoring?.outcome ? label(host.monitoring.outcome) : 'No run recorded'} at={host?.monitoring?.observed_at} now={now} maxAge={600}/>
-      <Observation title="Independent Availability Alerts" value={host?.external_monitoring?.enabled ? 'Enabled' : 'Activation not recorded'} at={host?.external_monitoring?.observed_at} now={now} maxAge={86400}/>
+      <Observation title="Independent Availability Alerts" value={host?.external_monitoring?.outcome === 'verification_failed' ? 'Verification unavailable' : host?.external_monitoring?.enabled === true ? 'Enabled · verified' : host?.external_monitoring?.enabled === false ? 'Disabled' : 'Not yet verified'} at={host?.external_monitoring?.observed_at} now={now} maxAge={86400}/>
     </Box></Panel>
   </Stack>;
 }

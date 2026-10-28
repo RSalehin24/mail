@@ -187,4 +187,4 @@ class MaintenanceBudgetTests(unittest.TestCase):
             capture = context.backup()
         self.assertEqual(context.docker.timeout, 5)
         self.assertEqual(capture.dependencies.services.docker.timeout, 30)
-        self.assertEqual(capture.dependencies.services.startup_timeout, 15)
+        self.assertEqual(capture.dependencies.services.startup_timeout, 30)

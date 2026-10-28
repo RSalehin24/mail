@@ -146,7 +146,7 @@ async function mailboxFlows(connection, fixture) {
   await connection.fill('Username prefix', 'ui-fixture');
   await connection.fill('Display name', 'Browser fixture');
   await connection.fill('Notes / purpose', '<img src=x onerror=window.__mailFixtureInjected=true>');
-  await connection.fill('Incoming mailbox password', '  synthetic mailbox password 42  ');
+  await connection.fill('Mailbox password', '  synthetic mailbox password 42  ');
   await connection.click({ tag: 'button', name: 'Create mailbox' });
   await connection.until(`document.querySelector('[role=dialog]') === null && document.querySelectorAll('.desktop-table tbody tr').length === 9`);
   await connection.fill('Search mailboxes', 'ui-fixture');
@@ -162,10 +162,17 @@ async function mailboxFlows(connection, fixture) {
   }
   assert.equal(await connection.read(`document.body.textContent.includes('hashes')`), true);
   assert.equal(await connection.read('location.pathname'), '/mailboxes/ui-fixture%40rsalehin24.me/connections');
+  await connection.until(`document.body.textContent.includes('Maddy’s queue')`);
+  const clientInstructions = await connection.read(`document.body.textContent`);
+  assert.ok(clientInstructions.includes('server IMAP Sent folder'));
+  assert.ok(clientInstructions.includes('587') && clientInstructions.includes('STARTTLS'));
+  assert.ok(!clientInstructions.includes('smtp-relay.brevo.com'));
+  assert.ok(!clientInstructions.includes('Reveal outgoing key'));
+  assert.ok(!clientInstructions.includes('Copy outgoing key'));
   await connection.click({ tag: 'button', name: 'Configuration' });
   await connection.until(`document.body.textContent.includes('Change incoming password')`);
   await connection.click({ tag: 'button', name: 'Change incoming password' });
-  await connection.fill('Incoming mailbox password', '  replacement fixture password 42  ');
+  await connection.fill('Mailbox password', '  replacement fixture password 42  ');
   await connection.click({ tag: 'button', name: 'Reset password' });
   await connection.until(`document.querySelector('#reauth-title') !== null`);
   await connection.fill('Master password', 'incorrect password');
@@ -191,6 +198,7 @@ async function mailboxFlows(connection, fixture) {
   await connection.until(`location.pathname.endsWith('/details')`);
   await connection.read('history.back()');
   await connection.until(`location.pathname.endsWith('/configuration')`);
+
   await connection.read('history.forward()');
   await connection.until(`location.pathname.endsWith('/details')`);
   await connection.click({ tag: 'a', name: 'RSalehin24 Mail Admin home' });
@@ -253,7 +261,7 @@ async function verificationFlows(connection) {
 async function securityAndServer(connection) {
   await connection.click({ tag: 'button', name: 'Security' });
   const headings = await connection.read(`[...document.querySelectorAll('#security-heading ~ div h3')].map(element => element.textContent)`);
-  assert.deepEqual(headings, ['Master password', 'Authenticator app', 'Recovery codes']);
+  assert.deepEqual(headings, ['Master password', 'Authenticator app', 'Recovery codes', 'Email verification codes']);
   await connection.read(`document.querySelector('#security-heading').scrollIntoView({block: 'start'})`);
   await connection.screenshot('security-cards');
   await connection.click({ tag: 'button', name: 'Change password' });
@@ -354,6 +362,95 @@ async function openSettings(connection) {
   await connection.until(`document.querySelector('fieldset')?.disabled === false`);
 }
 
+async function forwardingAndEmailSettings(connection) {
+  await connection.call('Emulation.setDeviceMetricsOverride', {width:1280,height:1000,deviceScaleFactor:1,mobile:false});
+  await connection.click({tag:'button',name:'Forwarding'});
+  await connection.until(`document.querySelector('h1')?.textContent === 'Forwarding'`);
+  await connection.until(`document.querySelector('[role=combobox]') !== null && !document.body.textContent.includes('Loading forwarding settings')`);
+  await connection.read(`document.querySelector('[role=combobox]').dispatchEvent(new MouseEvent('mousedown', {bubbles:true,button:0}))`);
+  await connection.until(`document.querySelector('[role=listbox]') !== null`);
+  await connection.read(`[...document.querySelectorAll('[role=option]')].find(option => option.textContent === 'cloud@rsalehin24.me').click()`);
+  await connection.until(`document.querySelector('[role=listbox]') === null`);
+  await connection.fill('Forward to','first@example.com');
+  await connection.until(`[...document.querySelectorAll('button')].some(button => button.textContent === 'Add forwarding' && !button.disabled)`);
+  await connection.click({tag:'button',name:'Add forwarding'});
+  await connection.until(`document.querySelector('.desktop-table tbody')?.textContent.includes('first@example.com')`);
+  await connection.call('Page.reload');
+  await connection.until(`document.querySelector('.desktop-table tbody')?.textContent.includes('first@example.com')`);
+  await connection.call('Page.navigate',{url:'http://localhost:8765/mailboxes/cloud%40rsalehin24.me/configuration'});
+  await connection.until(`document.querySelector('input[type=email]')?.value === 'first@example.com'`);
+  await connection.fill('Forward to','second@example.com');
+  await connection.click({tag:'button',name:'Save forwarding'});
+  await connection.until(`document.querySelector('.desktop-table tbody')?.textContent.includes('second@example.com')`);
+  await connection.click({tag:'button',name:'Forwarding'});
+  await connection.until(`document.querySelector('h1')?.textContent === 'Forwarding' && document.querySelector('.desktop-table tbody')?.textContent.includes('second@example.com')`);
+  await connection.read(`[...document.querySelectorAll('.desktop-table tbody button')].find(button => button.textContent === 'Disable').click()`);
+  await connection.until(`document.querySelector('.desktop-table tbody')?.textContent.includes('Disabled')`);
+  await connection.read(`[...document.querySelectorAll('.desktop-table tbody button')].find(button => button.textContent === 'Remove').click()`);
+  await connection.until(`document.querySelector('[role=dialog]') !== null`);
+  await connection.click({tag:'button',name:'Remove forwarding'});
+  await connection.until(`document.body.textContent.includes('No forwarding configured.') && document.querySelector('[role=dialog]') === null`);
+  await connection.click({tag:'button',name:'Settings'});
+  await connection.click({tag:'button',name:'Security'});
+  await connection.until(`document.body.textContent.includes('Email verification codes')`);
+  await connection.until(`[...document.querySelectorAll('input')].find(input => input.type==='checkbox')?.disabled === true`);
+  await connection.click({tag:'button',name:'Verify administrator email delivery'});
+  await connection.until(`[...document.querySelectorAll('button')].some(button => button.textContent === 'Send explicit delivery test' && !button.disabled && !button.closest('fieldset')?.disabled)`);
+  await connection.click({tag:'button',name:'Send explicit delivery test'});
+  await connection.until(`[...document.querySelectorAll('button')].some(button => button.textContent === 'I received this test')`);
+  await connection.read(`[...document.querySelectorAll('button')].find(button => button.textContent === 'I received this test').click()`);
+  await connection.click({tag:'button',name:'Security'});
+  await connection.until(`document.body.textContent.includes('Administrator email delivery is verified for the current provider settings.')`);
+  await connection.click({tag:'input',name:'Allow email verification codes'});
+  await connection.until(`[...document.querySelectorAll('input')].find(input => input.type==='checkbox')?.checked === true`);
+  await connection.call('Page.reload');
+  await connection.until(`[...document.querySelectorAll('input')].find(input => input.type==='checkbox')?.checked === true`);
+  await connection.click({tag:'input',name:'Allow email verification codes'});
+  await connection.until(`[...document.querySelectorAll('input')].find(input => input.type==='checkbox')?.checked === false`);
+}
+
+async function incomingDeliveryControls(connection) {
+  await connection.click({tag:'button',name:'Forwarding'});
+  await connection.until(`document.querySelector('#forwarding-incoming-tab') !== null`);
+  await connection.click({tag:'button',name:'Incoming Delivery'});
+  const panel = '#forwarding-incoming-panel';
+  await connection.until(`document.querySelector('${panel} .desktop-table tbody tr button') !== null`);
+  assert.equal(await connection.read(`document.querySelector('${panel} .MuiChip-colorWarning') !== null`), true);
+  await connection.read(`(() => {const select=document.querySelector('${panel} select'); select.value='5'; select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await connection.until(`document.querySelectorAll('${panel} .desktop-table tbody tr').length === 5`);
+  await connection.read(`document.querySelector('${panel} .MuiPagination-root [aria-label="Go to next page"]').click()`);
+  await connection.until(`document.querySelectorAll('${panel} .desktop-table tbody tr').length === 4`);
+  await connection.click({tag:'button',name:'Forwarding Rules'});
+  await connection.click({tag:'button',name:'Incoming Delivery'});
+  assert.equal(await connection.read(`document.querySelectorAll('${panel} .desktop-table tbody tr').length`),4);
+  await connection.read(`document.querySelector('${panel} .desktop-table tbody tr button').click()`);
+  await connection.until(`document.body.textContent.includes('Delivery verification check queued.')`);
+  await connection.call('Page.reload');
+  await connection.until(`document.querySelector('#forwarding-incoming-tab')?.getAttribute('aria-selected') === 'true'`);
+  const mailbox = 'cloud@rsalehin24.me';
+  let state = 'connected';
+  connection.events.set('Fetch.requestPaused', async event => {
+    const listing = {rules:[],revision:0,mode:'transparent',keep_local:true,connection:{configured:true,state,mailboxes:{[mailbox]:{local_delivery_verified:true}},connected_mailboxes:[mailbox]}};
+    await connection.call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:200,responseHeaders:[{name:'Content-Type',value:'application/json'}],body:Buffer.from(JSON.stringify(listing)).toString('base64')});
+  });
+  await connection.call('Fetch.enable',{patterns:[{urlPattern:'*/api/forwarding',requestStage:'Request'}]});
+  await connection.click({tag:'button',name:'Refresh delivery'});
+  await connection.until(`document.querySelector('${panel} .MuiChip-colorSuccess') !== null`);
+  assert.equal(await connection.read(`document.querySelector('${panel} .desktop-table tbody tr')?.querySelector('button') === null`),true);
+  state = 'sync_failed';
+  await connection.click({tag:'button',name:'Refresh delivery'});
+  await connection.until(`document.querySelector('${panel} .MuiChip-colorError') !== null`);
+  assert.equal(await connection.read(`document.querySelector('${panel} .desktop-table tbody tr button')?.disabled`),false);
+  for (const width of [360,1280]) {
+    await connection.call('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});
+    assert.equal(await connection.read('document.documentElement.scrollWidth <= innerWidth'),true);
+    await connection.screenshot(`incoming-delivery-${width}`);
+  }
+  await connection.call('Fetch.disable');
+  connection.events.delete('Fetch.requestPaused');
+  await connection.click({tag:'button',name:'Forwarding Rules'});
+}
+
 async function verify(connection, report) {
   const fixture = JSON.parse(await readFile(resolve('build/ui-fixture.json'), 'utf8'));
   report.source_sha256 = fixture.source_sha256;
@@ -395,6 +492,8 @@ async function verify(connection, report) {
   await recoveryControls(connection);
   await settingsTabs(connection);
   await securityAndServer(connection);
+  await forwardingAndEmailSettings(connection);
+  await incomingDeliveryControls(connection);
   await concurrentLoadingAndPagination(connection);
   await connection.screenshot('settings');
   await connection.click({ tag: 'button', name: 'Toggle dark mode' });

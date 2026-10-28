@@ -81,7 +81,6 @@ async def sender(email: str, request: Request) -> dict[str, Any]:
 async def client_configuration(email: str, request: Request) -> dict[str, Any]:
     application = services(request)
     normalized = await application.io.run(lambda: application.mailboxes.existing(email))
-    relay = await application.io.run(application.relay.masked)
     return {
         "incoming": {
             "host": MAIL_HOST,
@@ -91,12 +90,11 @@ async def client_configuration(email: str, request: Request) -> dict[str, Any]:
             "password": "Use your known account password or reset it; hashes cannot be recovered.",
         },
         "outgoing": {
-            "host": relay["host"],
-            "port": relay["port"],
-            "security": "STARTTLS" if relay["port"] == 587 else "TLS",
-            "username": relay["username"],
-            "password": "••••••••",
-            "credential_scope": "Shared Brevo SMTP key",
+            "host": MAIL_HOST,
+            "port": 587,
+            "security": "STARTTLS",
+            "username": normalized,
+            "password": "Use the same mailbox password as IMAP.",
         },
     }
 

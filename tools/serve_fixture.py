@@ -35,6 +35,7 @@ def frontend_identity() -> str:
 
 def main() -> None:
     fixture = ApiFixture()
+    fixture.auth.dependencies = dataclasses.replace(fixture.auth.dependencies, email_enabled=False)
     from tests.recovery_support import configure_recovery
     recovery = configure_recovery(fixture)
     from shared.files import atomic_json
@@ -42,6 +43,7 @@ def main() -> None:
     policy['protected'].update({f'protected{i:02d}@rsalehin24.me': 'Synthetic pagination fixture'
                                 for i in range(14)})
     atomic_json(recovery.policy_path, policy)
+    from tests.forwarding_support import configure_forwarding
     backups = fixture.host.helper.dependencies.backups
     with backups.connect() as connection:
         connection.executemany('INSERT INTO snapshots VALUES(?,?,?)',
@@ -79,6 +81,7 @@ def main() -> None:
             email = name + "@rsalehin24.me"
             fixture.host.maddy.credentials.add(email)
             fixture.host.maddy.storage.add(email)
+        configure_forwarding(fixture)
         report = ROOT / "build/ui-fixture.json"
         descriptor = os.open(report, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(descriptor, "w") as writer:
