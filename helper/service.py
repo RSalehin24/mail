@@ -35,12 +35,14 @@ class HelperDependencies:
     backups: BackupControl | None = None
     forwarding: ForwardingControl | None = None
     submission: SubmissionControl | None = None
+    read_lock_policy: LockPolicy | None = None
 
 
 class HostHelper:
     def __init__(self, dependencies: HelperDependencies) -> None:
         self.dependencies = dependencies
         self.maddy, self.journal = dependencies.maddy, dependencies.journal
+        self._inventory_cache: tuple[float, dict[str, list[str]]] | None = None
 
     def handle(self, request: HelperRequest) -> dict[str, Any]:
         if request.operation in {"submission_sync", "submission_reconcile"}:
@@ -106,17 +108,19 @@ class HostHelper:
             }
         if request.operation == "delete":
             self.dependencies.deletion.capability()
-        with HostLock(self.dependencies.lock, self.dependencies.lock_policy):
+        policy = (self.dependencies.read_lock_policy if request.operation == "inventory"
+                  else None) or self.dependencies.lock_policy
+        with HostLock(self.dependencies.lock, policy):
             return self._locked(request)
 
     def _status(self) -> dict[str, Any]:
         try:
-            with HostLock(self.dependencies.lock, self.dependencies.lock_policy):
-                self.maddy.validate()
-                inventory = self.maddy.inventories()
+            policy = self.dependencies.read_lock_policy or self.dependencies.lock_policy
+            with HostLock(self.dependencies.lock, policy):
+                observed, inventory = self._read_inventory()
                 return {
                     "state": "available",
-                    "observed_at": self.dependencies.clock(),
+                    "observed_at": observed,
                     "credential_count": len(inventory["credentials"]),
                     "storage_count": len(inventory["storage"]),
                 }
@@ -129,7 +133,21 @@ class HostHelper:
                 else "observation_unavailable",
             }
 
+    def _read_inventory(self) -> tuple[float, dict[str, list[str]]]:
+        # Called only under the mailbox lock. Adjacent inventory/status reads share
+        # one validated CLI observation; mutations always perform their own preflight.
+        cached = self._inventory_cache
+        if cached is None or not 0 <= self.dependencies.clock() - cached[0] < 2:
+            self._inventory_cache = None
+            self.maddy.validate()
+            inventory = self.maddy.inventories()
+            cached = (self.dependencies.clock(), inventory)
+            self._inventory_cache = cached
+        return cached[0], {key: list(values) for key, values in cached[1].items()}
+
     def _locked(self, request: HelperRequest) -> dict[str, Any]:
+        if request.operation != "inventory":
+            self._inventory_cache = None
         if self.dependencies.recovery is not None and request.operation != "inventory":
             if any(
                 row["state"]
@@ -143,8 +161,11 @@ class HostHelper:
         if self.journal.unresolved():
             raise ServiceError("reconciliation_required", 409)
         self.journal.retain(self.dependencies.clock())
-        self.maddy.validate()
-        inventory = self.maddy.inventories()
+        if request.operation == "inventory":
+            _, inventory = self._read_inventory()
+        else:
+            self.maddy.validate()
+            inventory = self.maddy.inventories()
         self.journal.synchronize(inventory, self.dependencies.clock())
         if request.operation == "inventory":
             return {"protocol": HELPER_PROTOCOL, **inventory}

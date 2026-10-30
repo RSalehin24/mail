@@ -55,6 +55,9 @@ def main() -> None:
         ForwardingControl(
             Path("/var/lib/mail-admin-helper"), Path(deployment["maddy_data_directory"])
         ),
+        read_lock_policy=LockPolicy(max(
+            inputs["lock_wait_seconds"], inputs["operation_timeout_seconds"] * 0.75,
+        )),
     )
     if (Path(deployment["maddy_data_directory"]) / "submission-relay.conf").is_file():
         with HostLock(dependencies.lock, dependencies.lock_policy):
