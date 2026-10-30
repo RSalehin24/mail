@@ -5,7 +5,9 @@ STARTTLS, full mailbox address and the same mailbox password for both protocols.
 The SMTP envelope, From and any Sender header must identify the authenticated mailbox.
 A supplemental awk check closes Maddy 0.9.6’s From-or-Sender fallback; it accepts
 a bare address or a display name with an angle-bracket address.
-The website has no compose screen. Provider credentials stay on the server.
+Optional webmail provides compose and saves its own single Sent copy after
+successful submission. It defaults to disabled; see the [webmail rollout and
+verification record](webmail-implementation.md). Provider credentials stay on the server.
 
 Enable saving sent messages in the account's server IMAP **Sent** folder (for
 Thunderbird, Copies & Folders → Place a copy in → this account's Sent folder;

@@ -13,7 +13,7 @@ from typing import Any
 
 from shared.errors import ServiceError
 from shared.files import atomic_json, protected_json
-from shared.validation import MAIL_HOST
+from shared.installation import site
 
 CONFIG = Path("/etc/mail-admin/independent-monitor.json")
 OBSERVATION = Path("/var/lib/mail-admin-alerts/external-monitoring.json")
@@ -91,7 +91,7 @@ def verify(configuration: dict[str, Any], token: str) -> bool:
     checks = [get_resource(name, token, project) for name in configuration["checks"]]
     ports = set()
     for check in checks:
-        if check.get("monitoredResource", {}).get("labels", {}).get("host") != MAIL_HOST:
+        if check.get("monitoredResource", {}).get("labels", {}).get("host") != site().mail_hostname:
             raise ServiceError("monitor_target_mismatch", 503)
         http = check.get("httpCheck", {})
         tcp = check.get("tcpCheck", {})

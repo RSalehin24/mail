@@ -23,11 +23,20 @@ COPY --from=dependencies /install /usr/local
 COPY --from=frontend /build/dist /app/static
 COPY backend /app/backend
 COPY shared /app/shared
+COPY applications /app/applications
 RUN python -m compileall --invalidation-mode checked-hash -q \
-    /app/backend /app/shared /usr/local/lib/python3.11
+    /app/backend /app/shared /app/applications /usr/local/lib/python3.11
 USER 10001:10001
 EXPOSE 8443
 CMD ["python", "-m", "backend"]
+
+FROM runtime AS management-runtime
+LABEL mail.application="management" org.opencontainers.image.version="0.2.7"
+CMD ["python", "-m", "applications.runtime", "management", "--root", "/state"]
+
+FROM runtime AS webmail-runtime
+LABEL mail.application="webmail" org.opencontainers.image.version="0.2.7"
+CMD ["python", "-m", "applications.runtime", "webmail", "--root", "/state"]
 
 FROM docker:29.4.0-cli@sha256:bb21349a52c00b206ad8b5c03fa52023c741c4cf11f269d40d40b9ebaac73d96 AS docker-client
 
@@ -37,6 +46,7 @@ COPY build/restic/0.19.1/restic-linux_amd64 /usr/local/bin/restic
 COPY --from=docker-client /usr/local/bin/docker /usr/bin/docker
 COPY --from=docker-client /usr/local/libexec/docker/cli-plugins/docker-compose /usr/local/libexec/docker/cli-plugins/docker-compose
 COPY --from=qualification-dependencies /qualification /usr/local
+COPY deployment /app/deployment
 COPY helper /app/helper
 COPY host /app/host
 COPY tests /app/tests

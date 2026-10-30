@@ -18,6 +18,8 @@ from backend.routes_forwarding import router as forwarding_router
 from backend.routes_mail import router
 from backend.routes_recovery import router as recovery_router
 from backend.routes_relay import router as relay_router
+from backend.routes_webmail import profile_router
+from backend.routes_webmail import router as webmail_router
 from backend.services import Services
 from shared.errors import ServiceError
 
@@ -25,7 +27,7 @@ from shared.errors import ServiceError
 async def housekeeping(application: FastAPI) -> None:
     context: Services = application.state.services
     while True:
-        await asyncio.sleep(3600)
+        await asyncio.sleep(60)
         try:
             await context.io.run(
                 lambda: cleanup(
@@ -33,6 +35,8 @@ async def housekeeping(application: FastAPI) -> None:
                 )
             )
             application.state.retention_status = "ok"
+            if context.webmail is not None:
+                await context.webmail.pool.run(context.webmail.cleanup)
         except ServiceError:
             application.state.retention_status = "degraded"
 
@@ -60,6 +64,8 @@ async def service_error(request: Request, error: Exception) -> JSONResponse:
     payload: dict[str, Any] = {"error": error.code, "request_id": request.state.request_id}
     if hasattr(request.state, "operation_id"):
         payload["operation_id"] = request.state.operation_id
+    if getattr(request.state, "webmail_revoked", False):
+        payload["revoked"] = True
     headers = {"Retry-After": str(error.retry_after)} if error.retry_after is not None else {}
     return JSONResponse(payload, status_code=error.status, headers=headers)
 
@@ -85,6 +91,8 @@ def create_app(context: Services | None = None) -> FastAPI:
         recovery_router,
         backups_router,
         forwarding_router,
+        webmail_router,
+        profile_router,
     ):
         application.include_router(routes)
     assets = context.settings.static_directory / "assets"

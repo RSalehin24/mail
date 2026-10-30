@@ -25,6 +25,8 @@ def session(request: Request) -> str:
 
 
 async def authenticated(request: Request) -> None:
+    if session(request).startswith('wm.'):
+        raise ServiceError('administrator_role_required', 403)
     application = services(request)
     await application.io.run(lambda: application.authentication.require_session(session(request)))
 

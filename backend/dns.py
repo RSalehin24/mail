@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from shared.validation import DOMAIN
+from shared.installation import site
 
 
 def dns_name(packet: bytes, start: int) -> tuple[str, int]:
@@ -42,7 +42,7 @@ def mx_records(packet: bytes, identifier: int) -> list[str]:
     if actual != identifier or flags & 0xFA0F != 0x8000 or questions != 1 or answers > 128:
         raise ValueError("Unusable DNS response")
     name, position = dns_name(packet, 12)
-    if name != DOMAIN or struct.unpack_from("!HH", packet, position) != (15, 1):
+    if name != site().domain or struct.unpack_from("!HH", packet, position) != (15, 1):
         raise ValueError("DNS question mismatch")
     position += 4
     records = []
@@ -69,10 +69,15 @@ def _resolver() -> str:
 
 
 def observe_mx() -> dict[str, Any]:
-    observed = {"observed_at": time.time(), "configured_mode": "cloudflare"}
+    observed = {
+        "observed_at": time.time(),
+        "configured_mode": "cloudflare" if site().delivery_domain else "direct",
+    }
     try:
         resolver, identifier = _resolver(), secrets.randbelow(65536)
-        question = b"".join(bytes((len(label),)) + label.encode() for label in DOMAIN.split("."))
+        question = b"".join(
+            bytes((len(label),)) + label.encode() for label in site().domain.split(".")
+        )
         packet = struct.pack("!6H", identifier, 0x0100, 1, 0, 0, 0) + question + b"\0\0\x0f\0\x01"
         family = socket.AF_INET6 if ":" in resolver else socket.AF_INET
         with socket.socket(family, socket.SOCK_DGRAM) as connection:

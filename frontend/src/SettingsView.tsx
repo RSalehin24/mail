@@ -1,7 +1,7 @@
 import { formatDateTime } from './format';
 import { useEffect, useState } from 'react';
 import { Alert, Box, Button, Paper, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
-import { api, cached, type Authorize, type Notify, type RelaySettings } from './api';
+import { adminEmail, domain, relayHost, api, cached, type Authorize, type Notify, type RelaySettings } from './api';
 import { SecuritySettings } from './SecuritySettings';
 
 interface Props { authorize: Authorize; notify: Notify; onRevoked: (codes: string[]) => void }
@@ -30,7 +30,7 @@ export function SettingsView({ authorize, notify, onRevoked }: Props) {
   </Stack>;
 }
 
-function OutgoingSettings({ authorize, notify }: Pick<Props, 'authorize' | 'notify'>) {
+export function OutgoingSettings({ authorize, notify }: Pick<Props, 'authorize' | 'notify'>) {
   const [relay, setRelay] = useState<RelaySettings | null>(() => cached<RelaySettings>('/settings/relay') ?? null);
   const [username, setUsername] = useState(() => cached<RelaySettings>('/settings/relay')?.username ?? '');
   const port = 587;
@@ -44,17 +44,17 @@ function OutgoingSettings({ authorize, notify }: Pick<Props, 'authorize' | 'noti
     catch (failure) { setError((failure as Error).message); }
   }
   useEffect(() => { void load(); }, []);
-  const delivery = useDeliveryHistory('mail@rsalehin24.me', JSON.stringify(relay?.tests));
+  const delivery = useDeliveryHistory(`mail@${domain}`, JSON.stringify(relay?.tests));
   return <Stack spacing={3}>
     {error && <Alert severity="error">{error}</Alert>}
     {!relay && error && <Button onClick={() => { setError(''); void load(); }}>Retry relay settings</Button>}
     <Paper component="fieldset" disabled={relay === null} variant="outlined" sx={{ m: 0, minWidth: 0, p: { xs: 2, md: 3 }, borderRadius: 3 }}><Stack spacing={2.5}>
       <Box><Typography variant="h6">Outgoing mail provider</Typography><Typography variant="body2" color="text.secondary">{relay ? `${relay.otp_ready ? 'Administrator email delivery verified' : 'Administrator email delivery needs verification'}` : 'Loading saved relay settings…'}</Typography></Box>
       <Typography variant="caption" color="text.secondary">{relay ? `Saved revision ${relay.revision}` : ''}</Typography>
-      <TextField label="SMTP host" value="smtp-relay.brevo.com" disabled/>
+      <TextField label="SMTP host" value={relayHost} disabled/>
       <TextField label="SMTP security" value="587 · STARTTLS" disabled/>
-      <TextField label="Brevo SMTP login" value={username} onChange={event => { setUsername(event.target.value); setDirty(true); }}/>
-      <TextField label="Brevo SMTP key" type="password" autoComplete="new-password" value={credential} onChange={event => { setCredential(event.target.value); setDirty(true); }} helperText={relay?.configured ? 'Configured and masked. Leave blank to preserve it.' : 'Required for first save.'}/>
+      <TextField label="SMTP provider login" value={username} onChange={event => { setUsername(event.target.value); setDirty(true); }}/>
+      <TextField label="SMTP provider key" type="password" autoComplete="new-password" value={credential} onChange={event => { setCredential(event.target.value); setDirty(true); }} helperText={relay?.configured ? 'Configured and masked. Leave blank to preserve it.' : 'Required for first save.'}/>
       <TextField label="Optional Brevo API key" type="password" autoComplete="new-password" value={apiKey} onChange={event => { setApiKey(event.target.value); setDirty(true); }} helperText="Encrypted separately and kept on the server."/>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}>
         <Button disabled={dirty || !relay?.configured} onClick={async () => {
@@ -65,7 +65,7 @@ function OutgoingSettings({ authorize, notify }: Pick<Props, 'authorize' | 'noti
       </Stack>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
         <Button variant="contained" disabled={!dirty || !username || (!relay?.configured && !credential)} onClick={() => authorize(async () => {
-          await api('/settings/relay', { host: 'smtp-relay.brevo.com', port, tls_mode: port === 587 ? 'starttls' : 'tls', username,
+          await api('/settings/relay', { host: relayHost, port, tls_mode: port === 587 ? 'starttls' : 'tls', username,
             ...(credential ? { credential } : {}), ...(apiKey ? { api_key: apiKey } : {}) });
           setCredential(''); setApiKey(''); setDirty(false); await load(); notify('Relay saved. Retest this revision before enabling email codes.');
         })}>Save relay</Button>
@@ -78,8 +78,8 @@ function OutgoingSettings({ authorize, notify }: Pick<Props, 'authorize' | 'noti
           notify(result.smtp_accepted ? 'Test accepted by SMTP. Confirm the matching message below after receipt.' : 'SMTP delivery test failed.'); await load();
         })}>Send explicit delivery test</Button>
       </Stack>
-      <Alert severity="info"><Typography variant="subtitle2">Administrator email delivery</Typography><Typography variant="body2">Tests from mail@rsalehin24.me go to rsalehin24@gmail.com. Each mailbox has its own sending verification and history on its Details page. Saving provider credentials requires a new delivery test.</Typography></Alert>
-      {!!relay?.tests.filter(test => test.sender === 'mail@rsalehin24.me').length && <Typography variant="subtitle2">Administrator delivery history</Typography>}
+      <Alert severity="info"><Typography variant="subtitle2">Administrator email delivery</Typography><Typography variant="body2">Tests from mail@{domain} go to {adminEmail}. Each mailbox has its own sending verification and history on its Details page. Saving provider credentials requires a new delivery test.</Typography></Alert>
+      {!!relay?.tests.filter(test => test.sender === `mail@${domain}`).length && <Typography variant="subtitle2">Administrator delivery history</Typography>}
       {delivery.rows.map(test => <Box key={test.id} sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
         <Typography variant="body2">From {test.sender} · {formatDateTime(test.created)}</Typography>
         <Typography variant="caption" sx={{ overflowWrap: 'anywhere' }}>Test {test.id}</Typography>

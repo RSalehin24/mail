@@ -21,7 +21,7 @@ async function responsive(connection) {
 }
 
 async function recoveryControls(connection) {
-  await connection.click({ tag: 'a', name: 'RSalehin24 Mail Admin home' });
+  await connection.click({ tag: 'a', name: 'Mail home' });
   await connection.until(`document.querySelector('h1')?.textContent === 'Mailboxes'`);
   await connection.until(`document.querySelector('a[href="/mailboxes/cloud%40rsalehin24.me/details"]') !== null`);
   await connection.click({ tag: 'a', name: 'cloud@rsalehin24.me' });
@@ -47,7 +47,7 @@ async function recoveryControls(connection) {
   await connection.until(`document.querySelector('h1')?.textContent === 'Deleted Mailboxes'`);
   await connection.click({ tag: 'button', name: 'Protected Mailboxes' });
   await connection.until(`document.querySelector('input')?.closest('section')?.textContent.includes('Protected Mailboxes')`);
-  assert.equal(await connection.read(`document.querySelector('title').textContent`), 'RSalehin24 Mail');
+  assert.equal(await connection.read(`document.querySelector('title').textContent`), 'Mail');
 }
 
 async function settingsTabs(connection) {
@@ -201,7 +201,7 @@ async function mailboxFlows(connection, fixture) {
 
   await connection.read('history.forward()');
   await connection.until(`location.pathname.endsWith('/details')`);
-  await connection.click({ tag: 'a', name: 'RSalehin24 Mail Admin home' });
+  await connection.click({ tag: 'a', name: 'Mail home' });
   await connection.until(`document.querySelector('h1')?.textContent === 'Mailboxes'`);
   await connection.until(`document.body.textContent.includes('Updated mailbox')`);
   assert.equal(await connection.read(`getComputedStyle(document.querySelector('thead th:nth-child(3)')).textAlign`), 'center');
@@ -227,8 +227,8 @@ async function mailboxFlows(connection, fixture) {
 
 async function relayFlows(connection) {
   await connection.click({ tag: 'button', name: 'Outgoing mail provider' });
-  await connection.fill('Brevo SMTP login', 'synthetic-browser-login');
-  await connection.fill('Brevo SMTP key', 'synthetic-browser-key');
+  await connection.fill('SMTP provider login', 'synthetic-browser-login');
+  await connection.fill('SMTP provider key', 'synthetic-browser-key');
   await connection.click({ tag: 'button', name: 'Save relay' });
   await connection.until(`document.body.textContent.includes('Saved revision 1')`);
   assert.equal(await connection.read(`document.querySelector('input[autocomplete="new-password"]').value`), '');
@@ -241,7 +241,7 @@ async function relayFlows(connection) {
 }
 
 async function verificationFlows(connection) {
-  await connection.click({ tag: 'a', name: 'RSalehin24 Mail Admin home' });
+  await connection.click({ tag: 'a', name: 'Mail home' });
   await connection.until(`document.querySelector('h1')?.textContent === 'Mailboxes'`);
   await connection.until(`document.querySelector('input[aria-label="Select cloud@rsalehin24.me"]') !== null`);
   await connection.click({ tag: 'input', name: 'Select cloud@rsalehin24.me' });
@@ -451,6 +451,35 @@ async function incomingDeliveryControls(connection) {
   await connection.click({tag:'button',name:'Forwarding Rules'});
 }
 
+async function mailboxLoadFailure(connection) {
+  let fail = true;
+  connection.events.set('Fetch.requestPaused', async event => {
+    if (!fail) { await connection.call('Fetch.continueRequest', {requestId:event.requestId}); return; }
+    await connection.call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:503,responseHeaders:[{name:'Content-Type',value:'application/json'}],body:Buffer.from(JSON.stringify({error:'operation_pending'})).toString('base64')});
+  });
+  await connection.call('Fetch.enable',{patterns:[{urlPattern:'*/api/accounts',requestStage:'Request'}]});
+  await connection.call('Page.navigate',{url:'http://localhost:8765/'});
+  await connection.until(`document.querySelector('[role=alert]')?.textContent.includes('The mailbox list is unavailable.')`);
+  assert.equal(await connection.read(`document.querySelector('.table-toolbar .MuiChip-root')?.textContent`),'Unavailable');
+  assert.equal(await connection.read(`document.querySelector('.MuiTablePagination-root') === null`),true);
+  assert.equal(await connection.read(`document.body.textContent.includes('No mailboxes')`),false);
+  await connection.screenshot('mailbox-list-unavailable');
+  fail = false;
+  await connection.click({tag:'button',name:'Refresh accounts'});
+  await connection.until(`document.querySelectorAll('.desktop-table tbody tr').length > 0 && !document.body.textContent.includes('The mailbox list took too long to load.')`);
+  const count = await connection.read(`document.querySelector('.table-toolbar .MuiChip-root')?.textContent`);
+  fail = true;
+  await connection.click({tag:'button',name:'Refresh accounts'});
+  await connection.until(`document.querySelector('[role=alert]')?.textContent.includes('Previously loaded accounts may be out of date.')`);
+  assert.equal(await connection.read(`document.querySelector('.table-toolbar .MuiChip-root')?.textContent`),count);
+  assert.equal(await connection.read(`document.querySelectorAll('.desktop-table tbody tr').length > 0`),true);
+  fail = false;
+  await connection.click({tag:'button',name:'Refresh accounts'});
+  await connection.until(`!document.body.textContent.includes('The mailbox list took too long to load.')`);
+  await connection.call('Fetch.disable');
+  connection.events.delete('Fetch.requestPaused');
+}
+
 async function verify(connection, report) {
   const fixture = JSON.parse(await readFile(resolve('build/ui-fixture.json'), 'utf8'));
   report.source_sha256 = fixture.source_sha256;
@@ -461,7 +490,7 @@ async function verify(connection, report) {
   await connection.until(`document.querySelector('h1')?.textContent === 'Welcome back'`);
   assert.equal(await connection.read(`document.querySelector('input[type=password]').type`), 'password');
   await connection.screenshot('login');
-  await connection.fill('Master password', fixture.password);
+  await connection.fill('Password', fixture.password);
   await connection.click({ tag: 'button', name: 'Continue securely' });
   await connection.until(`document.querySelector('h1')?.textContent === 'One more step'`);
   assert.equal(await connection.read(`document.querySelector('input[type=password]') === null`), true);
@@ -498,6 +527,7 @@ async function verify(connection, report) {
   await connection.screenshot('settings');
   await connection.click({ tag: 'button', name: 'Toggle dark mode' });
   await connection.screenshot('settings-dark');
+  await mailboxLoadFailure(connection);
   await connection.click({ tag: 'button', name: 'Sign out' });
   await connection.until(`document.querySelector('h1')?.textContent === 'Welcome back'`);
   assert.equal(await connection.read(`document.querySelectorAll('[role=dialog]').length`), 0);

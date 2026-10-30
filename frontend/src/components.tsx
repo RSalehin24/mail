@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Alert, Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle,
   FormControlLabel, Stack, TextField, Typography } from '@mui/material';
-import { api, type Enrollment } from './api';
+import { adminEmail, api, type Enrollment } from './api';
 
 export function CodeInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
@@ -57,7 +57,7 @@ export function Reauthenticate({ onVerified, onCancel }: { onVerified: () => voi
     setBusy(true); setError('');
     try {
       if (!challenge) {
-        const result = await api<{ challenge: string; email_otp_available: boolean }>('/security/reauth', { email: 'rsalehin24@gmail.com', password });
+        const result = await api<{ challenge: string; email_otp_available: boolean }>('/security/reauth', { email: adminEmail, password });
         setChallenge(result.challenge); setEmailAvailable(result.email_otp_available); setPassword('');
       } else {
         await api('/security/reauth/verify', { challenge, factor, code });

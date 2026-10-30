@@ -1,7 +1,24 @@
-export const adminEmail = 'rsalehin24@gmail.com';
-export const domain = 'rsalehin24.me';
+export let adminEmail = '';
+export let domain = '';
+export let relayHost = '';
+export interface Installation { kind: 'legacy' | 'management' | 'webmail'; version: string; configured: boolean; initialized: boolean; domain: string; hostname: string; mail_hostname: string; admin_email: string; relay_host: string }
+export let installationKind: Installation['kind'] = 'legacy';
+export async function loadInstallation(): Promise<Installation> {
+  const value = await api<Installation>('/installation');
+  adminEmail = value.admin_email; domain = value.domain; relayHost = value.relay_host; installationKind = value.kind;
+  return value;
+}
 
 const errorMessages: Record<string, string> = {
+  mail_management_helper_upgrade_required: 'Upgrade the local Mail Management helper before using Webmail.',
+  disable_mailbox_access_before_pairing: 'Disable mailbox access before pairing with a different installation.',
+  management_connection_unavailable: 'Mail Management is unreachable. Check its hostname, firewall, TLS certificate and pairing status.',
+  integration_upgrade_required: 'The applications use incompatible integration versions. Upgrade the older application and check pairing again.',
+  integration_credential_revoked_or_expired: 'The pairing credential was revoked or expired. Ask the Webmail administrator to pair again.',
+  mail_management_pairing_required: 'Pair Webmail with Mail Management in administration settings.',
+  two_server_qualification_required: 'The operator must complete two-server capacity qualification before enabling mailboxes.',
+  pilot_mailbox_required: 'Select one mailbox for the initial pilot.',
+  mailbox_identity_reconciliation_required: 'Your mailbox changed. Ask your administrator to reconnect webmail.',
   email_delivery_confirmation_required: 'Confirm receipt of an administrator delivery test before enabling email codes.',
   invalid_master_password: 'Invalid master password.',
   authentication_failed: 'Authentication failed. Check your details and try again.',
@@ -32,7 +49,7 @@ export function errorMessage(code: string): string {
 }
 
 export class ApiError extends Error {
-  constructor(public code: string, public status: number, public requestId = '', message?: string) {
+  constructor(public code: string, public status: number, public requestId = '', message?: string, public revoked = false) {
     super(message ?? errorMessage(code));
   }
 }
@@ -105,9 +122,9 @@ async function request<T>(path: string, body?: unknown, method = 'POST', signal?
       if (result.error === 'recent_authentication_required') window.dispatchEvent(new Event('mail-admin-reauth-expired'));
       const code = result.error ?? 'request_failed';
       const authenticationMessage = code === 'authentication_failed'
-        ? errorMessage(path === '/login' || path === '/security/reauth' ? 'invalid_master_password' : 'invalid_verification_code')
+        ? errorMessage(path === '/login' ? 'authentication_failed' : path === '/security/reauth' ? 'invalid_master_password' : 'invalid_verification_code')
         : undefined;
-      throw new ApiError(code, response.status, result.operation_id ?? result.request_id, authenticationMessage);
+      throw new ApiError(code, response.status, result.operation_id ?? result.request_id, authenticationMessage, result.revoked === true);
     }
     return result as T;
   }

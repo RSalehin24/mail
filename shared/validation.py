@@ -4,11 +4,8 @@ import re
 import uuid
 
 from shared.errors import ServiceError
+from shared.installation import site
 
-DOMAIN = "rsalehin24.me"
-ADMIN_EMAIL = "rsalehin24@gmail.com"
-MAIL_HOST = "mail.rsalehin24.me"
-OTP_SENDER = "mail@rsalehin24.me"
 SCHEMA_VERSION = 1
 HELPER_PROTOCOL = 1
 BODY_LIMIT = 65536
@@ -19,7 +16,7 @@ RESERVED = frozenset({"postmaster", "abuse", "hostmaster", "mailer-daemon"})
 def address(value: str) -> str:
     local, separator, domain = value.lower().partition("@")
     valid = re.fullmatch(r"[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?", local)
-    if not separator or domain != DOMAIN or len(local) > 64 or not valid or ".." in local:
+    if not separator or domain != site().domain or len(local) > 64 or not valid or ".." in local:
         raise ServiceError("invalid_address")
     return f"{local}@{domain}"
 
@@ -72,3 +69,15 @@ def capability(value: str) -> bool:
     if value not in {"true", "false"}:
         raise ServiceError("invalid_capability", 503)
     return value == "true"
+
+
+def __getattr__(name: str) -> str:
+    fields = {
+        "DOMAIN": "domain",
+        "ADMIN_EMAIL": "admin_email",
+        "MAIL_HOST": "mail_hostname",
+        "OTP_SENDER": "otp_sender",
+    }
+    if name in fields:
+        return str(getattr(site(), fields[name]))
+    raise AttributeError(name)

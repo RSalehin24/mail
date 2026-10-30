@@ -15,23 +15,28 @@ class HelperRequest:
     password: str = ""
     cutoff: str = ""
     recovery: dict[str, Any] | None = None
+    expected_inbox_validity: int = 0
 
     @classmethod
     def parse(cls, payload: dict[str, Any]) -> "HelperRequest":
         operation = payload.get("operation")
         if operation == "submission_reconcile":
-            if (type(payload.get("protocol")) is not int
-                    or payload["protocol"] != HELPER_PROTOCOL
-                    or set(payload) != {"protocol", "operation", "request_id"}):
+            if (
+                type(payload.get("protocol")) is not int
+                or payload["protocol"] != HELPER_PROTOCOL
+                or set(payload) != {"protocol", "operation", "request_id"}
+            ):
                 raise ServiceError("invalid_helper_fields", 400)
             return cls(operation, request_id(payload["request_id"]), recovery={})
         if operation == "submission_sync":
             from shared.submission import relay_configuration
 
-            if (type(payload.get("protocol")) is not int
-                    or payload["protocol"] != HELPER_PROTOCOL
-                    or set(payload) != {"protocol", "operation", "request_id",
-                                        "username", "credential", "revision"}):
+            if (
+                type(payload.get("protocol")) is not int
+                or payload["protocol"] != HELPER_PROTOCOL
+                or set(payload)
+                != {"protocol", "operation", "request_id", "username", "credential", "revision"}
+            ):
                 raise ServiceError("invalid_helper_fields", 400)
             values = {key: payload[key] for key in ("username", "credential")}
             relay_configuration(values)
@@ -73,6 +78,7 @@ class HelperRequest:
             "status": set(),
             "telemetry": set(),
             "inventory": set(),
+            "mailbox_identity": {"email"},
             "outcome": set(),
             "create": {"email", "password"},
             "password": {"email", "password"},
@@ -86,9 +92,14 @@ class HelperRequest:
             or payload.get("protocol") != HELPER_PROTOCOL
         ):
             raise ServiceError("unsupported_helper_request", 400)
+        if operation == "password" and "expected_inbox_validity" in payload:
+            expected = payload["expected_inbox_validity"]
+            if type(expected) is not int or not 0 < expected <= 4294967295:
+                raise ServiceError("invalid_helper_fields", 400)
+            fields["password"] = fields["password"] | {"expected_inbox_validity"}
         if set(payload) != {"protocol", "operation", "request_id"} | fields[operation]:
             raise ServiceError("invalid_helper_fields", 400)
-        text_fields = set(payload) - {"protocol", "acknowledged"}
+        text_fields = set(payload) - {"protocol", "acknowledged", "expected_inbox_validity"}
         if any(not isinstance(payload[key], str) for key in text_fields):
             raise ServiceError("invalid_helper_fields", 400)
         identifier = request_id(payload["request_id"])
@@ -100,4 +111,11 @@ class HelperRequest:
             payload["confirmation"] != email or payload["acknowledged"] is not True
         ):
             raise ServiceError("deletion_confirmation_required", 400)
-        return cls(operation, identifier, email, password, str(payload.get("cutoff", "")))
+        return cls(
+            operation,
+            identifier,
+            email,
+            password,
+            str(payload.get("cutoff", "")),
+            expected_inbox_validity=payload.get("expected_inbox_validity", 0),
+        )

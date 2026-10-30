@@ -1,3 +1,16 @@
+# Independently deployable mail applications
+
+The new 0.2.0 candidate separates Mail Management from Webmail, with independent
+packages, setup wizards, databases, keys and backups. Read the
+[installation, pairing, migration and qualification guide](docs/independent-applications.md).
+Build with `make split-build` and package with `make split-packages`.
+
+Production mail/routing has not been changed. Webmail rollout remains disabled
+until actual qualification on two separate 1 GB Ubuntu servers and a verified pilot.
+The historical single-host capacity results below do not qualify this deployment.
+
+---
+
 # Mail Admin
 
 Implementation of [the reviewed contract](docs/mail-admin-implementation/README.md).
@@ -9,6 +22,16 @@ inputs, and explicit approval. Remote fixture testing is a separate operation.
 Mail clients use `mail.rsalehin24.me` for IMAP 993/TLS and SMTP 587/STARTTLS,
 with the full mailbox address and mailbox password for both. Enable saving sent
 messages in the server IMAP Sent folder. See [SMTP submission and Sent storage](verification/smtp-submission.md).
+
+Optional webmail and private user profiles are implemented behind a disabled
+feature flag and mailbox allowlist. See the [webmail implementation, native
+compatibility and rollout checks](verification/webmail-implementation.md) before enabling it.
+The current server failed the 10-user capacity gate; upgrade and retest before rollout.
+The [five-user follow-up](verification/webmail-five-user-acceptance.json) also failed its capacity gate.
+The [one-user follow-up](verification/webmail-one-user-acceptance.json) passed ordinary
+use with a 1 MiB outgoing attachment; the full 10 MiB workload remains unqualified.
+Running the Python webmail backend and frontend on a separate server is feasible,
+but requires integration changes and a separate capacity test.
 
 Forwarding controls are in the main navigation and mailbox Configuration pages.
 New mailbox delivery registration is automatic; confirm Cloudflare's one-time

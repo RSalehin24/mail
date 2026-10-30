@@ -19,9 +19,10 @@ def require_existing_database(path: Path) -> None:
 
 
 class Database:
-    def __init__(self, path: Path, identity: str) -> None:
+    def __init__(self, path: Path, identity: str, *, busy_timeout: float = 0.25) -> None:
         self.path = path
         self.identity = identity
+        self.busy_timeout = busy_timeout
         self._writes = threading.RLock()
         require_existing_database(path)
         with self.transaction() as connection:
@@ -37,11 +38,11 @@ class Database:
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
         connection = None
-        deadline = time.monotonic() + 0.25
+        deadline = time.monotonic() + self.busy_timeout
         # Avoid making local writers contend through SQLite's busy polling while
         # the owning Python thread needs CPU to commit. Keep the original total
         # acquisition budget, including any remaining cross-process contention.
-        acquired = self._writes.acquire(timeout=0.25)
+        acquired = self._writes.acquire(timeout=self.busy_timeout)
         if not acquired:
             raise ServiceError("storage_unavailable", 503)
         try:
@@ -75,7 +76,10 @@ class Database:
                 connection.execute("INSERT INTO admin_auth(id) VALUES(1)")
         except sqlite3.Error as error:
             raise ServiceError("provisioning_incomplete", 503) from error
-        return cls(path, identity)
+        database = cls(path, identity)
+        from backend.webmail_schema import install
+        install(database)
+        return database
 
     def snapshot(self, destination: Path) -> None:
         descriptor = os.open(destination, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)

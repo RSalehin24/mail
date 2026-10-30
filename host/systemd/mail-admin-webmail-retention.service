@@ -1,0 +1,20 @@
+[Unit]
+Description=Observe Trash entry times and remove expired mail through guarded Maddy CLI
+After=docker.service mail-admin-helper.service
+Requires=docker.service
+[Service]
+Type=oneshot
+WorkingDirectory=/usr/local/lib/mail-admin
+ExecStart=/usr/bin/python3 -m host.webmail_retention
+User=root
+UMask=0077
+MemoryMax=96M
+CPUQuota=25%
+TasksMax=64
+TimeoutStartSec=180
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/mail-admin/data /var/lib/mail-admin-certificates /run/lock
+LogNamespace=mail-admin

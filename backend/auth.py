@@ -17,7 +17,8 @@ from backend.factors import FactorAttempt, Factors
 from backend.relay_state import otp_ready
 from backend.secrets import SecretKeys
 from shared.errors import ServiceError
-from shared.validation import ADMIN_EMAIL, master_password
+from shared.installation import site
+from shared.validation import master_password
 
 OTP_GENERATION_ATTEMPTS = 8
 
@@ -65,7 +66,7 @@ class Authentication:
         master_password(credentials.password)
         with self.database.transaction() as connection:
             before = admin_state(connection)
-        if not before["initialized"] or credentials.email != ADMIN_EMAIL:
+        if not before["initialized"] or credentials.email != site().admin_email:
             raise ServiceError("authentication_failed", 401)
         self._check_password(before["password_hash"], credentials.password)
         now = self.dependencies.clock()

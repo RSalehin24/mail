@@ -26,7 +26,7 @@ export function PasswordDialog({ mode, mailbox, onClose, onChanged, notify, auth
         request_id: identifier, email: `${local}@${domain}`, password, display_name: displayName, notes,
       }) : await api<Outcome>(`/accounts/${encodeURIComponent(mailbox!.email)}/password`, { request_id: identifier, password });
       if (result.state !== 'complete') { setUncertain(true); setError(`${result.warning || 'Reconciliation required.'} Operation ${identifier}`); }
-      else { notify(mode === 'create' ? 'Mailbox created. Authorize its sender in Brevo before sending.' : 'Password changed. Existing IMAP sessions may remain active.'); onChanged(); onClose(); }
+      else { notify(mode === 'create' ? 'Mailbox created. Authorize its sender in your SMTP provider before sending.' : 'Password changed. Existing IMAP sessions may remain active.'); onChanged(); onClose(); }
     } catch (failure) { if (failure instanceof ApiError && failure.code === 'recent_authentication_required') throw failure; setError((failure as Error).message); setUncertain(true); }
     finally { setBusy(false); }
   }
@@ -46,7 +46,7 @@ export function PasswordDialog({ mode, mailbox, onClose, onChanged, notify, auth
       <Stack direction="row" spacing={1}><Button onClick={() => { setPassword(generatePassword()); setVisible(true); }} disabled={busy || uncertain}>Generate 24-character password</Button>
         <Button startIcon={<ContentCopyOutlined/>} disabled={!password} onClick={async () => { await navigator.clipboard.writeText(password); notify('Password copied'); }}>Copy</Button></Stack>
       <FormControlLabel control={<Checkbox checked={visible} onChange={event => setVisible(event.target.checked)}/>} label="Show password for this flow"/>
-      {mode === 'create' && <Typography variant="body2" color="text.secondary">After creation, add and verify this sender in Brevo’s Senders & Domains settings. Then use “Test sender” and confirm receipt. Incoming provisioning does not authorize outgoing mail.</Typography>}
+      {mode === 'create' && <Typography variant="body2" color="text.secondary">After creation, add and verify this sender in your SMTP provider’s Senders & Domains settings. Then use “Test sender” and confirm receipt. Incoming provisioning does not authorize outgoing mail.</Typography>}
       {uncertain && <Typography variant="body2">Keep operation ID {identifier}. Reconcile the recorded outcome with the operator before trying another mutation.</Typography>}
     </Stack></DialogContent>
     <DialogActions><Button onClick={onClose} disabled={busy}>Close</Button><Button variant="contained"
@@ -65,7 +65,7 @@ export function DeleteDialog({ mailbox, cutoff, ...common }: Common & { mailbox:
   return <Dialog open fullScreen={useMediaQuery('(max-width:599px)')} fullWidth maxWidth="sm" onClose={busy ? undefined : common.onClose} aria-labelledby="delete-title">
     <DialogTitle id="delete-title">Permanently delete {mailbox.email}</DialogTitle>
     <DialogContent><Stack spacing={2.5}>
-      <Alert severity="warning">Stored messages and incoming credentials will be removed. Existing IMAP sessions may remain active if deletion fails. Brevo sender access and shared outgoing keys are managed separately.</Alert>
+      <Alert severity="warning">Stored messages and incoming credentials will be removed. Existing IMAP sessions may remain active if deletion fails. your SMTP provider sender access and shared outgoing keys are managed separately.</Alert>
       {error && <Alert severity="error">{error}</Alert>}
       <Typography>Trusted recovery cutoff: <strong>{cutoff || 'No qualifying backup available'}</strong></Typography>
       <FormControlLabel control={<Checkbox checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)}/>}

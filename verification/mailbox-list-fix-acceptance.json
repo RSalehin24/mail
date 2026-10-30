@@ -1,0 +1,118 @@
+{
+  "state": "deployed_and_verified",
+  "release": {
+    "image_id": "sha256:84ed5d2de72e7a53d2caf9da0c7eb432504b60dc2e92a006a177ffa195d5793a",
+    "source_sha256": "3d12b084757205eadcd0050fd02a33a990f3664b28b16b4d26d9f657348c9c05",
+    "source_hash_scope": [
+      "helper/service.py",
+      "helper/__main__.py",
+      "frontend/src/Dashboard.tsx"
+    ],
+    "operation_timeout_seconds": 30,
+    "previous_image": "sha256:7773bb71d16ec86fb69a565cadf5e777e18b6cab2dd3e6279b357a5a15353e63",
+    "host_files": [
+      "helper/service.py",
+      "helper/__main__.py"
+    ],
+    "files": {
+      "image.tar": "f58abba61fe1a963ba7afa1b042a8a71779ddfeea08153a74f697a618ce5295e",
+      "host-source-final.tar.gz": "6a43d5b0e19c7c554382e43322b7b6c0d66b5fe91f12cbee5eebdc9837be3c91",
+      "install-ui.py": "8c234036078d669915b6eddf35693c45ae84e1acdd3b5694b63977c095f8ad3f"
+    }
+  },
+  "browser": {
+    "scope": "local synthetic UI checks; not HTTPS or release qualification",
+    "started_at_utc": "2026-10-28T14:25:27.869Z",
+    "result": "pass",
+    "source_sha256": "edea63bebcc3fb8ae2a218c76147f6db62a243402235eb01af3853ec2d8143ef",
+    "frontend_image_id": "sha256:84ed5d2de72e7a53d2caf9da0c7eb432504b60dc2e92a006a177ffa195d5793a",
+    "completed_at_utc": "2026-10-28T14:25:52.749Z"
+  },
+  "public": {
+    "assets_match": true,
+    "anonymous_api_rejected": true,
+    "imap_993_tls": true,
+    "smtp_587_starttls": true,
+    "incoming_25": true,
+    "image_id": "sha256:84ed5d2de72e7a53d2caf9da0c7eb432504b60dc2e92a006a177ffa195d5793a"
+  },
+  "live_reads": {
+    "concurrent_read_checks": [
+      [
+        {
+          "operation": "accounts",
+          "seconds": 0.013,
+          "count": 9
+        },
+        {
+          "operation": "status",
+          "seconds": 0.243,
+          "state": "available"
+        }
+      ],
+      [
+        {
+          "operation": "accounts",
+          "seconds": 9.047,
+          "count": 9
+        },
+        {
+          "operation": "status",
+          "seconds": 9.249,
+          "state": "available"
+        }
+      ],
+      [
+        {
+          "operation": "accounts",
+          "seconds": 10.258,
+          "count": 9
+        },
+        {
+          "operation": "status",
+          "seconds": 10.275,
+          "state": "available"
+        }
+      ]
+    ],
+    "timeout_seconds": 30,
+    "accounts_preserved": 9,
+    "state": "pass"
+  },
+  "tests": {
+    "existing_unit": 533,
+    "focused_helper_and_metadata": 31,
+    "api": 94,
+    "ruff": "pass",
+    "mypy": "pass",
+    "frontend_lint_build": "pass"
+  },
+  "rollback_directory": "/var/lib/mail-admin-application-releases/admin-3d12b084757205ea",
+  "offsite_snapshot": "No new snapshot claimed; existing backup timers retained.",
+  "live_state": {
+    "state": "healthy",
+    "version": "admin-3d12b0847572",
+    "image_id": "sha256:84ed5d2de72e7a53d2caf9da0c7eb432504b60dc2e92a006a177ffa195d5793a",
+    "account_pairs": 9,
+    "protected_addresses": 9,
+    "forwarding": "connected",
+    "local_delivery_mailboxes": 9,
+    "gmail_forwarding": [
+      "mail@rsalehin24.me",
+      "website@rsalehin24.me"
+    ],
+    "email_codes_enabled": false,
+    "administrator_delivery_verified": true,
+    "monitoring_verified": true,
+    "cloudflare_credentials": "root:0600",
+    "unresolved_helper_operations": 0
+  },
+  "post_deployment_logs": {
+    "mailbox_timeout_errors_since_1430_utc": 0,
+    "late_future_errors_since_1430_utc": 0
+  },
+  "recovery_artifacts": {
+    "release_artifacts_updated": true,
+    "image_id": "sha256:84ed5d2de72e7a53d2caf9da0c7eb432504b60dc2e92a006a177ffa195d5793a"
+  }
+}

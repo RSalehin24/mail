@@ -1,0 +1,388 @@
+{
+  "version": "0.2.7",
+  "source_sha256": "05ed1cf05e1a8de2802201e84f59be0e601a652bab00db9c4e1fb758c0f626ab",
+  "scope": "Docker-contained Ubuntu guest simulation only",
+  "production_release_approved": false,
+  "production_webmail_enabled": false,
+  "simulation_capacity_result": "pass",
+  "dataset": {
+    "users": 10,
+    "seed_messages": 10000,
+    "seed_message_shape": "Small searchable multipart messages with a small attachment",
+    "attachment_bytes_each": 10485760,
+    "duration_seconds": 120,
+    "explicit_search_timeouts": 0,
+    "unexpected_errors": 0,
+    "historical_experiment_messages_removed_before_comparable_run": true
+  },
+  "hosts": {
+    "management": {
+      "machine_id": "5f8cf5f21f7d42bdb55f2e2353996386",
+      "memory_total_mib": 961.484375,
+      "available_memory_min_bytes": 278966272,
+      "oom_kills_before": 6,
+      "oom_kills_after": 6,
+      "containers": {
+        "mail-management": {
+          "memory_limit_bytes": 83886080,
+          "peak_memory_bytes": 67469312,
+          "oom_killed": false,
+          "error_count": 0,
+          "image": "sha256:77b76cf63702dffbbe2862dfa3d8f4c91e3c4f10a44a2dd7a370865eda351350"
+        },
+        "mail-management-integration": {
+          "memory_limit_bytes": 83886080,
+          "peak_memory_bytes": 60260352,
+          "oom_killed": false,
+          "error_count": 0,
+          "image": "sha256:77b76cf63702dffbbe2862dfa3d8f4c91e3c4f10a44a2dd7a370865eda351350"
+        },
+        "maddy": {
+          "memory_limit_bytes": 301989888,
+          "peak_memory_bytes": 303210496,
+          "oom_killed": false,
+          "error_count": 0,
+          "image": "sha256:b7ae9770e920196df7562402228fa72a4974de0bba686e99f5fc760045cb2427"
+        }
+      },
+      "monitor_samples": 209,
+      "installation_id": "1cd02e73-0487-438a-ab88-97cf9c5f4079",
+      "maintenance_cycles": 8
+    },
+    "webmail": {
+      "machine_id": "ebefc7f782bb4c448a3931fc7ccba28e",
+      "memory_total_mib": 961.484375,
+      "available_memory_min_bytes": 429203456,
+      "oom_kills_before": 1,
+      "oom_kills_after": 1,
+      "containers": {
+        "mail-webmail": {
+          "memory_limit_bytes": 402653184,
+          "peak_memory_bytes": 268992512,
+          "oom_killed": false,
+          "error_count": 0,
+          "image": "sha256:9b393534f3e29c5b2f347e91a9f3622e405103344466e667f1b212284927b1a8"
+        }
+      },
+      "monitor_samples": 210,
+      "installation_id": "a48e9b44-fb77-441e-9b30-39a3b8390077",
+      "maintenance_cycles": 0
+    }
+  },
+  "timings": {
+    "warmup": {
+      "count": 10,
+      "p95_seconds": 0.1661386539999512,
+      "max_seconds": 0.1661386539999512
+    },
+    "administrator": {
+      "count": 200,
+      "p95_seconds": 0.34693878200050676,
+      "max_seconds": 0.38459396100006416
+    },
+    "label": {
+      "count": 10,
+      "p95_seconds": 0.5944346540018159,
+      "max_seconds": 0.5944346540018159
+    },
+    "listing": {
+      "count": 580,
+      "p95_seconds": 0.4223579659992538,
+      "max_seconds": 0.7108332630014047
+    },
+    "opening": {
+      "count": 580,
+      "p95_seconds": 0.3485025529989798,
+      "max_seconds": 0.5484606110003369
+    },
+    "download": {
+      "count": 149,
+      "p95_seconds": 1.625632895000308,
+      "max_seconds": 2.145775228000275
+    },
+    "search": {
+      "count": 197,
+      "p95_seconds": 0.7462082630008808,
+      "max_seconds": 1.0573411179975665
+    },
+    "upload": {
+      "count": 10,
+      "p95_seconds": 0.4323797450015263,
+      "max_seconds": 0.4323797450015263
+    },
+    "bulk": {
+      "count": 149,
+      "p95_seconds": 0.4470927769980335,
+      "max_seconds": 0.6610103020029783
+    },
+    "sending": {
+      "count": 10,
+      "p95_seconds": 19.417507906000537,
+      "max_seconds": 19.417507906000537
+    }
+  },
+  "submissions": {
+    "durable_complete_sends": 10,
+    "relay_delivered_messages_verified_by_operation_header": 10,
+    "attachment_bytes_each": 10485760,
+    "duplicate_resubmission_used": false
+  },
+  "checks": {
+    "unit": {
+      "result": "pass",
+      "count": 561,
+      "artifact": "build/split-final-027/unit-checks.json",
+      "source_sha256": "05ed1cf05e1a8de2802201e84f59be0e601a652bab00db9c4e1fb758c0f626ab"
+    },
+    "integration": {
+      "result": "pass",
+      "count": 126,
+      "artifact": "build/split-final-027/integration-checks.json",
+      "source_sha256": "05ed1cf05e1a8de2802201e84f59be0e601a652bab00db9c4e1fb758c0f626ab"
+    },
+    "native_webmail": {
+      "result": "pass",
+      "count": 13,
+      "artifact": "build/split-native-final/maddy-checks.json",
+      "source_sha256": "05ed1cf05e1a8de2802201e84f59be0e601a652bab00db9c4e1fb758c0f626ab"
+    }
+  },
+  "packages": {
+    "management": {
+      "path": "build/mail-apps-0.2.7/mail-management-0.2.7.tar.gz",
+      "sha256": "f9ec34865f5d6bf20627b5db9a8b25f753f00ed9c02094e7a0a643ef02bca66f"
+    },
+    "webmail": {
+      "path": "build/mail-apps-0.2.7/mail-webmail-0.2.7.tar.gz",
+      "sha256": "221c9e20cc5136b255ffc69c683632a2b53c17fdf636eafa4a01cf0f80c0000a"
+    }
+  },
+  "evidence": {
+    "security": {
+      "scope": "isolated Docker simulation lifecycle; not production qualification",
+      "cases": {
+        "mailbox_isolation": "pass",
+        "administrator_denial": "pass",
+        "password_change": "pass",
+        "session_revocation": "pass",
+        "mfa_recovery": "pass",
+        "disconnection": "pass",
+        "uidvalidity": "pass",
+        "rotation_revocation": "pass"
+      },
+      "details": {
+        "mailbox_isolation": {
+          "profile_and_label_isolation": true,
+          "private_folder_denied": true
+        },
+        "administrator_denial": {
+          "management": 404,
+          "webmail": 403
+        },
+        "password_change": {
+          "old_session_revoked": true,
+          "native_old_password_rejected": true,
+          "stable_id_and_profile_preserved": true
+        },
+        "mfa_recovery": {
+          "enrollment_revokes_sessions": true,
+          "recovery_login": true,
+          "single_use_recovery": true,
+          "password_and_recovery_required_to_disable": true
+        },
+        "disconnection": {
+          "protected_operations_fail_closed": true,
+          "independent_webmail_administration_starts": true
+        },
+        "uidvalidity": {
+          "native_generation_change_denied": true,
+          "explicit_same_owner_reconciliation_preserves_profile": true
+        },
+        "rotation_revocation": {
+          "rotation_retires_predecessor": true,
+          "revocation_blocks_existing_sessions": true,
+          "single_use_enrollment": true
+        }
+      },
+      "result": "pass"
+    },
+    "recreation": {
+      "result": "pass",
+      "mailbox": "qualify-09@split.test",
+      "old_id": "71a7a71d214c4b5a801f76c164e9fd20",
+      "new_id": "7c93b3ce8fde4a8dbee1da2380f00bf6",
+      "new_profile_is_private": true,
+      "old_session_revoked": true,
+      "matching_native_backup_required": true
+    },
+    "content": {
+      "hostile_html": "pass",
+      "partial_failure": "pass",
+      "attachment_interruption_limits": "pass",
+      "details": {
+        "scripts_and_handlers_removed": true,
+        "remote_image_blocked": true,
+        "mixed_stale_bulk_reports_each_message": true,
+        "ten_mib_limit_enforced": true,
+        "interrupted_spool_removed": true
+      }
+    },
+    "trash": {
+      "result": "pass",
+      "outbox_flushed_before_reconciliation": true,
+      "native_identity_reconciliation": true,
+      "move_restore_delete_events": true,
+      "logged_out_before_native_removal": true,
+      "exact_uid_removed": true
+    },
+    "backup_restoration": {
+      "management": {
+        "result": "pass",
+        "backup_id": "5512f4988fff461a9e7ecaf2a2e1b7d5",
+        "snapshot_id": "c66dd879c440eff7ddb2564d2d2cfd3997eaf9d5989cd18acb7036e913bcc9e8",
+        "installation_id": "1cd02e73-0487-438a-ab88-97cf9c5f4079",
+        "elapsed_seconds": 19.918,
+        "restored": {
+          "sessions_revoked": true,
+          "pairing_revoked": true,
+          "rollout_disabled": true,
+          "cleanup_disabled": true,
+          "spool_excluded": true
+        },
+        "destination": "/var/tmp/restore-management-5512f498"
+      },
+      "webmail": {
+        "result": "pass",
+        "backup_id": "9e43fd24721d4741a624ef5810716f47",
+        "snapshot_id": "d1019f55d5a98d6ce2d86614225f9516dc5fe14ebdab24cf975d169bc84304cc",
+        "installation_id": "a48e9b44-fb77-441e-9b30-39a3b8390077",
+        "elapsed_seconds": 10.304,
+        "restored": {
+          "sessions_revoked": true,
+          "pairing_revoked": true,
+          "rollout_disabled": true,
+          "cleanup_disabled": true,
+          "spool_excluded": true
+        },
+        "destination": "/var/tmp/restore-webmail-9e43fd24"
+      }
+    },
+    "adoption": {
+      "result": "pass",
+      "native_container_and_routing_preserved": true,
+      "mail_store_copied": false,
+      "mailbox_id_preserved": true,
+      "profiles_labels_and_messages_preserved": true,
+      "interrupted_sending_uncertain": true,
+      "management_mfa_preserved": true,
+      "new_webmail_admin_mfa": true,
+      "independent_pairing": true
+    },
+    "upgrades": {
+      "from_version": "0.2.6",
+      "to_version": "0.2.7",
+      "native_before": {
+        "id": "a09f17e18eaaa53edd0bfb661b2f1089fbabb862921e4c2aa11ee71e4a3e0d3f",
+        "started": "2026-10-29T17:06:44.775869903Z",
+        "image": "sha256:b7ae9770e920196df7562402228fa72a4974de0bba686e99f5fc760045cb2427"
+      },
+      "applications": {
+        "webmail": {
+          "kind": "webmail",
+          "version": "0.2.7",
+          "configured": true,
+          "initialized": true,
+          "domain": "split.test",
+          "mail_hostname": "mail.split.test",
+          "admin_email": "admin@split.test",
+          "hostname": "webmail.split.test",
+          "relay_host": "relay.split.test",
+          "delivery_domain": ""
+        },
+        "management": {
+          "kind": "management",
+          "version": "0.2.7",
+          "configured": true,
+          "initialized": true,
+          "domain": "split.test",
+          "mail_hostname": "mail.split.test",
+          "admin_email": "admin@split.test",
+          "hostname": "manage.split.test",
+          "relay_host": "relay.split.test",
+          "delivery_domain": ""
+        }
+      },
+      "native_untouched": true,
+      "result": "pass"
+    },
+    "browser": {
+      "scope": "docker-contained-kvm-simulation; not production qualification",
+      "result": "pass",
+      "cases": [
+        "management: pairing and recovery controls, administrator mailbox denial, responsive administration",
+        "webmail: pairing and recovery controls, administrator mailbox denial, responsive administration",
+        "mailbox login over verified IMAP, responsive real inbox, no browser credential storage"
+      ]
+    }
+  },
+  "prior_failed_experiments": [
+    {
+      "version": "0.2.0",
+      "artifact": "build/split-simulation/run-01/baseline-resolved/workload.json",
+      "unexpected_errors": 1646,
+      "result": "failed",
+      "note": "Prior repeated runs accumulated large MIME copies; not an approved sizing profile."
+    },
+    {
+      "version": "0.2.1",
+      "artifact": "build/split-simulation/run-01/retest-384/workload.json",
+      "unexpected_errors": 40,
+      "result": "failed",
+      "note": "Prior repeated runs accumulated large MIME copies; not an approved sizing profile."
+    },
+    {
+      "version": "0.2.2",
+      "artifact": "build/split-simulation/run-01/retest-022/workload.json",
+      "unexpected_errors": 73,
+      "result": "failed",
+      "note": "Prior repeated runs accumulated large MIME copies; not an approved sizing profile."
+    },
+    {
+      "version": "0.2.3",
+      "artifact": "build/split-simulation/run-01/retest-023/workload.json",
+      "unexpected_errors": 3,
+      "result": "failed",
+      "note": "Prior repeated runs accumulated large MIME copies; not an approved sizing profile."
+    },
+    {
+      "version": "0.2.5",
+      "artifact": "build/split-simulation/run-01/retest-final/workload.json",
+      "unexpected_errors": 1,
+      "result": "failed",
+      "note": "Prior repeated runs accumulated large MIME copies; not an approved sizing profile."
+    },
+    {
+      "version": "0.2.6",
+      "artifact": "build/split-simulation/run-01/qualification-026/workload.json",
+      "unexpected_errors": 1,
+      "result": "failed",
+      "note": "Prior repeated runs accumulated large MIME copies; not an approved sizing profile."
+    },
+    {
+      "version": "0.2.7",
+      "artifact": "build/split-simulation/run-01/qualification-027/workload.json",
+      "unexpected_errors": 1,
+      "result": "failed",
+      "note": "Prior repeated runs accumulated large MIME copies; not an approved sizing profile."
+    }
+  ],
+  "limitations": [
+    "The two measured guests share one workstation and use Docker/QEMU/KVM; these are not physical-host production results.",
+    "Outer Docker wrappers have 1280 MiB limits for virtualization overhead; each guest has 1024 MiB RAM, one vCPU and no swap.",
+    "The baseline result is limited to its documented message-size distribution. A larger accumulated MIME history hit the serial compose queue deadline; that workload remains unqualified.",
+    "Lifecycle rehearsals used candidates 0.2.3 through 0.2.6; the final source passes the listed unit, integration and native tests. No matching production lifecycle attestation is installed.",
+    "Backups pause application containers and Maddy on Management, interrupting service and mailbox sessions. Restore stages a new directory and reconciliation metadata; activation is a reviewed operator step.",
+    "Public DNS, provider PTR, cloud firewall changes, remote backup replication, production cutover and pilot rollout were not performed."
+  ],
+  "final_fixture_state": "Both Docker pairs and their private providers stopped; synthetic mailbox rollout disabled; disks retained."
+}

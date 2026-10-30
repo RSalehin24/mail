@@ -16,7 +16,7 @@ select = ["E", "F", "I", "B", "UP", "S"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
-files = ["backend", "helper", "host", "shared"]
+files = ["applications", "deployment", "backend", "helper", "host", "shared"]
 
 [[tool.mypy.overrides]]
 module = ["pyotp.*", "qrcode.*"]

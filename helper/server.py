@@ -57,6 +57,7 @@ class HelperServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
 
     def __init__(self, path: Path, dependencies: tuple[HostHelper, SocketPolicy]) -> None:
         self.helper, self.policy = dependencies
+        self.request_queue_size = max(4, self.policy.concurrency)
         self.capacity = threading.BoundedSemaphore(self.policy.concurrency)
         metadata = path.parent.lstat()
         if (

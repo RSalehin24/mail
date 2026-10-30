@@ -10,7 +10,7 @@ wheels:
 build: fixture-space wheels
 	docker build --platform linux/amd64 --target runtime -t mail-admin:candidate .
 lint:
-	$(PYTHON) -m ruff check backend helper host shared tests tools
+	$(PYTHON) -m ruff check applications deployment backend helper host shared tests tools
 	cd frontend && npm run lint
 typecheck:
 	$(PYTHON) -m mypy
@@ -39,3 +39,10 @@ reads:
 check: lint typecheck reads unit integration
 plan:
 	PYTHONDONTWRITEBYTECODE=1 python3 docs/mail-admin-implementation/tools/verify_plan.py --run-tests --check-examples
+
+.PHONY: split-build split-packages
+split-build: fixture-space wheels
+	docker build --platform linux/amd64 --target management-runtime -t mail-management:0.2.7 .
+	docker build --platform linux/amd64 --target webmail-runtime -t mail-webmail:0.2.7 .
+split-packages: split-build restic
+	$(PYTHON) tools/package_apps.py --management-image mail-management:0.2.7 --webmail-image mail-webmail:0.2.7 --output build/mail-apps-0.2.7

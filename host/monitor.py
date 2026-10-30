@@ -10,7 +10,7 @@ from host.certificates import served_certificate
 from host.rollout import timestamp
 from shared.errors import ServiceError
 from shared.files import atomic_json, protected_json
-from shared.validation import MAIL_HOST
+from shared.installation import site
 
 
 def expiry_condition(record: dict[str, Any], now: float) -> str:
@@ -31,7 +31,9 @@ def expiry_condition(record: dict[str, Any], now: float) -> str:
 
 class Monitor:
     def __init__(
-        self, alerts: Alerts, dependencies: tuple[dict[str, Any], Callable[[], float]],
+        self,
+        alerts: Alerts,
+        dependencies: tuple[dict[str, Any], Callable[[], float]],
         reports: Path | None = None,
     ) -> None:
         self.reports = reports
@@ -87,21 +89,22 @@ class Monitor:
         consumers: dict[str, Any] = {}
         for port in (993, 443):
             try:
-                certificate = served_certificate((MAIL_HOST, port))
+                certificate = served_certificate((site().mail_hostname, port))
                 condition = expiry_condition(certificate, self.clock())
                 consumers["maddy" if port == 993 else "mail-admin"] = {
-                    "state": "tls_verified", "served_expiry": certificate["expiry"],
+                    "state": "tls_verified",
+                    "served_expiry": certificate["expiry"],
                     "served_sha256": certificate.get("served_sha256"),
                 }
             except (OSError, ValueError, KeyError, TypeError, ServiceError):
                 condition = "unreachable_or_untrusted"
                 consumers["maddy" if port == 993 else "mail-admin"] = {
-                    "state": "unknown", "reason": condition,
+                    "state": "unknown",
+                    "reason": condition,
                 }
             self.alerts.observe(f"external_tls_{port}", condition)
         self._report("served-certificates.json", {"consumers": consumers})
         self.alerts.flush()
-
 
     def _report(self, name: str, record: dict[str, Any]) -> None:
         if self.reports is not None:

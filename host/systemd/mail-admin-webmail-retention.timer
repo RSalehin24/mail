@@ -1,0 +1,9 @@
+[Unit]
+Description=Check mailbox Trash hourly, including while users are logged out
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+AccuracySec=1min
+Persistent=true
+[Install]
+WantedBy=timers.target

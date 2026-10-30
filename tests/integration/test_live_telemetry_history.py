@@ -15,7 +15,8 @@ class LiveTelemetryAndHistoryTests(ApiTestCase):
         with patch.object(self.fixture.services, 'dns', side_effect=RuntimeError('slow DNS')), \
                 patch.object(self.fixture.host.maddy, 'inventories') as inventory:
             response = await self.client.get('/api/session')
-            self.assertEqual(response.json(), {'authenticated': True})
+            self.assertEqual(response.json(), {'authenticated': True, 'role': 'administrator',
+                         'user': {'id': 'admin', 'email': 'rsalehin24@gmail.com'}})
             inventory.assert_not_called()
 
     async def test_slow_diagnostics_leave_inventory_telemetry_and_logout_responsive(self):

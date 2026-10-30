@@ -367,3 +367,15 @@ A booted full-server recovery of the latest production snapshot and a subsequent
 production reboot have not been recorded here. Successful encrypted snapshot
 integrity verification, isolated fixture recovery and live mail-data restore
 preflight must not be described as a successful full-server boot recovery.
+
+## Mailbox list timeout correction — 2026-10-28
+
+The live mailbox page reported `operation_pending` and displayed zero after an inventory read failed. Both Maddy databases still contained all nine account pairs. The previous five-second API/helper deadline was shorter than the combined Docker identity checks, Maddy version check, and two inventory commands (measured individually at 0.265, 2.741, 4.766, and 2.494 seconds during diagnosis). Simultaneous diagnostic and account requests also repeated the serialized CLI checks.
+
+Deployed `admin-3d12b0847572`, runtime `sha256:84ed5d2de72e7a53d2caf9da0c7eb432504b60dc2e92a006a177ffa195d5793a`, with matching 30-second web/helper operator settings. Adjacent status and account reads share a validated observation for at most two seconds under the existing mailbox lock; its original observation time is preserved. Mutations invalidate the read observation and always run fresh validation. Read requests can wait for the shared in-progress check instead of immediately failing on the shorter mutation-lock wait. No mailbox data, credentials, passwords, protections, or administrator authentication were reset.
+
+The page now distinguishes unavailable inventory from a confirmed empty inventory, keeps previously loaded rows on refresh failure, explains automatic retry for timed-out reads, and labels the footer timestamp as server status. A new browser case checks first-load failure, successful refresh, refresh failure with rows retained, and subsequent recovery.
+
+Verification: 533 existing unit tests, 31 focused helper/metadata tests including four new concurrency/cache/mutation checks, 94 API tests, Ruff, targeted mypy, frontend lint/build, and full synthetic browser flows. Three concurrent live account/status rounds returned nine intact pairs with both reads succeeding: accounts 0.013/9.047/10.258 seconds, status 0.243/9.249/10.275 seconds. Public asset hashes match the tested image, anonymous API reads/writes remain denied, and public SMTP 25, STARTTLS 587, and IMAPS 993 checks pass. Rollback records and the previous container are retained under `/var/lib/mail-admin-application-releases/admin-3d12b084757205ea` and `mail-admin-before-mailbox-list-fix`. Acceptance is recorded in `verification/mailbox-list-fix-acceptance.json`. A new offsite snapshot or boot recovery is not claimed for this correction.
+
+The matched image archive, host helper bundle, and application-release recovery artifacts were refreshed after this correction. The artifact update waited for the backup-control service to finish under the existing maintenance locks; recurring backup timers were resumed.

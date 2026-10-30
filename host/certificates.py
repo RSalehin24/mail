@@ -18,7 +18,7 @@ from typing import Any, Protocol
 from helper.process import Command, execute
 from shared.errors import ServiceError
 from shared.files import atomic_json, protected_json, sync_directory
-from shared.validation import MAIL_HOST
+from shared.installation import site
 
 
 @dataclass(frozen=True)
@@ -50,7 +50,15 @@ class PairValidator:
         self._openssl(
             ("verify",)
             + trust
-            + ("-purpose", "sslserver", "-verify_hostname", MAIL_HOST, "-untrusted", chain, chain)
+            + (
+                "-purpose",
+                "sslserver",
+                "-verify_hostname",
+                site().mail_hostname,
+                "-untrusted",
+                chain,
+                chain,
+            )
         )
         expiry = self._openssl(("x509", "-in", chain, "-enddate", "-noout")).strip()
         timestamp = datetime.strptime(expiry, "notAfter=%b %d %H:%M:%S %Y GMT").replace(tzinfo=UTC)
@@ -200,12 +208,10 @@ class Generations:
         sync_directory(self.paths.directory)
 
 
-def served_certificate(
-    endpoint: tuple[str, int], trust: Path | None = None
-) -> dict[str, Any]:
+def served_certificate(endpoint: tuple[str, int], trust: Path | None = None) -> dict[str, Any]:
     context = ssl.create_default_context(cafile=str(trust) if trust else None)
     with socket.create_connection(endpoint, timeout=5) as connection:
-        with context.wrap_socket(connection, server_hostname=MAIL_HOST) as secured:
+        with context.wrap_socket(connection, server_hostname=site().mail_hostname) as secured:
             certificate = secured.getpeercert(binary_form=True)
             if certificate is None:
                 raise ServiceError("served_certificate_missing", 503)

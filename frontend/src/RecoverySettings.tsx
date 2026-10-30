@@ -2,7 +2,7 @@ import { AdminTable } from './AdminTable';
 import { usePagination } from './PaginationControls';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, MenuItem, Paper, Stack, Switch, TextField, Typography, Checkbox } from '@mui/material';
-import { api, type Authorize, type Notify } from './api';
+import { domain, api, type Authorize, type Notify } from './api';
 
 export type Retention = '7_days' | '30_days' | 'forever' | 'none';
 export const retentionLabels: Record<Retention, string> = { '7_days': 'Retain for 7 days', '30_days': 'Retain for 30 days', forever: 'Keep forever', none: 'Don’t Retain' };
@@ -52,7 +52,7 @@ export function RecoverySettings({ authorize, notify, section = 'deletion' }: { 
   function saveProtection() {
     if (!policy) return;
     const address = email.trim().toLowerCase();
-    if (!/^[a-z0-9][a-z0-9._-]*@rsalehin24\.me$/.test(address)) { setError('Enter a mailbox address at rsalehin24.me.'); return; }
+    if (address.split('@')[1] !== domain || !/^[a-z0-9][a-z0-9._-]*@/.test(address)) { setError(`Enter a mailbox address at ${domain}.`); return; }
     if (!editing && address in policy.protected) { setError('This mailbox is already protected. Use Edit reason to change it.'); return; }
     savePolicy({ ...policy, protected: { ...policy.protected, [address]: reason.trim() } }, editing ? 'Protection reason saved.' : 'Mailbox protection added.', resetForm);
   }

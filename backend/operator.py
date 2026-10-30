@@ -72,6 +72,7 @@ def main() -> None:
             "encrypt",
             "decrypt",
             "extract",
+            "webmail-migrate",
         ),
     )
     parser.add_argument("--uid", type=int)
@@ -101,7 +102,10 @@ def main() -> None:
 
 
 def _authentication_action(action: str, application: Services) -> None:
-    if action == "bootstrap":
+    if action == 'webmail-migrate':
+        from backend.webmail_schema import install
+        install(application.authentication.database)
+    elif action == "bootstrap":
         _private_terminal()
         print(Enrollment(application.authentication).issue_bootstrap())
     elif action == "recover":

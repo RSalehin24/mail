@@ -1,0 +1,181 @@
+{
+  "recorded_at_UTC": "2026-10-28T18:59:18.153497+00:00",
+  "decision": "KEEP WEBMAIL DISABLED FOR FIVE USERS; tested configurations failed",
+  "scope": "Five active sessions, ten synthetic mailboxes, 10010 seed UIDs, same application source as previous ten-user tests. Isolated services coexist with unchanged production; HTTP transport uses an SSH tunnel. Each run warms sessions then measures 120 seconds.",
+  "workload": "Lists, opens, cross-folder body searches, labels, downloads, four 1 MiB attachment sends and one 10 MiB attachment send, synthetic administrator inventory and concurrent Trash observation. No outgoing Internet mail.",
+  "phases": [
+    {
+      "application_memory_MiB": 128,
+      "Maddy_memory_MiB": 96,
+      "Maddy_CPU_limit": 0.5,
+      "users": 5,
+      "duration_seconds": 120,
+      "total_seed_messages": 10010,
+      "active_mailbox_seed_messages": 5005,
+      "timings": {
+        "warmup": {
+          "count": 5,
+          "p95_seconds": 0.5173595059968648,
+          "max_seconds": 0.5173595059968648
+        },
+        "label": {
+          "count": 5,
+          "p95_seconds": 0.3090498360033962,
+          "max_seconds": 0.3090498360033962
+        },
+        "administrator": {
+          "count": 10,
+          "p95_seconds": 1.0968768980019377,
+          "max_seconds": 1.0968768980019377
+        },
+        "listing": {
+          "count": 12,
+          "p95_seconds": 1.2219514980024542,
+          "max_seconds": 1.2219514980024542
+        },
+        "opening": {
+          "count": 12,
+          "p95_seconds": 1.2008890740034985,
+          "max_seconds": 1.2008890740034985
+        },
+        "download": {
+          "count": 5,
+          "p95_seconds": 0.8754406910011312,
+          "max_seconds": 0.8754406910011312
+        },
+        "search": {
+          "count": 5,
+          "p95_seconds": 0.9730720139996265,
+          "max_seconds": 0.9730720139996265
+        },
+        "bulk": {
+          "count": 5,
+          "p95_seconds": 1.607900859999063,
+          "max_seconds": 1.607900859999063
+        },
+        "upload": {
+          "count": 5,
+          "p95_seconds": 3.1326748589999625,
+          "max_seconds": 3.1326748589999625
+        },
+        "sending": {
+          "count": 4,
+          "p95_seconds": 1.56234009200125,
+          "max_seconds": 1.56234009200125
+        }
+      },
+      "request_or_state_errors": 660,
+      "application_OOM_killed": true,
+      "Maddy_OOM_killed": false,
+      "minimum_available_host_memory_MiB": 249.434,
+      "fixture_stopped_for_memory_reserve": false,
+      "qualified": false,
+      "raw_report": "build/webmail-five-load.json"
+    },
+    {
+      "application_memory_MiB": 256,
+      "Maddy_memory_MiB": 128,
+      "Maddy_CPU_limit": 1,
+      "users": 5,
+      "duration_seconds": 120,
+      "total_seed_messages": 10010,
+      "active_mailbox_seed_messages": 5005,
+      "timings": {
+        "warmup": {
+          "count": 5,
+          "p95_seconds": 0.49557300499873236,
+          "max_seconds": 0.49557300499873236
+        },
+        "label": {
+          "count": 5,
+          "p95_seconds": 0.29611663100513397,
+          "max_seconds": 0.29611663100513397
+        },
+        "administrator": {
+          "count": 88,
+          "p95_seconds": 3.090011696003785,
+          "max_seconds": 3.9973634780035354
+        },
+        "listing": {
+          "count": 86,
+          "p95_seconds": 5.921109842005535,
+          "max_seconds": 7.5529048219977994
+        },
+        "opening": {
+          "count": 34,
+          "p95_seconds": 4.950591677996272,
+          "max_seconds": 5.242556730001525
+        },
+        "download": {
+          "count": 6,
+          "p95_seconds": 5.593616956000915,
+          "max_seconds": 5.593616956000915
+        },
+        "search": {
+          "count": 30,
+          "p95_seconds": 12.352440219998243,
+          "max_seconds": 13.310569526998734
+        },
+        "upload": {
+          "count": 5,
+          "p95_seconds": 5.504005793998658,
+          "max_seconds": 5.504005793998658
+        },
+        "bulk": {
+          "count": 11,
+          "p95_seconds": 3.7470336170008522,
+          "max_seconds": 3.7470336170008522
+        },
+        "sending": {
+          "count": 18,
+          "p95_seconds": 14.987880284999846,
+          "max_seconds": 14.987880284999846
+        }
+      },
+      "request_or_state_errors": 91,
+      "application_OOM_killed": false,
+      "Maddy_OOM_killed": true,
+      "minimum_available_host_memory_MiB": 113.508,
+      "fixture_stopped_for_memory_reserve": true,
+      "qualified": false,
+      "raw_report": "build/webmail-five-tuned-load.json"
+    }
+  ],
+  "interpretation": "Reducing active users did not remove the memory failures. A larger application budget shifted the bottleneck to Maddy and the host reserve. This does not establish an exact standalone replacement-server minimum. Keep the previously proposed 2 GiB host as a next qualification target; it has not been tested here.",
+  "limitations": [
+    "Only five mailboxes are active (5005 seed messages); ten mailboxes contain 10010 seed UIDs overall",
+    "Message templates are expanded by IMAP COPY, with distinct UIDs",
+    "Administrator inventory is synthetic and maintenance observes Trash; due native deletion is tested separately",
+    "First-run latency samples precede early application failure; second-run samples include failures, timeouts and a memory safety stop",
+    "HTTP timings include SSH transport"
+  ],
+  "source_matches_previous_10_user_measurement": true,
+  "production_feature_flag_changed": false,
+  "raw_evidence_prefix": "build/webmail-five-",
+  "cleanup": {
+    "removed_synthetic_containers": 6,
+    "private_fixture_directory_removed": true,
+    "temporary_local_credentials_removed": true,
+    "maintenance_cycles_per_observer": 48,
+    "production_after": {
+      "production": {
+        "mail-admin": {
+          "id_image_started_at_unchanged": true,
+          "running": true,
+          "OOM_killed": false
+        },
+        "maddy": {
+          "id_image_started_at_unchanged": true,
+          "running": true,
+          "OOM_killed": false
+        }
+      },
+      "HTTPS": {
+        "/api/status": 200,
+        "/api/session": 401
+      },
+      "remaining_fixture_containers": [],
+      "private_directory_removed": true
+    }
+  }
+}

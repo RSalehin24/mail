@@ -33,8 +33,8 @@ def main() -> None:
         ws="none",
         # ASGI admission bounds active requests. Allow bounded idle browser sockets
         # separately: Uvicorn counts keep-alive connections against this limit.
-        limit_concurrency=2 * settings.http_concurrency,
-        backlog=2 * settings.http_concurrency,
+        limit_concurrency=2 * settings.http_concurrency + (24 if settings.webmail_enabled else 0),
+        backlog=2 * settings.http_concurrency + (24 if settings.webmail_enabled else 0),
         timeout_keep_alive=5,
     )
 

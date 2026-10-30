@@ -23,14 +23,14 @@ const chrome = spawn(executable, [
 async function login(connection) {
   await connection.until(`document.querySelector('h1')?.textContent === 'Welcome back'`);
   assert.equal(await connection.read(`document.querySelector('input[type=password]').type`), 'password');
-  await connection.fill('Master password', material.password);
+  await connection.fill('Password', material.password);
   await connection.click({ tag: 'button', name: 'Continue securely' });
   await connection.until(`document.querySelector('h1')?.textContent === 'One more step'`);
   await connection.click({ tag: 'button', name: 'Use a recovery code' });
   await connection.fill('Recovery code', codes.pop());
   await connection.click({ tag: 'button', name: 'Verify and sign in' });
   await connection.until(`[...document.querySelectorAll('button')].some(button => button.getAttribute('aria-label') === 'Sign out')`);
-  await connection.click({ tag: 'a', name: 'RSalehin24 Mail Admin home' });
+  await connection.click({ tag: 'a', name: 'Mail home' });
   await connection.until(`document.querySelector('h1')?.textContent === 'Mailboxes'`);
   await connection.until(`document.querySelector('.mailbox-surface') !== null && !document.body.textContent.includes('Loading mailboxes…')`);
 }
@@ -110,7 +110,7 @@ async function relay(connection) {
   assert.equal(await connection.read(`document.body.textContent.includes('server IMAP Sent folder')`), true);
   assert.equal(await connection.read(`document.body.textContent.includes('STARTTLS') && document.body.textContent.includes('587')`), true);
   report.assertions.client_credentials_private_and_sent_guidance = true;
-  await connection.click({ tag: 'a', name: 'RSalehin24 Mail Admin home' });
+  await connection.click({ tag: 'a', name: 'Mail home' });
   await connection.until(`document.querySelector('h1')?.textContent === 'Mailboxes'`);
   assert.equal(await connection.read(`document.body.textContent.includes(${JSON.stringify(material.relay_key)})`), false);
   report.assertions.password_fields_masked = true;
@@ -130,7 +130,7 @@ async function mailboxDetails(connection) {
   await connection.until(`document.querySelector('[role=dialog]') === null && document.body.textContent.includes('Operations team')`);
   await connection.call('Page.reload', { ignoreCache: true });
   await connection.until(`document.querySelector('h1')?.textContent === 'https-browser@rsalehin24.me' && document.body.textContent.includes('Operations team')`);
-  await connection.click({ tag: 'a', name: 'RSalehin24 Mail Admin home' });
+  await connection.click({ tag: 'a', name: 'Mail home' });
   await connection.until(`document.querySelector('h1')?.textContent === 'Mailboxes'`);
   assert.equal(await connection.read(`document.body.textContent.includes('Host telemetry observed') || document.body.textContent.includes('configured unverified')`), false);
   report.assertions.mailbox_name_edit_persists = true;
@@ -140,7 +140,7 @@ async function mailboxDetails(connection) {
   assert.ok(headers.some(cell => cell.text === 'Actions'));
   report.assertions.centered_table_headers = true;
   await connection.click({ tag: 'button', name: 'Settings' });
-  await connection.click({ tag: 'a', name: 'RSalehin24 Mail Admin home' });
+  await connection.click({ tag: 'a', name: 'Mail home' });
   await connection.until(`document.querySelector('h1')?.textContent === 'Mailboxes'`);
   report.assertions.brand_link_returns_home = true;
   for (const width of [360, 768, 1280]) {

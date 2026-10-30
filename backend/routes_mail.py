@@ -1,5 +1,6 @@
 """Mailbox routes enforce the capability gate before invoking their helper adapter."""
 
+import json
 import uuid
 from typing import Any
 
@@ -7,9 +8,21 @@ from fastapi import APIRouter, Depends, Request
 
 from backend.authorization import authenticated, recent, services
 from backend.requests import CreateMailbox, DeleteMailbox, MailboxMetadata, ResetMailbox
+from backend.services import Services
 from shared.errors import ServiceError
 
 router = APIRouter(prefix="/api", dependencies=[Depends(authenticated)])
+
+
+def deletion_enabled(application: Services) -> bool:
+    if application.settings.application_kind == "management":
+        with application.authentication.database.transaction() as connection:
+            return bool(
+                json.loads(
+                    connection.execute("SELECT settings FROM application_state").fetchone()[0]
+                ).get("permanent_deletion_enabled")
+            )
+    return application.settings.permanent_deletion_enabled
 
 
 @router.get("/accounts")
@@ -38,7 +51,7 @@ async def reset(email: str, body: ResetMailbox, request: Request) -> dict[str, A
     return await application.io.run(lambda: application.mailboxes.reset(email, body.model_dump()))
 
 
-@router.patch('/accounts/{email}/metadata', dependencies=[Depends(recent)])
+@router.patch("/accounts/{email}/metadata", dependencies=[Depends(recent)])
 async def metadata(email: str, body: MailboxMetadata, request: Request) -> dict[str, str]:
     application = services(request)
     return await application.io.run(
@@ -49,7 +62,8 @@ async def metadata(email: str, body: MailboxMetadata, request: Request) -> dict[
 @router.delete("/accounts/{email}", dependencies=[Depends(recent)])
 async def delete(email: str, body: DeleteMailbox, request: Request) -> dict[str, Any]:
     application = services(request)
-    if not application.settings.permanent_deletion_enabled:
+    enabled = await application.io.run(lambda: deletion_enabled(application))
+    if not enabled:
         raise ServiceError("permanent_deletion_disabled", 403)
     request.state.operation_id = body.request_id
     return await application.io.run(lambda: application.mailboxes.delete(email, body.model_dump()))
@@ -58,6 +72,7 @@ async def delete(email: str, body: DeleteMailbox, request: Request) -> dict[str,
 @router.get("/diagnostics")
 async def diagnostics(request: Request) -> dict[str, Any]:
     application = services(request)
+
     def observe() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
         return (_read_host(request, "status"), application.dns(), application.relay.masked())
 
@@ -73,7 +88,7 @@ async def diagnostics(request: Request) -> dict[str, Any]:
             else "not_configured"
         },
         "capabilities": {
-            "permanent_deletion": application.settings.permanent_deletion_enabled,
+            "permanent_deletion": await application.io.run(lambda: deletion_enabled(application)),
             "email_otp": await application.io.run(application.authentication.email_available),
         },
     }

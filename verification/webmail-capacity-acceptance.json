@@ -1,0 +1,196 @@
+{
+  "recorded_at_UTC": "2026-10-28T18:32:22.698879+00:00",
+  "decision": "KEEP WEBMAIL DISABLED; upgrade and repeat complete capacity qualification",
+  "scope": "Isolated synthetic application and Maddy alongside unchanged production services; HTTP through an SSH tunnel. Warmed sessions, 120 seconds per workload. Not a standalone upgraded-host benchmark.",
+  "host": {
+    "reported_machine_class": "e2-micro",
+    "physical_memory_MiB": 952,
+    "swap_MiB": 0
+  },
+  "image": {
+    "tag": "mail-admin:webmail-review",
+    "id": "sha256:145849a6c7612aa8f4245e708d0fddc098155b9b2e9f1d6bc424372ecd76695c",
+    "architecture": "amd64",
+    "os": "linux",
+    "runtime_sources_match_measurement": true,
+    "browser_assets_match_image": true
+  },
+  "verification": {
+    "unit_tests": 547,
+    "API_tests": 103,
+    "native_Maddy_tests": 12,
+    "native_maximum_attachment_functional_test": "10 MiB with isolated Maddy raised to 192 MiB and 512 MiB test controller; does not qualify production limits",
+    "webmail_browser_groups": 5,
+    "administrator_browser": "pass",
+    "ruff": "pass",
+    "mypy_source_files": 125,
+    "frontend_lint_build_read_checks": "pass"
+  },
+  "phases": [
+    {
+      "application_memory_MiB": 128,
+      "maddy_memory_MiB": 96,
+      "maddy_CPU_limit": 0.5,
+      "duration_seconds": 120,
+      "measured_elapsed_seconds": 122.26578312300262,
+      "users": 10,
+      "seed_messages": 10010,
+      "seed_method": "100 distinct templates per mailbox, expanded by IMAP COPY; one additional HTML/attachment message; all message UIDs distinct",
+      "timings": {
+        "warmup": {
+          "count": 10,
+          "p95_seconds": 5.728424512002675,
+          "max_seconds": 5.728424512002675
+        },
+        "label": {
+          "count": 10,
+          "p95_seconds": 1.4691130209976109,
+          "max_seconds": 1.4691130209976109
+        },
+        "administrator": {
+          "count": 12,
+          "p95_seconds": 4.60232328499842,
+          "max_seconds": 4.60232328499842
+        },
+        "listing": {
+          "count": 15,
+          "p95_seconds": 6.550531294000393,
+          "max_seconds": 6.550531294000393
+        },
+        "opening": {
+          "count": 5,
+          "p95_seconds": 3.005892141001823,
+          "max_seconds": 3.005892141001823
+        },
+        "search": {
+          "count": 10,
+          "p95_seconds": 10.496207547002996,
+          "max_seconds": 10.496207547002996
+        },
+        "upload": {
+          "count": 6,
+          "p95_seconds": 6.897120668996649,
+          "max_seconds": 6.897120668996649
+        },
+        "bulk": {
+          "count": 4,
+          "p95_seconds": 7.582364788999257,
+          "max_seconds": 7.582364788999257
+        },
+        "sending": {
+          "count": 2,
+          "p95_seconds": 2.2430867020011647,
+          "max_seconds": 2.2430867020011647
+        }
+      },
+      "request_and_state_errors": 1143,
+      "application_OOM_killed": true,
+      "maddy_OOM_killed": false,
+      "minimum_available_host_memory_MiB": 188.172,
+      "fixture_stopped_for_memory_reserve": false,
+      "application_pass": false,
+      "raw_report": "build/webmail-capacity-final128.json"
+    },
+    {
+      "application_memory_MiB": 256,
+      "maddy_memory_MiB": 96,
+      "maddy_CPU_limit": 1,
+      "duration_seconds": 120,
+      "measured_elapsed_seconds": 121.47256056000333,
+      "users": 10,
+      "seed_messages": 10010,
+      "seed_method": "100 distinct templates per mailbox, expanded by IMAP COPY; one additional HTML/attachment message; all message UIDs distinct",
+      "timings": {
+        "warmup": {
+          "count": 10,
+          "p95_seconds": 3.6772874989983393,
+          "max_seconds": 3.6772874989983393
+        },
+        "label": {
+          "count": 10,
+          "p95_seconds": 1.6567346140000154,
+          "max_seconds": 1.6567346140000154
+        },
+        "administrator": {
+          "count": 91,
+          "p95_seconds": 1.7636780100001488,
+          "max_seconds": 3.745311863000097
+        },
+        "listing": {
+          "count": 105,
+          "p95_seconds": 5.806500294995203,
+          "max_seconds": 10.693580238999857
+        },
+        "opening": {
+          "count": 41,
+          "p95_seconds": 4.399765463000222,
+          "max_seconds": 8.494761223999376
+        },
+        "download": {
+          "count": 4,
+          "p95_seconds": 2.5984654999992927,
+          "max_seconds": 2.5984654999992927
+        },
+        "search": {
+          "count": 37,
+          "p95_seconds": 10.232384260001709,
+          "max_seconds": 10.46905488199991
+        },
+        "upload": {
+          "count": 10,
+          "p95_seconds": 6.739807833000668,
+          "max_seconds": 6.739807833000668
+        },
+        "bulk": {
+          "count": 12,
+          "p95_seconds": 5.004388293004013,
+          "max_seconds": 5.004388293004013
+        },
+        "sending": {
+          "count": 61,
+          "p95_seconds": 11.494784818998596,
+          "max_seconds": 13.258767823994276
+        }
+      },
+      "request_and_state_errors": 235,
+      "application_OOM_killed": false,
+      "maddy_OOM_killed": true,
+      "minimum_available_host_memory_MiB": 92.859,
+      "fixture_stopped_for_memory_reserve": true,
+      "application_pass": false,
+      "raw_report": "build/webmail-capacity-budget256.json"
+    }
+  ],
+  "upgrade_requirement": {
+    "measured_failures": [
+      "Application 128 MiB budget OOM-killed",
+      "Maddy 96 MiB budget OOM-killed",
+      "Available host memory fell below the required 128 MiB reserve",
+      "p95 listing/opening exceeded 3 seconds and errors occurred"
+    ],
+    "next_qualification_target": "At least 2 GiB host RAM with a sustained CPU allocation; start by evaluating 256 MiB application and 192 MiB Maddy budgets. CPU sizing and actual minimum RAM require a new full load test. This is a proposed test target, not a proven sufficient minimum."
+  },
+  "limitations": [
+    "100 distinct message templates per user expanded with IMAP COPY; all 10010 seed UIDs distinct",
+    "Administrator inventory uses a synthetic helper; actual production mutations were excluded",
+    "Maintenance observer ran 48 cycles in each final fixture; due native deletion was tested separately",
+    "Latency samples include failed and timed-out responses; transport timing includes the SSH connection",
+    "Enlarged-budget run was interrupted by memory reserve protection and native Maddy failure"
+  ],
+  "cleanup": {
+    "remote_fixture_containers_removed": 8,
+    "remote_fixture_directory_removed": true,
+    "local_UI_fixture_removed": true,
+    "production_container_id_image_and_start_time_unchanged": true,
+    "HTTPS_status": {
+      "/api/status": {
+        "status": 200,
+        "body": "{\"status\":\"ok\"}"
+      },
+      "/api/session": {
+        "status": 401
+      }
+    },
+    "remaining_remote_fixture_containers": []
+  }
+}

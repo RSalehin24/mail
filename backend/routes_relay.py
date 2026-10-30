@@ -8,13 +8,14 @@ from pydantic import Field
 from backend.authorization import authenticated, peer, recent, services
 from backend.requests import RequestModel
 from shared.errors import ServiceError
-from shared.validation import MAIL_HOST, OTP_SENDER, address
+from shared.installation import site
+from shared.validation import address
 
 router = APIRouter(prefix="/api", dependencies=[Depends(authenticated)])
 
 
 class RelaySettingsRequest(RequestModel):
-    host: Literal["smtp-relay.brevo.com"]
+    host: str = Field(max_length=253)
     port: Literal[587, 465]
     tls_mode: Literal["starttls", "tls"]
     username: str = Field(max_length=256)
@@ -35,6 +36,10 @@ async def masked(request: Request) -> dict[str, Any]:
 @router.post("/settings/relay", dependencies=[Depends(recent)])
 async def save(body: RelaySettingsRequest, request: Request) -> dict[str, Any]:
     application = services(request)
+    if application.settings.application_kind == "management" and (
+        body.port != 587 or body.tls_mode != "starttls"
+    ):
+        raise ServiceError("submission_requires_starttls_587", 400)
     return await application.io.run(lambda: application.relay.save(body.model_dump()))
 
 
@@ -48,7 +53,7 @@ async def quota(request: Request) -> dict[str, Any]:
 async def test(body: RelayTestRequest, request: Request) -> dict[str, Any]:
     application = services(request)
     return await application.io.run(
-        lambda: application.relay.test(OTP_SENDER, (body.mode, peer(request)))
+        lambda: application.relay.test(site().otp_sender, (body.mode, peer(request)))
     )
 
 
@@ -64,7 +69,7 @@ async def reveal(request: Request) -> dict[str, str]:
     credential = await application.io.run(application.relay.reveal)
     return {
         "credential": credential,
-        "scope": "Shared Brevo key; may authorize other sender identities.",
+        "scope": "Shared upstream relay key; may authorize other sender identities.",
     }
 
 
@@ -83,14 +88,14 @@ async def client_configuration(email: str, request: Request) -> dict[str, Any]:
     normalized = await application.io.run(lambda: application.mailboxes.existing(email))
     return {
         "incoming": {
-            "host": MAIL_HOST,
+            "host": site().mail_hostname,
             "port": 993,
             "security": "TLS",
             "username": normalized,
             "password": "Use your known account password or reset it; hashes cannot be recovered.",
         },
         "outgoing": {
-            "host": MAIL_HOST,
+            "host": site().mail_hostname,
             "port": 587,
             "security": "STARTTLS",
             "username": normalized,

@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from shared.errors import ServiceError
-from shared.validation import MAIL_HOST, capability
+from shared.installation import site
+from shared.validation import capability
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,10 @@ class Settings:
     operation_timeout: float
     email_otp_enabled: bool = False
     permanent_deletion_enabled: bool = False
+    webmail_enabled: bool = False
+    webmail_allowed_mailboxes: tuple[str, ...] = ()
+
+    application_kind: str = "legacy"
 
     @classmethod
     def from_environment(cls) -> "Settings":
@@ -30,7 +35,7 @@ class Settings:
         if min(values) <= 0 or timeout <= 0 or not math.isfinite(timeout):
             raise ServiceError("invalid_resource_configuration", 503)
         return cls(
-            f"https://{MAIL_HOST}",
+            f"https://{site().mail_hostname}",
             Path("/app/static"),
             values[0],
             values[1],
@@ -38,4 +43,13 @@ class Settings:
             timeout,
             capability(os.environ.get("EMAIL_OTP_ENABLED", "false")),
             capability(os.environ.get("PERMANENT_DELETION_ENABLED", "false")),
+            capability(os.environ.get("WEBMAIL_ENABLED", "false")),
+            cls._webmail_allowlist(),
         )
+
+    @staticmethod
+    def _webmail_allowlist() -> tuple[str, ...]:
+        from shared.validation import address
+
+        values = os.environ.get("WEBMAIL_ALLOWED_MAILBOXES", "")
+        return tuple(address(value.strip()) for value in values.split(",") if value.strip())

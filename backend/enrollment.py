@@ -13,11 +13,12 @@ from backend.auth import Authentication
 from backend.auth_state import admin_state, audit, invalidate_authentication, replace_recovery_codes
 from backend.factors import matching_step
 from shared.errors import ServiceError
-from shared.validation import ADMIN_EMAIL, master_password
+from shared.installation import site
+from shared.validation import master_password
 
 
 def qr_material(secret: str) -> dict[str, str]:
-    uri = pyotp.TOTP(secret).provisioning_uri(ADMIN_EMAIL, issuer_name="Mail Admin")
+    uri = pyotp.TOTP(secret).provisioning_uri(site().admin_email, issuer_name="Mail Admin")
     image = qrcode.make(uri, image_factory=qrcode.image.svg.SvgPathImage)
     encoded = base64.b64encode(image.to_string()).decode()
     return {"secret": secret, "uri": uri, "qr": "data:image/svg+xml;base64," + encoded}

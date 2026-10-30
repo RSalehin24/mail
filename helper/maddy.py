@@ -1,7 +1,10 @@
 """Fixed Docker/Maddy argv and host-side identity/mount/database preflight."""
 
+import hashlib
 import json
 import re
+import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -16,8 +19,9 @@ LAUNCHER = "/usr/local/libexec/mail-admin-maddy"
 def cli_reported_error(response: CommandResult) -> bool:
     # The pinned 0.9.5 CLI can log app.Run failure and still exit zero.
     # Password prompts need not end with a newline before that diagnostic.
-    return (re.search(r"(?<!\S)app\.Run failed(?=\s|$)", response.output) is not None
-            or response.output.startswith('Failed to initialize update pipe, '))
+    return re.search(
+        r"(?<!\S)app\.Run failed(?=\s|$)", response.output
+    ) is not None or response.output.startswith("Failed to initialize update pipe, ")
 
 
 def cli_succeeded(response: CommandResult) -> bool:
@@ -34,6 +38,7 @@ class MaddyAccess(Protocol):
     def validate(self) -> None: ...
     def inventories(self) -> dict[str, list[str]]: ...
     def change(self, arguments: tuple[str, ...], password: str = "") -> CommandResult: ...
+    def require_mailbox_identity(self, email: str, validity: int) -> None: ...
 
 
 class DockerMaddy:
@@ -47,6 +52,60 @@ class DockerMaddy:
         if result.code:
             raise ServiceError("maddy_unavailable", 503)
         return result
+
+    def require_mailbox_identity(self, email: str, validity: int) -> None:
+        store = Path(self.deployment["maddy_data_directory"]) / "imapsql.db"
+        if store.is_symlink() or not store.is_file():
+            raise ServiceError("mailbox_identity_unavailable", 503)
+        try:
+            with closing(
+                sqlite3.connect(store.as_uri() + "?mode=ro", uri=True, timeout=0.25)
+            ) as db:
+                row = db.execute(
+                    "SELECT b.uidvalidity FROM users u JOIN mboxes b "
+                    "ON b.id=u.inboxId AND b.uid=u.id WHERE u.username=?",
+                    (address(email),),
+                ).fetchone()
+                if row is None or row[0] != validity:
+                    raise ServiceError("mailbox_changed_refresh", 409)
+        except sqlite3.Error as error:
+            raise ServiceError("mailbox_identity_unavailable", 503) from error
+
+    def identity(self, email: str) -> dict[str, Any]:
+        store = Path(self.deployment["maddy_data_directory"]) / "imapsql.db"
+        if store.is_symlink() or not store.is_file():
+            raise ServiceError("mailbox_identity_unavailable", 503)
+        try:
+            with closing(
+                sqlite3.connect(store.as_uri() + "?mode=ro", uri=True, timeout=0.25)
+            ) as connection:
+                row = connection.execute(
+                    "SELECT u.id,b.uidvalidity FROM users u JOIN mboxes b "
+                    "ON b.id=u.inboxId AND b.uid=u.id WHERE u.username=?",
+                    (address(email),),
+                ).fetchone()
+                if row is None:
+                    raise ServiceError("account_not_found", 404)
+                credentials = store.with_name("credentials.db")
+                if credentials.is_symlink() or not credentials.is_file():
+                    raise ServiceError("mailbox_identity_unavailable", 503)
+                with closing(
+                    sqlite3.connect(credentials.as_uri() + "?mode=ro", uri=True, timeout=0.25)
+                ) as authentication:
+                    credential = authentication.execute(
+                        "SELECT * FROM passwords WHERE key=?",
+                        (address(email),),
+                    ).fetchone()
+                if credential is None:
+                    raise ServiceError("account_not_found", 404)
+                digest = hashlib.sha256(repr(tuple(credential)).encode()).hexdigest()
+                return {
+                    "native_id": row[0],
+                    "inbox_validity": row[1],
+                    "credential_fingerprint": digest,
+                }
+        except sqlite3.Error as error:
+            raise ServiceError("mailbox_identity_unavailable", 503) from error
 
     def validate(self) -> None:
         container = json.loads(self._docker(("inspect", "maddy")).output)[0]
@@ -73,14 +132,14 @@ class DockerMaddy:
         self.validate_cli_version()
 
     def expected_cli_version(self) -> str:
-        version = self.deployment.get('maddy_cli_version', '0.9.5')
-        if version not in ('0.9.5', '0.9.6'):
-            raise ServiceError('maddy_version_unsupported', 503)
+        version = self.deployment.get("maddy_cli_version", "0.9.5")
+        if version not in ("0.9.5", "0.9.6"):
+            raise ServiceError("maddy_version_unsupported", 503)
         return str(version)
 
     def validate_cli_version(self) -> None:
         result = self.change(("version",))
-        pattern = r'(?<![0-9.])' + re.escape(self.expected_cli_version()) + r'(?=$|\s)'
+        pattern = r"(?<![0-9.])" + re.escape(self.expected_cli_version()) + r"(?=$|\s)"
         if not cli_succeeded(result) or not re.search(pattern, result.output):
             raise ServiceError("maddy_version_mismatch", 503)
 

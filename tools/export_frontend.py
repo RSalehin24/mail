@@ -1,5 +1,6 @@
 """Export built UI assets from the exact local runtime image for browser checks."""
 
+import argparse
 import hashlib
 import json
 import shutil
@@ -15,11 +16,14 @@ def docker(arguments: tuple[str, ...]) -> str:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--image", default="mail-admin:candidate")
+    args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     target = root / "frontend/dist"
     if target.is_symlink():
         raise RuntimeError("Refusing symlink asset output")
-    image = json.loads(docker(("image", "inspect", "mail-admin:candidate")))[0]
+    image = json.loads(docker(("image", "inspect", args.image)))[0]
     identifier = docker(
         ("create", "--platform", "linux/amd64", "--label", "mail-admin.fixture=true", image["Id"])
     )

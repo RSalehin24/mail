@@ -1,9 +1,9 @@
 import { Forwarding } from './Forwarding';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Box, Breadcrumbs, Button, Chip, Paper, Stack, Tab, Tabs, Typography } from '@mui/material';
-import { api, cached, type Authorize, type Mailbox, type Notify } from './api';
+import { api, cached, installationKind, type Authorize, type Mailbox, type Notify } from './api';
 import { MailboxDetails } from './MailboxDetails';
-import { ClientConfig, PasswordDialog } from './MailboxDialogs';
+import { ClientConfig, PasswordDialog, DeleteDialog } from './MailboxDialogs';
 import { SenderVerification } from './SenderVerification';
 import { RecoveryAction } from './RecoveryActions';
 import { SendingHistory } from './SendingHistory';
@@ -14,6 +14,7 @@ export function MailboxPage({ encodedEmail, tab, authorize, notify }: {
 }) {
   const [mailbox, setMailbox] = useState<Mailbox | null>(() => cached<Mailbox>(`/accounts/${encodedEmail}`) ?? null);
   const [error, setError] = useState('');
+  const [cutoff, setCutoff] = useState('');
   const [dialog, setDialog] = useState('');
   const load = useCallback(async () => {
     try {
@@ -21,7 +22,7 @@ export function MailboxPage({ encodedEmail, tab, authorize, notify }: {
       setMailbox(account); setError('');
     } catch (failure) { setError((failure as Error).message); }
   }, [encodedEmail]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); if (installationKind === 'management') void api<{ backup: { id?: string } }>('/installation/settings').then(value => setCutoff(value.backup.id || '')).catch(() => {}); }, [load]);
   const common = { authorize, notify, onChanged: () => { void load(); }, onClose: () => setDialog('') };
   return <Stack spacing={3}>
     <Breadcrumbs aria-label="Breadcrumb"><Button href="/" onClick={event => { event.preventDefault(); navigate('/'); }}>Mailboxes</Button><Typography>{mailbox?.email ?? 'Mailbox'}</Typography></Breadcrumbs>
@@ -55,13 +56,14 @@ export function MailboxPage({ encodedEmail, tab, authorize, notify }: {
         {tab === 'configuration' && <Stack spacing={3}>
           <MailboxDetails key={mailbox.updated ?? mailbox.display_name + mailbox.notes} mailbox={mailbox} {...common} embedded/>
           <Button variant="outlined" sx={{ alignSelf: 'start' }} onClick={() => setDialog('password')}>Change incoming password</Button>
-          <Forwarding mailbox={mailbox.email} authorize={authorize} notify={notify}/>
+          {installationKind === 'legacy' && <Forwarding mailbox={mailbox.email} authorize={authorize} notify={notify}/>}
           <Box component="section" sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 3 }}><Typography variant="h6" sx={{ mb: 2 }}>Delete Mailbox</Typography><Button color="error" variant="outlined" sx={{ alignSelf: 'start' }} onClick={() => setDialog('delete')}>Delete mailbox</Button></Box>
         </Stack>}
         {tab === 'connections' && <ClientConfig mailbox={mailbox} {...common} embedded/>}
       </Paper>
       {dialog === 'password' && <PasswordDialog mailbox={mailbox} mode="reset" {...common}/>}
-      {dialog === 'delete' && <RecoveryAction email={mailbox.email} mode="delete" {...common} onChanged={() => navigate('/')}/>}
+      {dialog === 'delete' && installationKind === 'management' && <DeleteDialog mailbox={mailbox} cutoff={cutoff} {...common} onChanged={() => navigate('/')}/>}
+      {dialog === 'delete' && installationKind !== 'management' && <RecoveryAction email={mailbox.email} mode="delete" {...common} onChanged={() => navigate('/')}/>}
       {dialog === 'verify' && <SenderVerification emails={[mailbox.email]} mailboxes={[mailbox]} {...common} onChanged={load}/>}
     </>}
   </Stack>;

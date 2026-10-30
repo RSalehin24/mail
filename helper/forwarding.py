@@ -10,6 +10,7 @@ from typing import Any
 
 from shared.errors import ServiceError
 from shared.files import protected_json
+from shared.installation import site
 from shared.validation import address, request_id
 
 
@@ -23,7 +24,7 @@ def destination(value: str) -> str:
         )
     ):
         raise ServiceError("invalid_forwarding_destination", 400)
-    if value.rsplit("@", 1)[1].lower() == "rsalehin24.me":
+    if value.rsplit("@", 1)[1].lower() == site().domain:
         raise ServiceError("forwarding_requires_external_destination", 400)
     return value
 
@@ -138,27 +139,43 @@ class ForwardingControl:
                 ).fetchone()[0]
                 rules.append(item)
             path = self.root / "cloudflare-forwarding.json"
-            cloudflare: dict[str, Any] = (protected_json(path, self.root.stat().st_uid)
-                                         if path.exists() else {
-                "configured": False, "state": "not_connected", "observed_at": None,
-                "reason": "cloudflare_credentials_required"})
+            cloudflare: dict[str, Any] = (
+                protected_json(path, self.root.stat().st_uid)
+                if path.exists()
+                else {
+                    "configured": False,
+                    "state": "not_connected",
+                    "observed_at": None,
+                    "reason": "cloudflare_credentials_required",
+                }
+            )
             revision = db.execute("SELECT revision FROM metadata WHERE id=1").fetchone()[0]
             if cloudflare.get("configured") and cloudflare.get("revision") != revision:
                 cloudflare = {**cloudflare, "state": "pending"}
-            elif cloudflare.get("state") == "connected" and time.time() - float(
-                cloudflare.get("observed_at") or 0) > 300:
+            elif (
+                cloudflare.get("state") == "connected"
+                and time.time() - float(cloudflare.get("observed_at") or 0) > 300
+            ):
                 cloudflare = {**cloudflare, "state": "stale"}
             for item in rules:
                 state = cloudflare.get("mailboxes", {}).get(item["email"], {})
                 item["local_delivery_verified"] = bool(state.get("local_delivery_verified"))
                 item["destination_verified"] = item["destination"] in cloudflare.get(
-                    "verified_destinations", [])
-                row = db.execute("SELECT state FROM verifications WHERE destination=?",
-                                 (item["destination"],)).fetchone()
-                item["verification_state"] = ("verified" if item["destination_verified"] else
-                                              row[0] if row else "not_requested")
+                    "verified_destinations", []
+                )
+                row = db.execute(
+                    "SELECT state FROM verifications WHERE destination=?", (item["destination"],)
+                ).fetchone()
+                item["verification_state"] = (
+                    "verified"
+                    if item["destination_verified"]
+                    else row[0]
+                    if row
+                    else "not_requested"
+                )
                 item["synchronized"] = cloudflare.get("revision") == revision and item[
-                    "email"] in cloudflare.get("connected_mailboxes", [])
+                    "email"
+                ] in cloudflare.get("connected_mailboxes", [])
             return {
                 "connection": cloudflare,
                 "revision": db.execute("SELECT revision FROM metadata WHERE id=1").fetchone()[0],
@@ -239,16 +256,23 @@ class ForwardingControl:
                 )
             elif operation == "forwarding_verify_local":
                 self.inbox(email)
-                recipient = email.split("@", 1)[0] + "@delivery.rsalehin24.me"
-                db.execute("INSERT INTO verifications VALUES(?,'queued') ON CONFLICT(destination) "
-                           "DO UPDATE SET state='queued'", (recipient,))
+                recipient = email.split("@", 1)[0] + "@" + site().delivery_domain
+                db.execute(
+                    "INSERT INTO verifications VALUES(?,'queued') ON CONFLICT(destination) "
+                    "DO UPDATE SET state='queued'",
+                    (recipient,),
+                )
             elif operation == "forwarding_verify":
                 rule = db.execute(
-                    "SELECT destination FROM rules WHERE email=?", (email,)).fetchone()
+                    "SELECT destination FROM rules WHERE email=?", (email,)
+                ).fetchone()
                 if rule is None:
                     raise ServiceError("forwarding_rule_missing", 404)
-                db.execute("INSERT INTO verifications VALUES(?,'queued') ON CONFLICT(destination) "
-                           "DO UPDATE SET state='queued'", (rule["destination"],))
+                db.execute(
+                    "INSERT INTO verifications VALUES(?,'queued') ON CONFLICT(destination) "
+                    "DO UPDATE SET state='queued'",
+                    (rule["destination"],),
+                )
             elif operation == "forwarding_retry":
                 rule = db.execute(
                     "SELECT * FROM rules WHERE email=? AND enabled=1", (email,)

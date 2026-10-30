@@ -43,6 +43,8 @@ class OfflineRecovery:
             return codes
 
     def _invalidate_state(self, connection: sqlite3.Connection) -> list[str]:
+        from backend.webmail_schema import invalidate_restored
+        invalidate_restored(connection)
         invalidate_authentication(connection)
         codes = replace_recovery_codes(connection, self.auth.keys)
         connection.execute("UPDATE relay_settings SET readiness_test=NULL")

@@ -1,0 +1,446 @@
+{
+  "recorded_at_UTC": "2026-10-29T11:33:33.594403+00:00",
+  "decision": "One user passed the tested ordinary 1 MiB workload. Full 10 MiB support remains unqualified on the tested shared-host configurations. Keep production webmail disabled.",
+  "host": {
+    "installed_RAM": "1 GB class",
+    "Linux_usable_RAM_MiB": 952,
+    "swap": "none"
+  },
+  "scope": "One active synthetic mailbox, ten seeded synthetic mailboxes, 10010 distinct seed UIDs overall and 1001 in the active mailbox. Independent application, pinned Maddy and root Trash observer coexist with existing production. HTTP transport includes an SSH tunnel.",
+  "workload": "Folder listings, message opens, cross-folder body searches, labels, uploads/downloads, a self-addressed local SMTP submission, synthetic administrator inventory and concurrent Trash observation. Ordinary outgoing attachment is 1 MiB; maximum cases use 10 MiB. No outgoing Internet mail.",
+  "seed_method": "100 distinct header/body templates per mailbox expanded through native IMAP COPY, plus one HTML/attachment message; distinct UIDs, not 10010 distinct bodies",
+  "phases": [
+    {
+      "case": "ordinary",
+      "conclusion": "PASS for the tested ordinary workload; not full-release qualification",
+      "users": 1,
+      "application_memory_limit_MiB": 128,
+      "Maddy_memory_limit_MiB": 96,
+      "Maddy_CPU_limit": 0.5,
+      "largest_outgoing_attachment_MiB": 1,
+      "planned_measured_duration_seconds": 120,
+      "elapsed_seconds": 121.69959039099922,
+      "timings": {
+        "warmup": {
+          "count": 1,
+          "p95_seconds": 4.658618855995883,
+          "max_seconds": 4.658618855995883
+        },
+        "label": {
+          "count": 1,
+          "p95_seconds": 0.5263446099997964,
+          "max_seconds": 0.5263446099997964
+        },
+        "administrator": {
+          "count": 123,
+          "p95_seconds": 0.8356576910009608,
+          "max_seconds": 2.9591407350017107
+        },
+        "listing": {
+          "count": 27,
+          "p95_seconds": 1.532882460996916,
+          "max_seconds": 2.5807939959995565
+        },
+        "opening": {
+          "count": 27,
+          "p95_seconds": 1.1577882589990622,
+          "max_seconds": 1.2347180559954722
+        },
+        "download": {
+          "count": 2,
+          "p95_seconds": 3.8556862460027332,
+          "max_seconds": 3.8556862460027332
+        },
+        "search": {
+          "count": 9,
+          "p95_seconds": 7.0029677849961445,
+          "max_seconds": 7.0029677849961445
+        },
+        "upload": {
+          "count": 1,
+          "p95_seconds": 3.4530521540000336,
+          "max_seconds": 3.4530521540000336
+        },
+        "sending": {
+          "count": 1,
+          "p95_seconds": 8.802618508998421,
+          "max_seconds": 8.802618508998421
+        },
+        "bulk": {
+          "count": 7,
+          "p95_seconds": 0.7574284779984737,
+          "max_seconds": 0.7574284779984737
+        }
+      },
+      "request_or_state_errors": 0,
+      "pending_submissions_observed": 0,
+      "application_workload_pass": true,
+      "application_OOM_killed": false,
+      "Maddy_OOM_killed": false,
+      "minimum_sampled_available_host_memory_MiB": 276.12109375,
+      "memory_samples": 113,
+      "memory_sampling_span_seconds": 113.11083388328552,
+      "host_oom_kill_counter_delta_in_sampling_interval": 0,
+      "application_peak_memory_MiB": 77.4375,
+      "Maddy_peak_memory_MiB": 44.00390625,
+      "fixture_stopped_for_memory_reserve": false,
+      "cumulative_send_states": {
+        "complete": 1
+      },
+      "cumulative_active_mailbox_folder_counts": {
+        "Archive": 0,
+        "Drafts": 0,
+        "INBOX": 1002,
+        "Junk": 0,
+        "Sent": 1,
+        "Trash": 1
+      },
+      "raw_evidence_prefix": "build/webmail-one-ordinary",
+      "full_release_qualified": false,
+      "sampling_note": "113 seconds of memory samples do not cover the entire 121.7-second measured interval. Runtime OOM flags and sampled OOM counters were zero. The sampled host minimum is not a whole-run guarantee."
+    },
+    {
+      "case": "maximum",
+      "conclusion": "FAIL: application OOM during large-message preparation",
+      "users": 1,
+      "application_memory_limit_MiB": 128,
+      "Maddy_memory_limit_MiB": 96,
+      "Maddy_CPU_limit": 0.5,
+      "largest_outgoing_attachment_MiB": 10,
+      "planned_measured_duration_seconds": 30,
+      "elapsed_seconds": 35.43420727699413,
+      "timings": {
+        "warmup": {
+          "count": 1,
+          "p95_seconds": 4.8129278359992895,
+          "max_seconds": 4.8129278359992895
+        },
+        "label": {
+          "count": 1,
+          "p95_seconds": 0.28642748900165316,
+          "max_seconds": 0.28642748900165316
+        },
+        "administrator": {
+          "count": 23,
+          "p95_seconds": 2.5224678660015343,
+          "max_seconds": 2.602933996997308
+        },
+        "listing": {
+          "count": 1,
+          "p95_seconds": 0.8856350900023244,
+          "max_seconds": 0.8856350900023244
+        },
+        "opening": {
+          "count": 1,
+          "p95_seconds": 0.2860422569938237,
+          "max_seconds": 0.2860422569938237
+        },
+        "download": {
+          "count": 1,
+          "p95_seconds": 11.227493612997932,
+          "max_seconds": 11.227493612997932
+        },
+        "search": {
+          "count": 1,
+          "p95_seconds": 3.4971769350013346,
+          "max_seconds": 3.4971769350013346
+        },
+        "upload": {
+          "count": 1,
+          "p95_seconds": 6.496777148997353,
+          "max_seconds": 6.496777148997353
+        }
+      },
+      "request_or_state_errors": 4,
+      "pending_submissions_observed": 0,
+      "application_workload_pass": false,
+      "application_OOM_killed": true,
+      "Maddy_OOM_killed": false,
+      "minimum_sampled_available_host_memory_MiB": 229.9609375,
+      "memory_samples": 159,
+      "memory_sampling_span_seconds": 159.01462030410767,
+      "host_oom_kill_counter_delta_in_sampling_interval": 1,
+      "application_peak_memory_MiB": 128.0,
+      "Maddy_peak_memory_MiB": 44.1875,
+      "fixture_stopped_for_memory_reserve": false,
+      "cumulative_send_states": {
+        "complete": 1,
+        "preparing": 1
+      },
+      "cumulative_active_mailbox_folder_counts": {
+        "Archive": 0,
+        "Drafts": 0,
+        "INBOX": 1002,
+        "Junk": 0,
+        "Sent": 1,
+        "Trash": 1
+      },
+      "raw_evidence_prefix": "build/webmail-one-maximum",
+      "full_release_qualified": false
+    },
+    {
+      "case": "tuned",
+      "conclusion": "FAIL: Maddy OOM; the larger application budget avoided application OOM",
+      "users": 1,
+      "application_memory_limit_MiB": 192,
+      "Maddy_memory_limit_MiB": 128,
+      "Maddy_CPU_limit": 1,
+      "largest_outgoing_attachment_MiB": 10,
+      "planned_measured_duration_seconds": 120,
+      "elapsed_seconds": 120.99548897199566,
+      "timings": {
+        "warmup": {
+          "count": 1,
+          "p95_seconds": 3.7741809069993906,
+          "max_seconds": 3.7741809069993906
+        },
+        "label": {
+          "count": 1,
+          "p95_seconds": 0.7355041460032226,
+          "max_seconds": 0.7355041460032226
+        },
+        "administrator": {
+          "count": 112,
+          "p95_seconds": 1.5493870569989667,
+          "max_seconds": 3.696686374001729
+        },
+        "listing": {
+          "count": 42,
+          "p95_seconds": 0.8589613260046463,
+          "max_seconds": 2.3215180129991495
+        },
+        "opening": {
+          "count": 4,
+          "p95_seconds": 1.8996528260031482,
+          "max_seconds": 1.8996528260031482
+        },
+        "download": {
+          "count": 1,
+          "p95_seconds": 12.226281067996752,
+          "max_seconds": 12.226281067996752
+        },
+        "search": {
+          "count": 14,
+          "p95_seconds": 7.679962741000054,
+          "max_seconds": 7.679962741000054
+        },
+        "upload": {
+          "count": 1,
+          "p95_seconds": 6.7118553960026475,
+          "max_seconds": 6.7118553960026475
+        },
+        "sending": {
+          "count": 3,
+          "p95_seconds": 12.31807179700263,
+          "max_seconds": 12.31807179700263
+        },
+        "bulk": {
+          "count": 1,
+          "p95_seconds": 0.6859724020032445,
+          "max_seconds": 0.6859724020032445
+        }
+      },
+      "request_or_state_errors": 53,
+      "pending_submissions_observed": 0,
+      "application_workload_pass": false,
+      "application_OOM_killed": false,
+      "Maddy_OOM_killed": true,
+      "minimum_sampled_available_host_memory_MiB": 157.46484375,
+      "memory_samples": 240,
+      "memory_sampling_span_seconds": 242.18861556053162,
+      "host_oom_kill_counter_delta_in_sampling_interval": 1,
+      "application_peak_memory_MiB": 169.546875,
+      "Maddy_peak_memory_MiB": 128.0,
+      "fixture_stopped_for_memory_reserve": false,
+      "cumulative_send_states": {
+        "complete": 2,
+        "preparation_uncertain": 1
+      },
+      "cumulative_active_mailbox_folder_counts": {
+        "Archive": 0,
+        "Drafts": 0,
+        "INBOX": 1003,
+        "Junk": 0,
+        "Sent": 2,
+        "Trash": 2
+      },
+      "raw_evidence_prefix": "build/webmail-one-tuned",
+      "full_release_qualified": false
+    },
+    {
+      "case": "memory-tuned",
+      "conclusion": "FAIL: host reserve below 128 MiB, timeouts and listing latency failure; guard stopped only the synthetic application",
+      "users": 1,
+      "application_memory_limit_MiB": 192,
+      "Maddy_memory_limit_MiB": 192,
+      "Maddy_CPU_limit": 1,
+      "largest_outgoing_attachment_MiB": 10,
+      "planned_measured_duration_seconds": 120,
+      "elapsed_seconds": 120.61892575899401,
+      "timings": {
+        "warmup": {
+          "count": 1,
+          "p95_seconds": 5.017575167999894,
+          "max_seconds": 5.017575167999894
+        },
+        "label": {
+          "count": 1,
+          "p95_seconds": 0.47452720400178805,
+          "max_seconds": 0.47452720400178805
+        },
+        "administrator": {
+          "count": 81,
+          "p95_seconds": 2.644794005995209,
+          "max_seconds": 4.3103847329985
+        },
+        "listing": {
+          "count": 7,
+          "p95_seconds": 11.268181724000897,
+          "max_seconds": 11.268181724000897
+        },
+        "opening": {
+          "count": 4,
+          "p95_seconds": 1.3300281350020668,
+          "max_seconds": 1.3300281350020668
+        },
+        "download": {
+          "count": 1,
+          "p95_seconds": 9.410814451999613,
+          "max_seconds": 9.410814451999613
+        },
+        "search": {
+          "count": 2,
+          "p95_seconds": 9.498299940001743,
+          "max_seconds": 9.498299940001743
+        },
+        "upload": {
+          "count": 1,
+          "p95_seconds": 8.191337785006908,
+          "max_seconds": 8.191337785006908
+        },
+        "sending": {
+          "count": 1,
+          "p95_seconds": 15.087528459996975,
+          "max_seconds": 15.087528459996975
+        },
+        "bulk": {
+          "count": 1,
+          "p95_seconds": 1.726024140996742,
+          "max_seconds": 1.726024140996742
+        },
+        "sending_status": {
+          "count": 3,
+          "p95_seconds": 1.728872446998139,
+          "max_seconds": 1.728872446998139
+        }
+      },
+      "request_or_state_errors": 38,
+      "pending_submissions_observed": 1,
+      "application_workload_pass": false,
+      "application_OOM_killed": false,
+      "Maddy_OOM_killed": false,
+      "minimum_sampled_available_host_memory_MiB": 119.91796875,
+      "memory_samples": 61,
+      "memory_sampling_span_seconds": 61.01943826675415,
+      "host_oom_kill_counter_delta_in_sampling_interval": 0,
+      "application_peak_memory_MiB": 160.83984375,
+      "Maddy_peak_memory_MiB": 112.87890625,
+      "fixture_stopped_for_memory_reserve": true,
+      "cumulative_send_states": {
+        "complete": 3,
+        "preparation_uncertain": 1
+      },
+      "cumulative_active_mailbox_folder_counts": {
+        "Archive": 0,
+        "Drafts": 0,
+        "INBOX": 1004,
+        "Junk": 0,
+        "Sent": 3,
+        "Trash": 3
+      },
+      "raw_evidence_prefix": "build/webmail-one-memory-tuned",
+      "full_release_qualified": false,
+      "Maddy_environment": {
+        "GOGC": "50",
+        "GOMEMLIMIT": "96MiB"
+      },
+      "sampling_note": "Sampler ended at the reserve guard; load client continued to its planned duration, so later connection errors follow the intentional fixture stop."
+    }
+  ],
+  "limitations": [
+    "Two minutes is a limited workload check, not proof of continuous long-term operation or complete release acceptance.",
+    "These test services coexist with production; they do not establish the exact resource minimum of a replacement or split deployment.",
+    "Memory sampling includes some idle setup/capture time in maximum and tuned cases; ordinary sampling is shorter than the full measured workload.",
+    "The maximum case planned only 30 seconds; OOM occurred before a sustained maximum-attachment check could qualify.",
+    "Latency samples for failed runs include timeouts, connection failures and, in the last case, a deliberate guard stop.",
+    "The load client was corrected before memory-tuned to observe operation_pending and poll the same durable sending record. Earlier maximum/tuned errors include expected pending responses. OOM and reserve failures independently establish failure.",
+    "Administrator inventory uses synthetic data. Concurrent maintenance observes Trash; due native removal was verified separately in the native test suite.",
+    "Warmup is reported separately from listing/opening p95."
+  ],
+  "source_evidence": {
+    "matches_previous_source": true,
+    "checked_files": 125,
+    "changed": []
+  },
+  "production_feature_flag_changed_by_this_task": false,
+  "production_mutating_commands_issued_by_this_task": false,
+  "cleanup": {
+    "recorded_at_UTC": "2026-10-29T11:31:40.283575+00:00",
+    "removed_synthetic_containers": [
+      "webmail-one-ff1428ecbe2f-ordinary-app",
+      "webmail-one-ff1428ecbe2f-maximum-app",
+      "webmail-one-ff1428ecbe2f-tuned-app",
+      "webmail-one-ff1428ecbe2f-memory-tuned-app",
+      "webmail-one-ff1428ecbe2f-observer",
+      "webmail-one-ff1428ecbe2f-prepare",
+      "mail-admin-fixture-3a3882cc-07ff-4eab-b7b8-7621d699e671"
+    ],
+    "private_directory_removed": true,
+    "remaining_fixture_containers": [],
+    "stopped_local_owned_ssh_processes": [],
+    "temporary_local_credentials_removed": true,
+    "last_observer_log": [
+      "{\"scope\": \"isolated-synthetic-webmail\", \"maintenance_cycles\": 180}",
+      "{\"scope\": \"isolated-synthetic-webmail\", \"maintenance_cycles\": 180}"
+    ]
+  },
+  "production_after": {
+    "recorded_at_UTC": "2026-10-29T11:31:44.009643+00:00",
+    "production": {
+      "mail-admin": {
+        "id_image_unchanged": true,
+        "start_time_unchanged": false,
+        "before_started_at_UTC": "2026-10-28T14:29:45.627820369Z",
+        "after_started_at_UTC": "2026-10-28T21:00:24.28709578Z",
+        "running": true,
+        "OOM_killed": false,
+        "restart_count": 0
+      },
+      "maddy": {
+        "id_image_unchanged": true,
+        "start_time_unchanged": false,
+        "before_started_at_UTC": "2026-10-28T13:28:13.89482971Z",
+        "after_started_at_UTC": "2026-10-28T21:00:21.693014128Z",
+        "running": true,
+        "OOM_killed": false,
+        "restart_count": 0
+      }
+    },
+    "remaining_fixture_containers": [],
+    "private_directory_removed": true,
+    "HTTPS": {
+      "/api/status": 200,
+      "/api/session": 401
+    }
+  },
+  "production_observation_note": "Container IDs and images match the preflight and both services are running without Docker OOM flags. Their start timestamps changed to approximately 2026-10-28 21:00 UTC after the measured synthetic workload. This task issued no production start/stop/update commands; the restart cause was not investigated. Do not claim unchanged start times or uninterrupted production uptime.",
+  "separate_server_feasibility": {
+    "status": "Architecturally feasible; not implemented, deployed or load-tested on a second server",
+    "existing_server": "Maddy, message storage, SMTP submission/delivery, local privileged account and mail-maintenance functions",
+    "second_server": "React frontend, Python webmail backend, private profile/label/session/sending metadata, temporary attachment spools",
+    "mail_transport": "Certificate-verified IMAP 993 and authenticated SMTP submission 587 with STARTTLS",
+    "integration_work_required": "Adapt same-host administrator/helper and retention/metadata coordination to an authenticated inter-server boundary; do not copy the mailbox store or share live SQLite over a network filesystem.",
+    "capacity_note": "Separating hosts gives each service its own budget. Moving only static React assets leaves the Python workload on the current host. Maddy limits and the complete split workload still require measurement, particularly for 10 MiB messages and multiple users.",
+    "Maddy_protocol_reference": "https://maddy.email/docker/"
+  }
+}

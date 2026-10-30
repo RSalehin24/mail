@@ -7,7 +7,7 @@ from backend.auth import Authentication
 from backend.auth_state import audit
 from backend.relay_state import otp_ready
 from shared.errors import ServiceError
-from shared.validation import ADMIN_EMAIL, OTP_SENDER
+from shared.installation import site
 
 
 def enabled(connection: sqlite3.Connection, default: bool = False) -> bool:
@@ -35,8 +35,8 @@ class EmailAuthentication:
             "enabled": selected,
             "delivery_verified": ready,
             "available": selected and ready,
-            "sender": OTP_SENDER,
-            "recipient": ADMIN_EMAIL,
+            "sender": site().otp_sender,
+            "recipient": site().admin_email,
         }
 
     def save(self, session: str, selected: bool) -> dict[str, Any]:

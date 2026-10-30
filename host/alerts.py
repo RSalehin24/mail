@@ -13,9 +13,10 @@ from urllib.parse import urlsplit
 from host.locks import HostLock, LockPolicy
 from shared.errors import ServiceError
 from shared.files import atomic_json, protected_bytes, protected_json
+from shared.installation import site
 from shared.mail_templates import operational_alert
-from shared.smtp import SMTP_HOST, OutboundMessage, SmtpCredentials, authenticated, send_message
-from shared.validation import ADMIN_EMAIL, OTP_SENDER, bounded_text, utf8_size
+from shared.smtp import OutboundMessage, SmtpCredentials, authenticated, send_message
+from shared.validation import bounded_text, utf8_size
 
 
 class AlertTransport(Protocol):
@@ -27,7 +28,7 @@ class SmtpAlertTransport:
         self.configuration = configuration
 
     def deliver(self, event: dict[str, Any]) -> None:
-        if self.configuration.get("recipient") != ADMIN_EMAIL:
+        if self.configuration.get("recipient") != site().admin_email:
             raise ServiceError("invalid_alert_recipient", 503)
         credentials = protected_json(Path(self.configuration["credential_reference"]))
         username, credential = credentials.get("username"), credentials.get("credential")
@@ -37,12 +38,12 @@ class SmtpAlertTransport:
         if not username or not 1 <= utf8_size(credential) <= 4096:
             raise ServiceError("invalid_alert_credential", 503)
         connection_details = SmtpCredentials(
-            SMTP_HOST, self.configuration["port"], username, credential
+            site().relay_host, self.configuration["port"], username, credential
         )
         bounded_text(event["name"], 128)
         bounded_text(event["condition"], 128)
         subject, body = operational_alert(event)
-        message = OutboundMessage(OTP_SENDER, subject, body)
+        message = OutboundMessage(site().otp_sender, subject, body)
         try:
             with authenticated(connection_details, 5) as connection:
                 send_message(connection, message)

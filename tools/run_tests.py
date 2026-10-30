@@ -40,7 +40,16 @@ def source_identities(root: Path | None = None) -> dict[str, str]:
     root = root or ROOT
     files = {
         path
-        for directory in ("backend", "shared", "helper", "host", "tests", "tools")
+        for directory in (
+            "applications",
+            "deployment",
+            "backend",
+            "shared",
+            "helper",
+            "host",
+            "tests",
+            "tools",
+        )
         for path in (root / directory).rglob("*")
         if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
     }

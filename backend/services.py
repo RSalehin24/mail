@@ -19,6 +19,7 @@ from backend.helper_client import HelperClient
 from backend.mailboxes import Mailboxes
 from backend.relay import Relay, RelayDependencies, SmtpTransport
 from backend.secrets import SecretKeys
+from backend.webmail_services import MailServices
 from backend.work import WorkPool
 from shared.errors import ServiceError
 from shared.files import protected_json
@@ -35,6 +36,7 @@ class Services:
     io: WorkPool
     relay: Relay
     dns: Callable[[], dict[str, Any]] = observe_mx
+    webmail: MailServices | None = None
 
     @classmethod
     def production(cls) -> "Services":
@@ -67,16 +69,18 @@ class Services:
         helper = HelperClient(
             Path("/run/mail-admin-helper/control.sock"), settings.operation_timeout
         )
+
         def synchronize(values: dict[str, Any]) -> None:
-            result = helper.call({"operation": "submission_sync", "request_id": str(uuid.uuid4()),
-                                  **values})
+            result = helper.call(
+                {"operation": "submission_sync", "request_id": str(uuid.uuid4()), **values}
+            )
             if result.get("synchronized") is not True:
                 raise ServiceError("submission_synchronization_failed", 503)
 
         def reconcile() -> None:
             helper.call({"operation": "submission_reconcile", "request_id": str(uuid.uuid4())})
 
-        return cls(
+        result = cls(
             settings,
             authentication,
             Mailboxes((database, helper, time.time)),
@@ -84,12 +88,34 @@ class Services:
             WorkPool(settings.http_concurrency, settings.operation_timeout),
             Relay(
                 RelayDependencies(
-                    database, keys, SmtpTransport(settings.operation_timeout),
-                    time.time, synchronize, reconcile
+                    database,
+                    keys,
+                    SmtpTransport(settings.operation_timeout),
+                    time.time,
+                    synchronize,
+                    reconcile,
                 )
             ),
         )
+        if settings.webmail_enabled:
+            if not settings.webmail_allowed_mailboxes:
+                raise ServiceError("webmail_test_mailbox_required", 503)
+            from backend.webmail_schema import require_schema
+
+            require_schema(database)
+            with database.transaction() as connection:
+                if not connection.execute(
+                    "SELECT cleanup_enabled FROM webmail_maintenance WHERE id=1"
+                ).fetchone()[0]:
+                    raise ServiceError("webmail_retention_not_ready", 503)
+            webmail = MailServices(authentication)
+            result.webmail = webmail
+            result.mailboxes.on_security_change = lambda: webmail.auth.cleanup(force=True)
+            result.mailboxes.ownership = lambda email: webmail.auth.owner_guard(email, wait=True)
+        return result
 
     def close(self) -> None:
+        if self.webmail is not None:
+            self.webmail.close()
         self.hashes.close()
         self.io.close()

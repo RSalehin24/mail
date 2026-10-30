@@ -11,7 +11,7 @@ import EditOutlined from '@mui/icons-material/EditOutlined';
 import SettingsOutlined from '@mui/icons-material/SettingsOutlined';
 import SendOutlined from '@mui/icons-material/SendOutlined';
 import ArrowDownwardRounded from '@mui/icons-material/ArrowDownwardRounded';
-import { api, cached, type Authorize, type Diagnostics, type Mailbox, type Notify } from './api';
+import { api, cached, ApiError, type Authorize, type Diagnostics, type Mailbox, type Notify } from './api';
 import { PasswordDialog } from './MailboxDialogs';
 import { SenderVerification } from './SenderVerification';
 import { navigate, mailboxPath } from './navigation';
@@ -19,6 +19,7 @@ import { navigate, mailboxPath } from './navigation';
 export function Dashboard({ authorize, notify }: { authorize: Authorize; notify: Notify }) {
   const [mailboxes, setMailboxes] = useState<Mailbox[]>(() => cached<Mailbox[]>('/accounts') ?? []);
   const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(() => cached<Diagnostics>('/diagnostics') ?? null);
+  const [hasLoaded, setHasLoaded] = useState(cached('/accounts') !== undefined);
   const [loading, setLoading] = useState(!cached('/accounts'));
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -32,8 +33,8 @@ export function Dashboard({ authorize, notify }: { authorize: Authorize; notify:
   const load = useCallback(async () => {
     try {
       const accounts = await api<Mailbox[]>('/accounts');
-      setMailboxes(accounts); setError('');
-    } catch (failure) { setError((failure as Error).message); }
+      setMailboxes(accounts); setHasLoaded(true); setError('');
+    } catch (failure) { setError(failure instanceof ApiError && failure.code === 'operation_pending' ? 'The mailbox list took too long to load. Retrying automatically.' : (failure as Error).message); }
     finally { setLoading(false); }
   }, []);
   useEffect(() => { void api<Diagnostics>('/diagnostics').then(setDiagnostics).catch(() => {}); void load(); const timer = setInterval(() => { void load(); }, 15000); return () => clearInterval(timer); }, [load]);
@@ -67,13 +68,13 @@ export function Dashboard({ authorize, notify }: { authorize: Authorize; notify:
       <Box><Typography variant="h4" component="h1">Mailboxes</Typography></Box>
       <Button variant="contained" startIcon={<AddRounded/>} onClick={() => setDialog({ mode: 'create' })}>New mailbox</Button>
     </Stack>
-    {error && <Alert severity="warning" sx={{ mb: 2 }}>{error} Previously loaded accounts may be out of date.</Alert>}
+    {error && <Alert severity="warning" sx={{ mb: 2 }}>{error} {hasLoaded ? 'Previously loaded accounts may be out of date.' : 'The mailbox list is unavailable.'}</Alert>}
     {!!diagnostics?.host.unresolved?.length && <Alert severity="warning" sx={{ mb: 2 }}>A mailbox operation needs administrator review before further changes.</Alert>}
     {pending.length > 0 && <Alert severity="info" className="receipt-notice" action={<Button color="inherit" size="small" onClick={() => setVerification(pending.map(mailbox => mailbox.email))}>Review receipts</Button>}>Test emails are waiting for confirmation for {pending.length} {pending.length === 1 ? 'mailbox' : 'mailboxes'}.</Alert>}
     <Paper variant="outlined" className="mailbox-surface" sx={{ mt: 3 }}>
       {loading && <Box role="status" aria-label="Loading mailboxes" sx={{ p: 3 }}><Skeleton/><Skeleton/><Skeleton/></Box>}
       <Stack className="table-toolbar" direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}>
-        <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center' }}><Typography variant="h6" sx={{ fontSize: '1rem' }}>All mailboxes</Typography><Chip size="small" label={mailboxes.length}/></Stack>
+        <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center' }}><Typography variant="h6" sx={{ fontSize: '1rem' }}>All mailboxes</Typography><Chip size="small" label={hasLoaded ? mailboxes.length : loading ? 'Loading…' : 'Unavailable'}/></Stack>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           <TextField label="Search mailboxes" placeholder="Search name or address" size="small" value={search}
             onChange={event => { setSearch(event.target.value); setPage(0); }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded fontSize="small"/></InputAdornment> } }}/>
@@ -112,10 +113,10 @@ export function Dashboard({ authorize, notify }: { authorize: Authorize; notify:
         </Stack>{mailbox.notes && <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>{mailbox.notes}</Typography>}
       </Card>)}</Box>
       {!loading && !error && !filtered.length && <Box sx={{ py: 8, textAlign: 'center' }}><Typography variant="h6">{search ? 'No matching mailboxes' : 'No mailboxes'}</Typography><Typography color="text.secondary" variant="body2" sx={{ mt: 1 }}>{search ? 'Try another address or name.' : 'Create a mailbox.'}</Typography></Box>}
-      <PaginationControls count={filtered.length} page={currentPage} size={rowsPerPage} onPage={setPage} onSize={value => { setRowsPerPage(value); setPage(0); }}/>
+      {hasLoaded && <PaginationControls count={filtered.length} page={currentPage} size={rowsPerPage} onPage={setPage} onSize={value => { setRowsPerPage(value); setPage(0); }}/>}
     </Paper>
     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between', mt: 2, px: 0.5 }}>
-      <Typography variant="caption" color="text.secondary">{diagnostics?.host.summary ? `Last checked ${formatTime(diagnostics.host.summary.observed_at)}` : 'Waiting for server status'}</Typography>
+      <Typography variant="caption" color="text.secondary">{diagnostics?.host.summary ? `Server status checked ${formatTime(diagnostics.host.summary.observed_at)}` : 'Waiting for server status'}</Typography>
 
     </Stack>
     <Menu anchorEl={menu?.anchor} open={!!menu} onClose={() => setMenu(null)} slotProps={{ paper: { sx: { minWidth: 225, borderRadius: 2, mt: 0.5 } } }}>

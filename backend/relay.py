@@ -13,9 +13,10 @@ from backend.quota import read_quota
 from backend.relay_state import otp_ready
 from backend.secrets import SecretKeys
 from shared.errors import ServiceError
+from shared.installation import site
 from shared.mail_templates import delivery_test, verification_code
-from shared.smtp import SMTP_HOST, OutboundMessage, SmtpCredentials, authenticated, send_message
-from shared.validation import ADMIN_EMAIL, OTP_SENDER, address, bounded_text, utf8_size
+from shared.smtp import OutboundMessage, SmtpCredentials, authenticated, send_message
+from shared.validation import address, bounded_text, utf8_size
 
 
 @dataclass(frozen=True)
@@ -66,7 +67,7 @@ class Relay:
 
     def save(self, payload: dict[str, Any]) -> dict[str, Any]:
         if (
-            payload["host"] != SMTP_HOST
+            payload["host"] != site().relay_host
             or type(payload["port"]) is not int
             or payload["port"] not in {465, 587}
         ):
@@ -95,7 +96,7 @@ class Relay:
                 connection.execute(
                     "INSERT OR REPLACE INTO relay_settings VALUES(1,?,?,?,?,?,?,NULL)",
                     (
-                        SMTP_HOST,
+                        site().relay_host,
                         payload["port"],
                         username,
                         self.keys.seal(credential, "relay-credential"),
@@ -108,8 +109,9 @@ class Relay:
                 if self.dependencies.synchronize is not None:
                     if payload["port"] != 587:
                         raise ServiceError("submission_requires_starttls_587", 400)
-                    self.dependencies.synchronize({"username": username, "credential": credential,
-                                                   "revision": revision})
+                    self.dependencies.synchronize(
+                        {"username": username, "credential": credential, "revision": revision}
+                    )
                 audit(connection, (self.dependencies.clock(), "relay-settings", "saved"))
         except (OSError, ServiceError):
             if self.dependencies.reconcile is not None:
@@ -125,7 +127,7 @@ class Relay:
             confirmed = otp_ready(connection)
         if row is None:
             raise ServiceError("relay_not_configured", 409)
-        if row["host"] != SMTP_HOST or row["port"] not in {465, 587}:
+        if row["host"] != site().relay_host or row["port"] not in {465, 587}:
             raise ServiceError("relay_configuration_invalid", 503)
         return SavedRelay(
             row["host"],
@@ -142,7 +144,7 @@ class Relay:
             if row is None:
                 return {
                     "configured": False,
-                    "host": SMTP_HOST,
+                    "host": site().relay_host,
                     "port": 587,
                     "otp_ready": False,
                     "username": "",
@@ -155,7 +157,7 @@ class Relay:
                 for test in connection.execute(
                     "SELECT * FROM relay_tests WHERE revision=? AND sender=? "
                     "ORDER BY created DESC LIMIT 10",
-                    (row["revision"], OTP_SENDER),
+                    (row["revision"], site().otp_sender),
                 )
             ]
             confirmed = otp_ready(connection)
@@ -187,7 +189,7 @@ class Relay:
         with self.database.transaction() as connection:
             connection.execute(
                 "INSERT INTO relay_tests VALUES(?,?,?,?,0,0,0,?)",
-                (identifier, configuration.revision, sender, ADMIN_EMAIL, now),
+                (identifier, configuration.revision, sender, site().admin_email, now),
             )
         message = (
             OutboundMessage(
@@ -214,7 +216,7 @@ class Relay:
             "connection_ok": succeeded,
             "smtp_accepted": succeeded and mode == "delivery",
             "delivery_confirmed": False,
-            "recipient": ADMIN_EMAIL,
+            "recipient": site().admin_email,
             "sender": sender,
         }
 
@@ -230,12 +232,12 @@ class Relay:
                 not test
                 or not settings
                 or not test["accepted"]
-                or test["recipient"] != ADMIN_EMAIL
+                or test["recipient"] != site().admin_email
                 or test["revision"] != settings["revision"]
             ):
                 raise ServiceError("relay_test_not_confirmable", 409)
             connection.execute("UPDATE relay_tests SET confirmed=1 WHERE id=?", (identifier,))
-            if test["sender"] == OTP_SENDER:
+            if test["sender"] == site().otp_sender:
                 connection.execute(
                     "UPDATE relay_settings SET readiness_test=? WHERE id=1", (identifier,)
                 )
@@ -265,7 +267,5 @@ class Relay:
             raise ServiceError("email_otp_unavailable", 403)
         self.dependencies.transport.perform(
             configuration,
-            OutboundMessage(
-                OTP_SENDER, *verification_code(code)
-            ),
+            OutboundMessage(site().otp_sender, *verification_code(code)),
         )
