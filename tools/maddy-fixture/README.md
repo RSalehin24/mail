@@ -69,3 +69,13 @@ identity before a new candidate can qualify. Production selection remains separa
 Export fixture images without `--platform` to retain their complete OCI identity.
 The remote exporter now selects the actual loaded approved fixture and preserves
 that full image rather than requiring only the original Mac image.
+
+## Second Linux rebuild (2026-11-20, D-013)
+
+The same archives, patch and toolchains were rebuilt on a new workstation. The
+archive, patch and `go.sum` hashes match `inputs-linux.json`, the go-smtp parser tests
+and `go mod verify` passed, but the executable hash is
+`24e2f562af94b1c833e5a33cd9540c719a10447469aa9a7c0b5a45ff4526ca52`, not the
+approved `6900b364...`. The owner approved pinning this image index,
+`sha256:26a3a4386f21f0008d50a589058252f52cbcd364a94c99743788ae55ea2f4ebb`, for
+fixture use only. It is weaker evidence than a bit-identical rebuild.

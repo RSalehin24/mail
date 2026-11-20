@@ -12,6 +12,12 @@ from unittest.mock import patch
 from tests.tls_support import CertificateFixture
 
 
+def canonical_path_argument(argument):
+    # RFC 5321 keywords are case-insensitive; Python 3.14's smtplib sends them lowercase.
+    keyword, separator, path = argument.decode().partition(":")
+    return keyword.upper() + separator + path
+
+
 class SmtpHandler(socketserver.StreamRequestHandler):
     def finish(self):
         try:
@@ -80,12 +86,12 @@ class SmtpHandler(socketserver.StreamRequestHandler):
 
     def sender(self, argument):
         fixture = self.server.fixture
-        fixture.events.append(("sender", argument.decode()))
+        fixture.events.append(("sender", canonical_path_argument(argument)))
         accepted = self.authorized and not fixture.reject_sender
         self.reply(b"250 sender accepted" if accepted else b"550 sender rejected")
 
     def recipient(self, argument):
-        self.server.fixture.events.append(("recipient", argument.decode()))
+        self.server.fixture.events.append(("recipient", canonical_path_argument(argument)))
         self.reply(b"250 recipient accepted" if self.authorized else b"530 authentication required")
 
     def data(self, argument):

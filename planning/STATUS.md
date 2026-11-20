@@ -8,9 +8,12 @@ Updated 2026-11-20. Resume here; do not re-derive earlier decisions ([DECISIONS]
 
 ## Next action
 
-1. Phase 0 baseline: install `.venv` and `frontend/node_modules` (needs approval), run the existing checks, record which pass.
+1. Phase 0 is done. Next: confirm today's backup and the 9:13 PM boot-time failure (read-only), then Phase 1 (see PLAN).
 2. Confirm the 2026-11-20 dashboard backup (started 9:46 PM Dhaka) finished, and read why the 9:13 PM boot-time run failed.
 3. Delete `~/.cf_token` and revoke the temporary Cloudflare token (owner action).
+
+## Phase 0 baseline (2026-11-20, Python 3.14, D-007 to D-015)
+All suites pass locally: lint, typecheck, reads, unit (537), integration (94), build, browser, Maddy (31 modules), runtime (8), ACME (7). Fixes made to stale tests/fixtures, assertions unchanged: SMTP keyword case (D-009), inventory cache wait (D-014). The Maddy fixture image is a local rebuild with a different executable hash than the approved one, pinned by owner decision (D-013); weaker evidence than the original. Not run: `make plan`, qualification suite, any production check. Python 3.14 was used instead of 3.11.
 
 ## Open items for the owner
 - Billing: set a $0.01 budget alert; check the Billing report in a few days.

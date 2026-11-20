@@ -18,6 +18,8 @@ from tests.helper_support import MAILBOX_PASSWORD
 from tests.maddy_support import RealMaddyFixture, imap_login
 from tests.restore_support import bodies, deliver
 
+INVENTORY_CACHE_SECONDS = 2
+
 
 class InventoryAndMetadataTests(unittest.TestCase):
     def setUp(self):
@@ -52,6 +54,8 @@ class InventoryAndMetadataTests(unittest.TestCase):
                             for row in original))
         self.fixture.maddy.change(('creds', 'remove', '--yes', requests[0]['email']))
         self.fixture.maddy.change(('imap-acct', 'remove', '--yes', requests[1]['email']))
+        # The helper shares one inventory read for 2 seconds; wait so this reads the removals.
+        time.sleep(INVENTORY_CACHE_SECONDS + 0.1)
         rows = {row['email']: row for row in self.mailboxes.inventory()}
         self.assertEqual(len(rows), 8)
         for index, presence in ((0, (False, True)), (1, (True, False))):
