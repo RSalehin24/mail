@@ -13,7 +13,13 @@ from typing import Any
 from host.mailbox_store import body_path, connect, extract_mailbox, validate
 from shared.archive import decrypt_archive, encrypt_archive, extract_archive
 from shared.errors import ServiceError
-from shared.files import atomic_json, protected_bytes, protected_json, sync_directory
+from shared.files import (
+    atomic_group_json,
+    atomic_json,
+    protected_bytes,
+    protected_json,
+    sync_directory,
+)
 from shared.validation import request_id
 
 
@@ -27,7 +33,8 @@ class MailboxArchives:
         if root.is_symlink() or key.is_symlink():
             raise ServiceError("recovery_storage_invalid", 503)
         root.mkdir(mode=0o700, exist_ok=True)
-        if root.stat().st_uid != owner or root.stat().st_mode & 0o077:
+        # 0750 deliberately lets the dashboard's group read the store; 0700 keeps it private.
+        if root.stat().st_uid != owner or root.stat().st_mode & 0o027:
             raise ServiceError("recovery_storage_invalid", 503)
         self.root, self.owner = root, owner
         if not key.exists():
@@ -38,10 +45,22 @@ class MailboxArchives:
                 writer.write(secrets.token_bytes(32))
                 writer.flush()
                 os.fsync(writer.fileno())
+            self._share(key)
             sync_directory(key.parent)
         self.key = protected_bytes(key, owner)
         if len(self.key) != 32:
             raise ServiceError("recovery_key_invalid", 503)
+
+    def _shared_group(self) -> int | None:
+        """The group a group-readable store (mode 0750) hands its new files to."""
+        metadata = self.root.stat()
+        return metadata.st_gid if metadata.st_mode & 0o050 == 0o050 else None
+
+    def _share(self, path: Path) -> None:
+        group = self._shared_group()
+        if group is not None:
+            os.chown(path, -1, group)
+            path.chmod(0o640)
 
     def paths(self, identifier: str) -> tuple[Path, Path]:
         identifier = request_id(identifier)
@@ -68,6 +87,7 @@ class MailboxArchives:
                     if path.is_file():
                         writer.add(path, arcname=str(path.relative_to(selected)))
             encrypt_archive(plain, archive, self.key)
+            self._share(archive)
             verified = directory / "verified.tar"
             decrypt_archive(archive, verified, self.key)
             if digest(verified) != digest(plain):
@@ -75,17 +95,19 @@ class MailboxArchives:
             extracted = directory / "verified"
             extract_archive(verified, extracted)
             self._verify(extracted, email, checksums)
-            atomic_json(
-                manifest,
-                {
-                    "schema_version": 1,
-                    "email": email,
-                    "verified": True,
-                    "key_sha256": hashlib.sha256(self.key).hexdigest(),
-                    "encrypted_sha256": digest(archive),
-                    "files": checksums,
-                },
-            )
+            record = {
+                "schema_version": 1,
+                "email": email,
+                "verified": True,
+                "key_sha256": hashlib.sha256(self.key).hexdigest(),
+                "encrypted_sha256": digest(archive),
+                "files": checksums,
+            }
+            group = self._shared_group()
+            if group is None:
+                atomic_json(manifest, record)
+            else:
+                atomic_group_json(manifest, record, group)
             sync_directory(self.root)
         return identifier
 

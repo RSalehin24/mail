@@ -185,7 +185,8 @@ class CloudflareSync:
                                  'destination': target if target in verified else None}
         script = worker_script(routes)
         sha = hashlib.sha256(script.encode()).hexdigest()
-        previous = protected_json(self.observation, self.control.root.stat().st_uid) if (
+        # The worker reads the record it wrote itself, as its own user.
+        previous = protected_json(self.observation, os.geteuid()) if (
             self.observation.exists()) else {}
         existing = self.api.listing(f'/zones/{self.api.zone}/email/routing/rules')
         replacements = []

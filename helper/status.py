@@ -2,6 +2,7 @@
 
 import os
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -18,14 +19,27 @@ CONSUMER_FIELDS = frozenset({
 })
 
 
-def host_status() -> dict[str, Any]:
+@dataclass(frozen=True)
+class HostStatusPaths:
+    """Where the observations live; the defaults are the host's, a container passes its mounts."""
+
+    maddy_data: Path = Path("/opt/maddy/data")
+    deployment: Path = Path("/etc/mail-admin/deployment.json")
+    certificate_state: Path = Path("/var/lib/mail-admin-certificates/state.json")
+    served_certificates: Path = Path("/var/lib/mail-admin-alerts/served-certificates.json")
+    monitoring: Path = Path("/var/lib/mail-admin-alerts/monitor-observation.json")
+    external_monitoring: Path = Path("/var/lib/mail-admin-alerts/external-monitoring.json")
+    backup_manifest: Path = Path("/var/lib/mail-admin-backup/manifest.json")
+
+
+def host_status(paths: HostStatusPaths = HostStatusPaths()) -> dict[str, Any]:
     now = time.time()
     memory = {}
     for line in Path("/proc/meminfo").read_text().splitlines():
         name, _, value = line.partition(":")
         if name in {"MemTotal", "MemAvailable"}:
             memory[name] = int(value.split()[0]) * 1024
-    disk = os.statvfs("/opt/maddy/data")
+    disk = os.statvfs(paths.maddy_data)
     return {
         "observed_at": now,
         "scope": "host",
@@ -37,15 +51,11 @@ def host_status() -> dict[str, Any]:
         "disk_used_bytes": (disk.f_blocks - disk.f_bfree) * disk.f_frsize,
         "disk_reserved_bytes": max(0, disk.f_bfree - disk.f_bavail) * disk.f_frsize,
         "inodes_free": disk.f_favail,
-        "thresholds": _thresholds(),
-        "certificates": _certificates(now),
-        "monitoring": _observation(
-            Path("/var/lib/mail-admin-alerts/monitor-observation.json"), now, 600,
-        ),
-        "external_monitoring": _observation(
-            Path("/var/lib/mail-admin-alerts/external-monitoring.json"), now, 86400,
-        ),
-        "backup": _observation(Path("/var/lib/mail-admin-backup/manifest.json"), now),
+        "thresholds": _thresholds(paths.deployment),
+        "certificates": _certificates(now, paths),
+        "monitoring": _observation(paths.monitoring, now, 600),
+        "external_monitoring": _observation(paths.external_monitoring, now, 86400),
+        "backup": _observation(paths.backup_manifest, now),
     }
 
 
@@ -85,9 +95,9 @@ def _scalars(record: dict[str, Any], fields: frozenset[str]) -> dict[str, Any]:
     return result
 
 
-def _thresholds() -> dict[str, Any]:
+def _thresholds(deployment: Path = HostStatusPaths.deployment) -> dict[str, Any]:
     try:
-        inputs = protected_json(Path("/etc/mail-admin/deployment.json"))["inputs"]
+        inputs = protected_json(deployment)["inputs"]
         fields = ("disk_free_minimum_bytes", "inode_free_minimum", "recovery_point_seconds")
         values = {field: inputs[field] for field in fields}
         if any(type(value) is not int or value < 0 for value in values.values()):
@@ -97,9 +107,9 @@ def _thresholds() -> dict[str, Any]:
         return {"state": "unavailable"}
 
 
-def _certificates(now: float) -> dict[str, Any]:
-    renewal = _observation(Path("/var/lib/mail-admin-certificates/state.json"), now)
-    served = _observation(Path("/var/lib/mail-admin-alerts/served-certificates.json"), now, 600)
+def _certificates(now: float, paths: HostStatusPaths) -> dict[str, Any]:
+    renewal = _observation(paths.certificate_state, now)
+    served = _observation(paths.served_certificates, now, 600)
     if "consumers" in served:
         return {**renewal, **served, "outcome": renewal.get("outcome", "unavailable"),
                 "state": served.get("state", "fresh"), "reason": served.get("reason"),

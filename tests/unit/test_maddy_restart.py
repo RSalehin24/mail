@@ -189,7 +189,8 @@ class RelayRollbackTests(unittest.TestCase):
         path.chmod(0o600)
         restarter = FakeRestarter(failures)
         actions = RelayActions(FakeVerifier(valid), restarter)
-        with patch("helper.submission.protected_bytes", side_effect=lambda p: p.read_bytes()):
+        read = lambda path, owner: path.read_bytes()  # noqa: E731 -- owner is unused here
+        with patch("helper.submission.protected_bytes", side_effect=read):
             control = SubmissionControl(Path(directory.name), None, actions)
             with self.assertRaises(ServiceError) as raised:
                 control.synchronize({"username": "u", "credential": "secret-1", "revision": 1})

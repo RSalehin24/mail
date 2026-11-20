@@ -47,10 +47,10 @@ class RecoveryHttpsTests(unittest.TestCase):
                   'protected': {'other@rsalehin24.me': 'Operational mailbox'}}
         atomic_json(root / 'recovery-policy.json', policy)
         qualify_fixture(root)
-        for name in ('recovery-policy.json', 'recovery-qualified.json'):
-            # Root-owned records the dashboard may read through its group, as on the host.
-            os.chown(root / name, 0, SERVICE_ID)
-            (root / name).chmod(0o640)
+        # The dashboard edits the policy, so the service user owns it; root wrote the proof
+        # and shares it through the group, as the cutover sets them on the host.
+        os.chown(root / 'recovery-policy.json', SERVICE_ID, SERVICE_ID)
+        RuntimeFixture.grant_dashboard(root / 'recovery-qualified.json')
         web.start()
         shared = DashboardOwnedState(mail, web)
         writers = FixtureWriters(shared)
@@ -58,6 +58,7 @@ class RecoveryHttpsTests(unittest.TestCase):
         (root / 'recovery-worker.lock').touch(mode=0o600)
         context = SimpleNamespace(
             deployment={**mail.maddy.deployment, 'maddy_data_directory': str(mail.data),
+                        'state_owner_uid': SERVICE_ID,
                         'maddy_message_paths': ['messages'],
                         'backup_sources': {'dashboard': str(web.directories['data'])}},
             docker=SimpleNamespace(inspect=lambda name: {}),
@@ -66,6 +67,10 @@ class RecoveryHttpsTests(unittest.TestCase):
         )
         worker = MailboxRecovery(context, root)
         worker.maddy, worker.writers = mail.maddy, writers
+        # The one-time grant: the store and its key are readable by the service group, and the
+        # worker then creates every new recovery point group-readable by itself.
+        RuntimeFixture.grant_dashboard(root / 'recovery-points')
+        RuntimeFixture.grant_dashboard(root / 'recovery.key')
         authentication = RuntimeAuthentication(self, web)
         authentication.enroll()
         authentication.login()
@@ -99,10 +104,7 @@ class RecoveryHttpsTests(unittest.TestCase):
         self.assertEqual(web.api('POST', '/api/recovery/delete', payload)[0], 200)
         deleted = web.api('GET', '/api/recovery/mailboxes')[2]['mailboxes']
         self.assertEqual(deleted[0]['email'], email)
-        # Known gap of the in-process host: availability is checked by the dashboard user, but
-        # the recovery store must stay root-owned and 0700, so it cannot read it and reports
-        # False. The restore below still works because the root worker verifies the archive.
-        self.assertFalse(deleted[0]['recovery_available'])
+        self.assertTrue(deleted[0]['recovery_available'])
         self.assertEqual(deleted[0]['deadline'] - deleted[0]['deleted_at'], 7 * 86400)
         with sqlite3.connect(web.database.path) as connection:
             self.assertIsNone(connection.execute('SELECT 1 FROM mailboxes WHERE email=?',

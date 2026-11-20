@@ -99,7 +99,7 @@ class DeletionEnabledRuntime(CrashRuntime):
         generation = self.journal().incarnation(email)["generation"]
         covered = {"generation": generation, "credentials": True, "storage": True,
                    "messages": True}
-        self.write_record("backup-manifest.json", {
+        self.write_record("manifest.json", {
             "verified": True, "available": True, "restore_passed": True,
             "availability_observed_at": time.time(), "cutoff": cutoff,
             "accounts": {email: covered},

@@ -1,9 +1,10 @@
 import json
 import os
+import time
 import unittest
 from unittest.mock import patch
 
-from helper.status import _observation
+from helper.status import HostStatusPaths, _observation, host_status
 from shared.files import protected_json
 from tests.support import StateFixture
 
@@ -84,6 +85,31 @@ class HostStatusTests(unittest.TestCase):
                 'inputs': {**inputs, 'disk_free_minimum_bytes': value},
             }):
                 self.assertEqual(_thresholds(), {'state': 'unavailable'})
+
+    def test_every_observation_and_the_disk_come_from_the_injected_locations(self):
+        root = self.fixture.root
+        recent = {'observed_at': time.time(), 'outcome': 'active'}
+        paths = HostStatusPaths(
+            maddy_data=root, deployment=root / 'deployment.json',
+            certificate_state=root / 'certificates.json',
+            served_certificates=root / 'served.json', monitoring=root / 'monitor.json',
+            external_monitoring=root / 'external.json', backup_manifest=root / 'manifest.json',
+        )
+        inputs = {'disk_free_minimum_bytes': 1, 'inode_free_minimum': 2,
+                  'recovery_point_seconds': 3}
+        for name, record in (('deployment', {'inputs': inputs}), ('certificates', recent),
+                             ('monitor', recent), ('manifest', recent)):
+            (root / (name + '.json')).write_text(json.dumps(record))
+            (root / (name + '.json')).chmod(0o600)
+        with patch('helper.status.protected_json',
+                   side_effect=lambda path: protected_json(path, os.getuid())):
+            result = host_status(paths)
+        self.assertEqual(result['thresholds'], inputs)
+        self.assertEqual(result['certificates']['outcome'], 'active')
+        self.assertEqual(result['monitoring']['outcome'], 'active')
+        self.assertEqual(result['backup']['outcome'], 'active')
+        self.assertEqual(result['external_monitoring']['reason'], 'unavailable')
+        self.assertGreater(result['disk_total_bytes'], 0)
 
 
 class CpuSamplerTests(unittest.TestCase):

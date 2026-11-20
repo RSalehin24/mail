@@ -24,7 +24,16 @@ AUTHENTICATED_PROBE = "/api/session"
 OPERATION_TIMEOUT_SECONDS = 5
 STATE_TARGET = "/var/lib/mail-admin-helper"
 LOCK_TARGET = "/run/lock/mail-admin-maddy.lock"
-HOST_RECORDS_TARGET = "/run/mail-admin-host/"
+# Directories root tools write into and replace files in atomically; the container mounts them
+# read-only. Each maps a fixture directory name to its path in the container.
+OBSERVATION_DIRECTORIES = {
+    "etc": "/run/mail-admin-host/etc",
+    "backup": "/var/lib/mail-admin-backup",
+    "alerts": "/var/lib/mail-admin-alerts",
+    "certificates": "/var/lib/mail-admin-certificates",
+}
+RECORD_DIRECTORIES = {"deployment.json": "etc", "helper-policy.json": "etc",
+                      "manifest.json": "backup"}
 RESOURCE_OBSERVATION = """import json
 from pathlib import Path
 fields = {'Name', 'State', 'Threads', 'VmRSS', 'VmHWM'}
@@ -124,12 +133,24 @@ class RuntimeFixture:
             "maddy_cli_version": "0.9.6",
             "state_owner_uid": SERVICE_ID,
         }
-        self.records = {name: self.root / name for name in
-                        ("deployment.json", "helper-policy.json", "backup-manifest.json")}
+        self.observation_directories = {}
+        for name in OBSERVATION_DIRECTORIES:
+            directory = self.root / name
+            directory.mkdir(mode=0o750)
+            self.grant_dashboard(directory)
+            self.observation_directories[name] = directory
+        self.records = {name: self.observation_directories[directory] / name
+                        for name, directory in RECORD_DIRECTORIES.items()}
         for name, path in self.records.items():
             path.touch(mode=0o640)
-            os.chown(path, 0, SERVICE_ID)
+            self.grant_dashboard(path)
             self.write_record(name, self.deployment if name == "deployment.json" else {})
+
+    @staticmethod
+    def grant_dashboard(path):
+        """What the cutover does once: the file or directory stays root's, readable by the group."""
+        os.chown(path, 0, SERVICE_ID)
+        path.chmod(0o750 if path.is_dir() else 0o640)
 
     def write_record(self, name, content):
         """Rewrite in place: the container binds the file, so its inode must not change."""
@@ -172,7 +193,8 @@ class RuntimeFixture:
             (files.tls, "/data/tls"),
             (self.state, STATE_TARGET),
             (self.lock, LOCK_TARGET),
-        ) + tuple((path, HOST_RECORDS_TARGET + name) for name, path in self.records.items())
+        ) + tuple((self.observation_directories[name], target)
+                  for name, target in OBSERVATION_DIRECTORIES.items())
 
     def _start_container(self):
         self.launch()

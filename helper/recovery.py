@@ -173,13 +173,19 @@ def validate_policy(policy: Any) -> RecoveryPolicy:
 
 
 class RecoveryControl:
-    def __init__(self, directory: Path, records: RecoveryRecords, owner: int = 0) -> None:
+    def __init__(
+        self, directory: Path, records: RecoveryRecords, owner: int = 0,
+        policy_owner: int | None = None,
+    ) -> None:
+        # The root workers write the proof, key and recovery points (owner); the policy is edited
+        # through the dashboard, so it belongs to whoever owns the shared state.
         self.directory, self.records, self.owner = directory, records, owner
+        self.policy_owner = owner if policy_owner is None else policy_owner
         self.policy_path = directory / "recovery-policy.json"
         self.availability: dict[str, tuple[tuple[Any, ...], bool]] = {}
 
     def policy(self) -> dict[str, Any]:
-        policy = protected_json(self.policy_path, self.owner)
+        policy = protected_json(self.policy_path, self.policy_owner)
         validate_policy(policy)
         if policy["enabled"]:
             require_qualified(self.directory, self.owner)
