@@ -36,6 +36,10 @@ print(json.dumps({
 
 
 class RuntimeFixture:
+    writable_targets = frozenset({"/app/data"})
+    extra_arguments = ()
+    extra_environment = ()
+
     def __init__(self, helper=None):
         self.host = HelperFixture()
         self.root = self.host.root
@@ -137,7 +141,7 @@ class RuntimeFixture:
             "127.0.0.1::8443",
         )
         for source, target in self.bind_sources():
-            readonly = "" if target == "/app/data" else ",readonly"
+            readonly = "" if target in self.writable_targets else ",readonly"
             command += (
                 "--mount",
                 "type=bind,src="
@@ -150,9 +154,9 @@ class RuntimeFixture:
             "HASH_PARALLELISM=1",
             "HTTP_CONCURRENCY=4",
             "OPERATION_TIMEOUT_SECONDS=5",
-        ):
+        ) + self.extra_environment:
             command += ("-e", value)
-        command += (os.environ["MAIL_ADMIN_RUNTIME_REFERENCE"],)
+        command += self.extra_arguments + (os.environ["MAIL_ADMIN_RUNTIME_REFERENCE"],)
         self.identifier = self.command(command).stdout.strip()
         self.command(("start", self.identifier))
 

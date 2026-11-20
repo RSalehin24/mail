@@ -39,7 +39,7 @@ class Services:
     @classmethod
     def production(cls) -> Services:
         RuntimePolicy().require_running()
-        require_runtime_sources()
+        require_runtime_sources(local_host=Settings.from_environment().local_host)
         return cls._load()
 
     @classmethod

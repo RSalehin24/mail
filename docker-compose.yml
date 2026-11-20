@@ -1,4 +1,54 @@
+# One project for both containers: the dashboard runs the Maddy account commands itself (no Docker
+# access, no root helper), so Maddy and the dashboard run as the same user and share its data.
+x-maddy-runtime-tmpfs: &maddy-runtime-tmpfs
+  "/run/maddy:size=1048576,mode=0700,uid=${MAIL_ADMIN_UID:?Set service UID},gid=${MAIL_ADMIN_GID:?Set service GID}"
+
 services:
+  maddy:
+    image: ghcr.io/foxcpp/maddy@sha256:e1074e92a452b84d1135ebe8ab831c5f541d33dcbd39e38fab740a53bbf2f97c
+    pull_policy: never
+    platform: linux/amd64
+    container_name: maddy
+    user: "${MAIL_ADMIN_UID:?Set service UID}:${MAIL_ADMIN_GID:?Set service GID}"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 96m
+    memswap_limit: 96m
+    cpus: 0.5
+    pids_limit: 128
+    logging:
+      driver: local
+      options: {max-size: "5m", max-file: "2"}
+    entrypoint: [/usr/local/libexec/mail-admin-maddy, -config, /data/maddy.conf]
+    command: [run]
+    environment:
+      MADDY_DOMAIN: rsalehin24.me
+      MADDY_HOSTNAME: mail.rsalehin24.me
+    ports: ["25:25", "993:993", "587:587"]
+    tmpfs: [*maddy-runtime-tmpfs]
+    volumes:
+      - type: bind
+        source: /opt/maddy/data
+        target: /data
+        bind: {create_host_path: false}
+      - type: bind
+        source: /opt/maddy/config/maddy.conf
+        target: /data/maddy.conf
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${MAIL_ADMIN_TLS_DIRECTORY:?Set validated immutable certificate generation}
+        target: /data/tls
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: /usr/local/libexec/mail-admin-maddy
+        target: /usr/local/libexec/mail-admin-maddy
+        read_only: true
+        bind: {create_host_path: false}
+
   mail-admin:
     image: ${MAIL_ADMIN_IMAGE:?Set tested runtime image}
     pull_policy: never
@@ -25,8 +75,40 @@ services:
         read_only: true
         bind: {create_host_path: false}
       - type: bind
-        source: /run/mail-admin-helper
-        target: /run/mail-admin-helper
+        source: /opt/maddy/data
+        target: /data
+        bind: {create_host_path: false}
+      - type: bind
+        source: /opt/maddy/config/maddy.conf
+        target: /data/maddy.conf
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${MAIL_ADMIN_TLS_DIRECTORY:?Set validated immutable certificate generation}
+        target: /data/tls
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: /var/lib/mail-admin-helper
+        target: /var/lib/mail-admin-helper
+        bind: {create_host_path: false}
+      - type: bind
+        source: /run/lock/mail-admin-maddy.lock
+        target: /run/lock/mail-admin-maddy.lock
+        bind: {create_host_path: false}
+      - type: bind
+        source: /etc/mail-admin/deployment.json
+        target: /run/mail-admin-host/deployment.json
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: /etc/mail-admin/helper-policy.json
+        target: /run/mail-admin-host/helper-policy.json
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: /var/lib/mail-admin-backup/manifest.json
+        target: /run/mail-admin-host/backup-manifest.json
         read_only: true
         bind: {create_host_path: false}
       - type: bind
@@ -44,7 +126,9 @@ services:
         tmpfs:
           size: ${MAIL_ADMIN_TMPFS_LIMIT:?Set measured temporary filesystem limit}
           mode: 01777
+    tmpfs: [*maddy-runtime-tmpfs]
     environment:
+      LOCAL_HOST: "true"
       HASH_MEMORY_KIB: ${MAIL_ADMIN_HASH_MEMORY_KIB:?Set measured hash memory}
       HASH_PARALLELISM: ${MAIL_ADMIN_HASH_PARALLELISM:?Set measured hash concurrency}
       HTTP_CONCURRENCY: ${MAIL_ADMIN_HTTP_CONCURRENCY:?Set measured HTTP concurrency}

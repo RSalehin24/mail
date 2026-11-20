@@ -52,6 +52,8 @@ class RuntimeCompose:
                                       '-f', str(root / 'docker-compose.yml'),
                                       'config', '--format', 'json'))
         configuration = json.loads(result.stdout)
+        # The shipped project holds Maddy too; this fixture starts the dashboard against its own.
+        configuration['services'].pop('maddy')
         service = configuration['services']['mail-admin']
         service.update({'container_name': self.container, 'restart': 'no',
                         'labels': {'mail-admin.fixture': self.project},
