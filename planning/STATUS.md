@@ -8,7 +8,7 @@ Updated 2026-11-20. Resume here; do not re-derive earlier decisions ([DECISIONS]
 
 ## Next action
 
-1. Phase 0 is done. Backup check done (see below). Update done (see below). Next: owner decides on deploying it (T2/T3, needs restore point and approval), then Phase 1 (see PLAN).
+1. Phase 0 is done. Backup check done (see below). Update done (see below). Next: owner decides on deploying the Python 3.15 image and the timer fix together (T2/T3, needs restore point and approval), then Phase 1 (see PLAN).
 2. Confirm the 2026-11-20 dashboard backup (started 9:46 PM Dhaka) finished, and read why the 9:13 PM boot-time run failed.
 3. Delete `~/.cf_token` and revoke the temporary Cloudflare token (owner action).
 
@@ -20,6 +20,9 @@ Repo and image only, not deployed. Python 3.15.2 base image (digest-pinned), 18 
 
 ## Timer CPU measurement (2026-11-20 17:54 UTC, read-only)
 Starts in the last hour: recovery 932 (timer: 2 s after each run), backup-control 845 (3 s), forwarding 111 (30 s), tls-observation 29 (2 min), monitor 12 (5 min), independent-monitor 4 (15 min). Last-run CPU per start is about 0.3-0.4 s each, so these timers cost roughly 675 CPU-s per hour (about 19% of one core, estimate from last-run values); recovery and backup-control are about 90% of it. CPU pressure avg300 is 11%; memory 468 of 953 MB used; no swap.
+
+## Timer fix prepared in the repo (D-018, not deployed)
+New `host/systemd/mail-admin-backup-control.path` and `mail-admin-recovery.path` start each worker when its request database (`backup-control.db`, `recovery.db`) is closed after a write. Their timers are now 5-minute fallbacks (was 3 s and 2 s) and the idle catalog refresh is hourly (`CATALOG_REFRESH_SECONDS`, was 300 s). Expected: about 24 idle starts per hour instead of about 1,800, requests still start at once. Tests added: `tests/unit/test_systemd_units.py` and the hourly refresh test in `tests/unit/test_backup_control.py`; the restore installer fixture accepts `.path` units. Passing: lint, typecheck, unit, integration, and `make linux-check` (48 modules, Maddy, runtime and ACME included). Not verified: that `PathChanged` fires on the helper's SQLite writes on the real VM (check with a disposable test after deploy), and a self-retrigger loop is expected to stop after one idle run per job. Deploy needs: copy two units, `systemctl daemon-reload`, `systemctl enable --now` the two `.path` units, restart the two timers; rollback: disable the `.path` units and restore the old timer files (3 s and 2 s).
 
 ## Backup check (2026-11-20, read-only)
 - The 9:46 PM Dhaka backup (15:47 UTC) succeeded: verified, all 9 mailboxes, snapshot `0e9c0c45`, recovered alert sent. `restore_passed` is false: no restore test has run.

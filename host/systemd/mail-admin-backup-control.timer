@@ -1,8 +1,8 @@
 [Unit]
-Description=Process queued backup and restore requests
+Description=Fallback sweep for queued backup and restore requests and catalog refresh
 [Timer]
 OnBootSec=20s
-OnUnitInactiveSec=3s
-AccuracySec=1s
+OnUnitInactiveSec=5min
+AccuracySec=30s
 [Install]
 WantedBy=timers.target

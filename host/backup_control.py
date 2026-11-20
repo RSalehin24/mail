@@ -29,6 +29,9 @@ from shared.errors import ServiceError
 from shared.files import sync_directory
 from shared.validation import address
 
+# Jobs and the Refresh button update the catalog on demand; this is only the idle fallback.
+CATALOG_REFRESH_SECONDS = 3600
+
 ROOT = Path("/var/lib/mail-admin-helper")
 STAGING = Path("/var/lib/mail-admin-backup/restore-ui")
 
@@ -111,7 +114,7 @@ class BackupWorker:
                     "SELECT observed FROM observations WHERE id=1"
                 ).fetchone()
             if row is None:
-                if observation is None or time.time() - observation[0] >= 300:
+                if observation is None or time.time() - observation[0] >= CATALOG_REFRESH_SECONDS:
                     self.catalog()
                 return
             job = self.control.job(row["id"], private=True)

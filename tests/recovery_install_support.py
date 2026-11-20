@@ -130,7 +130,7 @@ class RecoveryInstallation:
     def install_units(self):
         for source in (self.root / 'units').iterdir():
             if (not source.is_file() or source.is_symlink()
-                or source.suffix not in {'.service', '.timer'}
+                or source.suffix not in {'.service', '.timer', '.path'}
                 or not source.name.startswith(('mail-admin-', 'maddy-cert-'))):
                 raise RuntimeError('Unexpected captured fixture unit')
             copy_owned(source, Path('/etc/systemd/system') / source.name)

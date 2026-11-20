@@ -1,0 +1,9 @@
+[Unit]
+Description=Start the recovery worker when a mailbox recovery request is written
+
+[Path]
+PathChanged=/var/lib/mail-admin-helper/recovery.db
+Unit=mail-admin-recovery.service
+
+[Install]
+WantedBy=paths.target

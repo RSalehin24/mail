@@ -1,5 +1,6 @@
 import json
 import tempfile
+import time
 import unittest
 import uuid
 from pathlib import Path
@@ -141,3 +142,41 @@ class BackupPublicationOutcomeTests(unittest.TestCase):
         self.assertTrue(result["verified"])
         self.assertEqual(result["reference"], "verified-reference")
         self.assertEqual(result["cleanup"]["state"], "failed")
+
+
+class BackupCatalogFallbackTests(unittest.TestCase):
+    def worker(self, observed_age):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        from host.backup_control import BackupWorker
+
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name)
+        worker = BackupWorker.__new__(BackupWorker)
+        worker.root, worker.control = root, BackupControl(root)
+        worker.context = SimpleNamespace(deployment={})
+        worker.cleanup_staging, worker.catalog = Mock(), Mock()
+        if observed_age is not None:
+            with worker.control.connect() as connection:
+                connection.execute(
+                    "INSERT INTO observations VALUES(1,?,?)", (time.time() - observed_age, "")
+                )
+        return worker
+
+    def test_idle_run_refreshes_only_a_missing_or_hour_old_catalog(self):
+        from unittest.mock import patch
+
+        from host.backup_control import CATALOG_REFRESH_SECONDS
+
+        for age, refreshed in (
+            (None, True),
+            (CATALOG_REFRESH_SECONDS - 60, False),
+            (CATALOG_REFRESH_SECONDS + 60, True),
+        ):
+            with self.subTest(age=age):
+                worker = self.worker(age)
+                with patch("host.backup_control.HostLock"):  # The lock needs root ownership.
+                    worker.run()
+                self.assertEqual(worker.catalog.called, refreshed)
