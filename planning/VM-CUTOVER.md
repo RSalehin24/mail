@@ -21,5 +21,12 @@ Goal: run Maddy and the dashboard as the same unprivileged user (uid/gid 10001, 
 ## Rollback (stay within 15 minutes; decide at step 8)
 Stop both containers; `chown -R 0:0` on `/opt/maddy/data` and `/var/lib/mail-admin-helper`; restore the saved compose files, `/etc/mail-admin/` and unit files from the restore directory; remove `state_owner_uid`; `systemctl daemon-reload`; start the old Maddy and old dashboard images; re-enable `mail-admin-helper.service`; run the same verification. If mail data looks damaged, restore from the fresh backup with the existing restore tooling (ask first).
 
+## Additions after the repo work (2026-11-21)
+- Production Maddy is 0.9.6, not 0.9.5: set `maddy_cli_version` to `0.9.6` in the deployment record (the dashboard's version check reads it).
+- Set top-level `state_owner_uid: 10001`; render `mail-admin.tmpfiles` and the units again so the shared lock files are created for 10001 at boot.
+- The new compose file defines both services in one project; the old `maddy_default` network name is dropped. Stop and remove the old two projects before `docker compose up`, and keep the old compose files for rollback.
+- The helper's socket unit and socket directory no longer exist in the repo: disable and mask `mail-admin-helper.service` on the VM and remove `/run/mail-admin-helper` after the cutover.
+- Records: `/etc/mail-admin/deployment.json`, `helper-policy.json` and `/var/lib/mail-admin-backup/manifest.json` must be root:10001 mode 0640 (root stays the owner).
+
 ## Not yet verified
 Whether the production Maddy digest behaves like the fixture build under a non-root user with `cap_drop: ALL`; ownership of the TLS generation directory seen by uid 10001; whether any systemd unit or tool assumes `/run/mail-admin-helper`; memory of the CLI inside the dashboard's 128 MiB limit under load; the deployment record's hash and approval fields.
