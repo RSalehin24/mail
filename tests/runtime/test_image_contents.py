@@ -7,6 +7,8 @@ import subprocess
 import unittest
 from pathlib import Path
 
+from helper.recovery import QUALIFIED_FILES
+
 ROOT = Path(__file__).resolve().parents[2]
 APPLICATION_ENTRIES = {"backend", "helper", "host", "shared", "static"}
 REPOSITORY_PACKAGES = ("backend", "helper", "host", "shared")
@@ -15,6 +17,8 @@ DEVELOPMENT_NAMES = {
     "tests", "tools", "docs", "planning", "verification", "frontend", "Dockerfile",
     "docker-compose.yml", "Makefile", "pyproject.toml", "README.md", ".git",
 }
+# The recovery qualification proof hashes these worker files, so the dashboard must hold them.
+QUALIFIED_HOST_FILES = {Path(name).name for name in QUALIFIED_FILES if name.startswith("host/")}
 IMAGE_LISTING = """
 import json, os, shutil
 entries = [os.path.relpath(os.path.join(base, name), "/app")
@@ -79,7 +83,7 @@ class RuntimeImageContentsTests(unittest.TestCase):
         needed = {
             module.split(".")[1] + ".py" if module != "host" else "__init__.py"
             for module in import_closure(application_modules()) if module.split(".")[0] == "host"
-        } | {"__init__.py"}
+        } | {"__init__.py"} | QUALIFIED_HOST_FILES
         present = {Path(entry).name for entry in self.image["entries"]
                    if entry.startswith("host/") and entry.endswith(".py")}
         self.assertEqual(present, needed)
