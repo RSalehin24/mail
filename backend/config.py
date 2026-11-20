@@ -19,6 +19,7 @@ class Settings:
     operation_timeout: float
     email_otp_enabled: bool = False
     permanent_deletion_enabled: bool = False
+    local_host: bool = False
 
     @classmethod
     def from_environment(cls) -> Settings:
@@ -38,4 +39,5 @@ class Settings:
             timeout,
             capability(os.environ.get("EMAIL_OTP_ENABLED", "false")),
             capability(os.environ.get("PERMANENT_DELETION_ENABLED", "false")),
+            capability(os.environ.get("LOCAL_HOST", "false")),
         )

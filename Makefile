@@ -22,13 +22,13 @@ unit:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) tools/run_tests.py unit
 integration:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) tools/run_tests.py integration
-maddy-integration: fixture-space wheels restic
+maddy-integration: fixture-space wheels restic build
 	docker build --platform linux/amd64 --target qualification -t mail-admin:qualification .
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) tools/run_linux.py
 runtime-integration: build restic
 	docker build --platform linux/amd64 --target qualification -t mail-admin:qualification .
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) tools/run_linux.py --suite runtime
-acme-integration: fixture-space wheels restic
+acme-integration: fixture-space wheels restic build
 	docker build --platform linux/amd64 --target qualification -t mail-admin:qualification .
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) tools/run_linux.py --suite acme
 linux-check: maddy-integration runtime-integration acme-integration

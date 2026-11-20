@@ -7,23 +7,17 @@ from backend.auth import AuthDependencies, Authentication
 from backend.authorization import COOKIE_NAME
 from backend.config import Settings
 from backend.enrollment import Enrollment
+from backend.local_host import LocalHost
 from backend.mailboxes import Mailboxes
 from backend.main import create_app
 from backend.relay import Relay, RelayDependencies
 from backend.services import Services
 from backend.work import WorkPool
-from helper.protocol import HelperRequest
 from tests.auth_support import AuthFixture
 from tests.helper_support import HelperFixture
 from tests.support import StateFixture
 
-
-class DirectHelper:
-    def __init__(self, helper):
-        self.helper = helper
-
-    def call(self, request):
-        return self.helper.handle(HelperRequest.parse({"protocol": 1, **request}))
+DirectHelper = LocalHost  # The tests drive the production in-process facade.
 
 
 class FakeRelayTransport:

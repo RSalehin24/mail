@@ -15,7 +15,7 @@ from backend.binds import require_runtime_sources
 from backend.config import Settings
 from backend.database import Database
 from backend.dns import observe_mx
-from backend.helper_client import HelperClient
+from backend.helper_client import HelperAccess, HelperClient
 from backend.mailboxes import Mailboxes
 from backend.relay import Relay, RelayDependencies, SmtpTransport
 from backend.secrets import SecretKeys
@@ -64,9 +64,16 @@ class Services:
         authentication = Authentication(
             AuthDependencies(database, keys, hasher, time.time, settings.email_otp_enabled)
         )
-        helper = HelperClient(
-            Path("/run/mail-admin-helper/control.sock"), settings.operation_timeout
-        )
+        helper: HelperAccess
+        if settings.local_host:
+            # Imported on demand: the runtime image gains the helper package with this setting.
+            from backend.local_host import create_local_host
+
+            helper = create_local_host(settings.operation_timeout)
+        else:
+            helper = HelperClient(
+                Path("/run/mail-admin-helper/control.sock"), settings.operation_timeout
+            )
         def synchronize(values: dict[str, Any]) -> None:
             result = helper.call({"operation": "submission_sync", "request_id": str(uuid.uuid4()),
                                   **values})
