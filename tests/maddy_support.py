@@ -306,3 +306,53 @@ class RealMaddyFixture:
             path.write_text(json.dumps(observation, indent=2) + "\n")
         finally:
             self.command(("rm", "--force", self.identifier))
+
+
+SERVICE_ID = 10001
+
+
+def maddy_image_reference():
+    """The pinned image the runtime image copies its Maddy binary from, so both match."""
+    dockerfile = Path(__file__).resolve().parents[1] / "Dockerfile"
+    match = re.search(r"^FROM (\S+) AS maddy-binary$", dockerfile.read_text(), re.MULTILINE)
+    if match is None:
+        raise RuntimeError("The Dockerfile must name the pinned maddy-binary stage")
+    return match[1]
+
+
+def own_tree(path):
+    os.chown(path, SERVICE_ID, SERVICE_ID)
+    for root, directories, files in os.walk(path):
+        for name in directories + files:
+            os.chown(Path(root, name), SERVICE_ID, SERVICE_ID)
+
+
+def maddy_runtime_tmpfs():
+    return (f"/run/maddy:size={MADDY_RUNTIME_TMPFS_BYTES},mode=0700,"
+            f"uid={SERVICE_ID},gid={SERVICE_ID}")
+
+
+class ProductionImageMaddy(DockerMaddy):
+    def expected_cli_version(self):
+        return "0.9.6"
+
+
+class UnprivilegedMaddyFixture(RealMaddyFixture):
+    """The production Maddy image, as the dashboard's user with every capability dropped."""
+
+    additional_arguments = (
+        "--user", f"{SERVICE_ID}:{SERVICE_ID}", "--cap-drop", "ALL",
+        "--security-opt", "no-new-privileges:true",
+    )
+    maddy_class = ProductionImageMaddy
+
+    def image_reference(self):
+        return maddy_image_reference()
+
+    def runtime_tmpfs(self):
+        return maddy_runtime_tmpfs()
+
+    def launch(self):
+        for path in (self.data, self.configuration, self.tls):
+            own_tree(path)
+        return super().launch()

@@ -5,10 +5,9 @@ import json
 import os
 import uuid
 
-from tests.maddy_support import imap_login
+from tests.maddy_support import SERVICE_ID, imap_login
 from tests.restore_support import bodies, deliver
-from tests.runtime.test_mail_flow import MailFlowFixture
-from tests.runtime_local_support import SERVICE_ID, LocalHostRuntime, UnprivilegedMaddyFixture
+from tests.runtime_mail_support import MailFlowFixture
 
 DOCKER_SOCKET = "docker.sock"
 NO_DOCKER_PROBE = (
@@ -20,15 +19,6 @@ NO_DOCKER_PROBE = (
 
 
 class LocalHostFlowTests(MailFlowFixture):
-    def create_maddy(self):
-        return UnprivilegedMaddyFixture()
-
-    def create_web(self):
-        return LocalHostRuntime(self.maddy)
-
-    def journal(self):
-        return self.web.journal()
-
     def create_mailbox(self, email, password):
         payload = {
             "request_id": str(uuid.uuid4()),
@@ -77,7 +67,7 @@ class LocalHostFlowTests(MailFlowFixture):
         for path in paths:
             with self.subTest(path=path.name):
                 self.assertEqual(os.stat(path).st_uid, SERVICE_ID)
-        self.assertIsNotNone(self.journal())
+        self.assertIsNotNone(self.web.journal())
 
     def test_dashboard_container_has_no_docker_access_and_no_helper_socket(self):
         record = json.loads(self.web.command(("inspect", self.web.identifier)).stdout)[0]

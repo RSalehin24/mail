@@ -6,7 +6,7 @@ from pathlib import Path
 
 from shared.runtime_policy import RUNTIME_POLICY_NAME, RuntimePolicy
 from tests.runtime_auth_support import RuntimeAuthentication
-from tests.runtime_support import RuntimeFixture
+from tests.runtime_support import AUTHENTICATED_PROBE, RuntimeFixture
 
 
 class RuntimeTests(unittest.TestCase):
@@ -30,25 +30,12 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(str(uuid.UUID(body["request_id"])), body["request_id"])
         self.assertEqual(headers["cache-control"], "no-store")
 
-    def test_real_https_enrollment_cookie_helper_and_deletion_capability(self):
+    def test_real_https_enrollment_cookie_and_logout_close_the_session(self):
         self.assertEqual(self.fixture.api("GET", "/api/accounts")[0], 401)
         self.enroll()
         self.login()
-        email = "runtime-fixture@rsalehin24.me"
-        password = " preserved runtime fixture password "
-        status, headers, result = self.fixture.api(
-            "POST",
-            "/api/accounts/create",
-            {"request_id": str(uuid.uuid4()), "email": email, "password": password},
-        )
-        self.assertEqual(status, 200)
-        self.assertEqual(result["state"], "complete")
-        self.assertEqual(headers["cache-control"], "no-store")
-        status, _, rows = self.fixture.api("GET", "/api/accounts")
-        self.assertEqual(status, 200)
-        self.assertEqual(rows[0]["email"], email)
-        self.assertEqual(self.fixture.host.maddy.calls[0][1], password)
-        self.assertNotIn(password.encode(), self.fixture.database.path.read_bytes())
+        status, headers, _ = self.fixture.api("GET", "/api/status")
+        self.assertEqual((status, headers["cache-control"]), (200, "no-store"))
         self.assertEqual(self.fixture.api("POST", "/api/logout", {})[0], 200)
         self.assertEqual(self.fixture.api("GET", "/api/accounts")[0], 401)
 
@@ -57,7 +44,7 @@ class RuntimeTests(unittest.TestCase):
         self.login()
         self.fixture.command(("restart", self.fixture.identifier))
         self.fixture.ready()
-        self.assertEqual(self.fixture.api("GET", "/api/accounts")[0], 200)
+        self.assertEqual(self.fixture.api("GET", AUTHENTICATED_PROBE)[0], 200)
         status, _, _ = self.fixture.api("POST", "/api/setup", {"token": "invented"})
         self.assertEqual(status, 403)
 
@@ -66,12 +53,12 @@ class RuntimeTests(unittest.TestCase):
         self.login()
         self.fixture.database.path.chmod(0o400)
         try:
-            status, headers, _ = self.fixture.api("GET", "/api/accounts")
+            status, headers, _ = self.fixture.api("GET", AUTHENTICATED_PROBE)
             self.assertEqual(status, 503)
             self.assertEqual(headers["cache-control"], "no-store")
         finally:
             self.fixture.database.path.chmod(0o600)
-        self.assertEqual(self.fixture.api("GET", "/api/accounts")[0], 200)
+        self.assertEqual(self.fixture.api("GET", AUTHENTICATED_PROBE)[0], 200)
 
     def test_missing_initialized_database_cannot_reopen_setup_on_restart(self):
         self.enroll()
@@ -140,7 +127,7 @@ class RuntimeTests(unittest.TestCase):
         policy.resume()
         self.fixture.command(("start", self.fixture.identifier))
         self.fixture.ready()
-        self.assertEqual(self.fixture.api("GET", "/api/accounts")[0], 200)
+        self.assertEqual(self.fixture.api("GET", AUTHENTICATED_PROBE)[0], 200)
 
     def test_runtime_privileges_mounts_image_tools_and_measured_container_memory(self):
         source = (

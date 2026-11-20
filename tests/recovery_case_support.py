@@ -19,8 +19,10 @@ from tests.restore_support import DashboardRecoveryFixture, RecoveryArchive, bod
 
 
 class RecoveryCase(unittest.TestCase):
+    maddy_class = RealMaddyFixture
+
     def setUp(self):
-        self.fixture = RealMaddyFixture()
+        self.fixture = self.maddy_class()
         self.addCleanup(self.fixture.close)
         self.fixture.start()
 

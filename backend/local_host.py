@@ -3,7 +3,7 @@
 import os
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from helper.deletion import DeletionPaths
 from helper.dependencies import HostLocations, build_dependencies
@@ -13,6 +13,7 @@ from helper.maddy_restart import local_relay_actions
 from helper.protocol import HelperRequest
 from helper.service import HostHelper
 from host.preflight import provision_lock
+from shared.errors import ServiceError
 from shared.files import protected_json
 from shared.validation import HELPER_PROTOCOL
 
@@ -37,6 +38,10 @@ LOCAL_LOCATIONS = HostLocations(
 )
 
 
+class HelperAccess(Protocol):
+    def call(self, request: dict[str, Any]) -> dict[str, Any]: ...
+
+
 class LocalHost:
     """Same call interface as the socket client; there is no lost response to look up."""
 
@@ -44,7 +49,11 @@ class LocalHost:
         self.helper = helper
 
     def call(self, request: dict[str, Any]) -> dict[str, Any]:
-        return self.helper.handle(HelperRequest.parse({"protocol": HELPER_PROTOCOL, **request}))
+        try:
+            return self.helper.handle(HelperRequest.parse({"protocol": HELPER_PROTOCOL, **request}))
+        except (OSError, ValueError, KeyError, TypeError, RecursionError) as error:
+            # What the socket server used to turn into a safe 503: a host failure is never a 500.
+            raise ServiceError("helper_unavailable", 503) from error
 
 
 def create_local_host(timeout: float, locations: HostLocations = LOCAL_LOCATIONS) -> LocalHost:

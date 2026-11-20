@@ -8,8 +8,9 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 
-from tools.browser_inputs import pinned_inputs
 from tools.qualification_bundle import QualificationBundle, validate_report_time
+
+from tools.browser_inputs import pinned_inputs
 from tools.run_tests import source_digest
 
 

@@ -3,20 +3,23 @@ import dataclasses
 import hashlib
 import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from unittest.mock import patch
 
 from helper.protocol import HelperRequest
 from shared.errors import ServiceError
 from shared.files import atomic_json, protected_json
+from tests.maddy_support import UnprivilegedMaddyFixture
 from tests.recovery_case_support import RecoveryCase
 from tests.restore_support import deliver
 from tests.runtime_auth_support import RuntimeAuthentication
-from tests.runtime_crash_support import CommandBarrier, DeletionEnabledRuntime, wait_for_complete
+from tests.runtime_crash_support import DeletionEnabledRuntime
 
 
 class GuardedDeletionTests(RecoveryCase):
+    # The dashboard runs as the Maddy user, so the shared Maddy data must belong to that user.
+    maddy_class = UnprivilegedMaddyFixture
+
     def setUp(self):
         super().setUp()
         self.email = self.create('guarded-recovery')
@@ -77,8 +80,8 @@ class GuardedDeletionTests(RecoveryCase):
             atomic_json(self.paths.backup, baseline)
             self.write_policy(policy)
 
-    def test_pending_https_delete_resolves_once_and_old_backup_cannot_cover_recreated_mail(self):
-        web = DeletionEnabledRuntime(self.helper)
+    def start_dashboard(self):
+        web = DeletionEnabledRuntime(self.fixture)
         self.addCleanup(web.close)
         web.start()
         authentication = RuntimeAuthentication(self, web)
@@ -86,54 +89,25 @@ class GuardedDeletionTests(RecoveryCase):
         authentication.login()
         authentication.reauthenticate()
         self.assertEqual(web.api('GET', '/api/accounts')[0], 200)
-        payload = {'request_id': self.request.request_id, 'confirmation': self.email,
-                   'acknowledged': True, 'cutoff': self.request.cutoff}
-        self.complete_after_observed_pending(web, payload)
-        status, _, outcome = web.api('DELETE', '/api/accounts/' + self.email, payload)
-        # Retain only the API's stable error identifier, never the full response
-        # (which may contain private fixture data), when this acceptance step fails.
-        self.assertEqual(status, 200, f"Deletion error identifier: {outcome.get('error')}")
-        self.assertEqual(outcome.get('state'), 'complete')
-        self.assertEqual(self.fixture.maddy.inventories(), {'credentials': [], 'storage': []})
-        with web.database.transaction() as database:
-            self.assertEqual(database.execute('SELECT COUNT(*) FROM mailboxes').fetchone()[0], 0)
-        recreated = self.create('guarded-recovery')
-        self.assertEqual(recreated, self.email)
-        old_generation = self.archive.manifest['accounts'][self.email]['generation']
-        self.assertNotEqual(self.helper.journal.incarnation(self.email)['generation'],
-                            old_generation)
-        deliver(self.fixture, self.email, self.body.decode())
-        request = dataclasses.replace(self.request, request_id=str(uuid.uuid4()))
-        self.assert_rejected_without_mutation(request)
+        return web
 
-    def complete_after_observed_pending(self, web, payload):
-        barrier = CommandBarrier(self.fixture.maddy.change, ('creds', 'remove'))
-        with (patch.object(self.fixture.maddy, 'change', side_effect=barrier),
-              ThreadPoolExecutor(max_workers=1) as workers):
-            response = workers.submit(web.api, 'DELETE', '/api/accounts/' + self.email, payload)
-            try:
-                self.assertTrue(barrier.reached.wait(10))
-                status, headers, outcome = response.result(timeout=8)
-                self.assertEqual(headers['cache-control'], 'no-store')
-                self.assert_pending_response(status, outcome)
-                self.assertEqual(web.api('GET', '/api/status')[0], 200)
-            finally:
-                barrier.release.set()
-            record = wait_for_complete(self.helper.journal, self.request.request_id)
-            self.assertEqual(record['state'], 'complete')
-        self.assertEqual(sum(arguments[:2] == ('creds', 'remove')
-                             for arguments in barrier.arguments), 1)
-        self.assertEqual(sum(arguments[:2] == ('imap-acct', 'remove')
-                             for arguments in barrier.arguments), 1)
-
-    def assert_pending_response(self, status, outcome):
-        if status == 503:
-            self.assertEqual(outcome['error'], 'operation_pending')
-            self.assertEqual(outcome['operation_id'], self.request.request_id)
-            return
-        self.assertEqual((status, outcome['state']), (200, 'pending'))
-        self.assertEqual(outcome['request_id'], self.request.request_id)
-        self.assertIn('some messages may already have been removed', outcome['warning'])
+    def test_https_delete_outliving_the_deadline_never_repeats_removal_and_stays_unresolved(self):
+        web = self.start_dashboard()
+        payload = {'request_id': str(uuid.uuid4()), 'confirmation': self.email,
+                   'acknowledged': True, 'cutoff': web.authorize(self.email)}
+        web.hold_after('creds remove')
+        _, headers, outcome = web.api('DELETE', '/api/accounts/' + self.email, payload)
+        self.assertEqual(headers['cache-control'], 'no-store')
+        self.assertNotEqual(outcome.get('state'), 'complete')
+        self.assertTrue(web.held())
+        web.clear_hold()
+        self.assertEqual(len(web.calls('creds remove')), 1)
+        retried = web.api('DELETE', '/api/accounts/' + self.email, payload)[2]
+        self.assertNotEqual(retried.get('state'), 'complete')
+        self.assertEqual(len(web.calls('creds remove')), 1)
+        self.assertEqual(len(web.calls('imap-acct remove')), 0)
+        self.assertNotEqual(web.journal().lookup(payload['request_id'])['state'], 'complete')
+        self.assertEqual(self.fixture.maddy.inventories()['credentials'], [])
 
     def test_unavailable_or_tampered_archive_and_forged_cutoff_cannot_authorize_real_deletion(self):
         baseline = self.archive.manifest
@@ -202,16 +176,9 @@ class GuardedDeletionTests(RecoveryCase):
         self.helper.dependencies.deletion.check(self.request, self.helper.journal)
 
     def test_https_delete_updates_metadata_and_old_backup_cannot_cover_recreated_mail(self):
-        web = DeletionEnabledRuntime(self.helper)
-        self.addCleanup(web.close)
-        web.start()
-        authentication = RuntimeAuthentication(self, web)
-        authentication.enroll()
-        authentication.login()
-        authentication.reauthenticate()
-        self.assertEqual(web.api('GET', '/api/accounts')[0], 200)
-        payload = {'request_id': self.request.request_id, 'confirmation': self.email,
-                   'acknowledged': True, 'cutoff': self.request.cutoff}
+        web = self.start_dashboard()
+        payload = {'request_id': str(uuid.uuid4()), 'confirmation': self.email,
+                   'acknowledged': True, 'cutoff': web.authorize(self.email)}
         status, _, outcome = web.api('DELETE', '/api/accounts/' + self.email, payload)
         self.assertEqual((status, outcome['state']), (200, 'complete'))
         self.assertEqual(self.fixture.maddy.inventories(), {'credentials': [], 'storage': []})

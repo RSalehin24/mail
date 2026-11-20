@@ -11,10 +11,8 @@ from tests.recovery_activation_support import credential_digest, verify_mail
 from tests.recovery_web_support import RecoveredHttps, restored_permissions
 
 CLIENT = """import json,sys
-from pathlib import Path
-from backend.helper_client import HelperClient
-print(json.dumps(HelperClient(Path('/run/mail-admin-helper/control.sock'),30).call(
- json.load(sys.stdin))))
+from backend.local_host import create_local_host
+print(json.dumps(create_local_host(30).call(json.load(sys.stdin))))
 """
 
 
@@ -69,10 +67,11 @@ class RestoredBoot:
             or observed['HostConfig']['CapDrop'] != ['ALL']
             or observed['HostConfig']['Privileged']):
             raise RuntimeError('Restored dashboard privileges changed at boot')
-        binding = next(m for m in observed['Mounts']
-                       if m['Destination'] == '/run/mail-admin-helper')
-        if binding['Source'] != '/run/mail-admin-helper' or binding['RW']:
-            raise RuntimeError('Restored helper socket bind changed at boot')
+        destinations = {m['Destination']: m for m in observed['Mounts']}
+        state = destinations.get('/var/lib/mail-admin-helper')
+        if (state is None or not state['RW'] or '/run/mail-admin-helper' in destinations
+                or any('docker.sock' in m['Source'] for m in observed['Mounts'])):
+            raise RuntimeError('Restored dashboard host mounts changed at boot')
 
     def client(self, request):
         import subprocess

@@ -50,8 +50,47 @@ services:
         bind:
           create_host_path: false
       - type: bind
-        source: /run/mail-admin-helper
-        target: /run/mail-admin-helper
+        source: /opt/maddy/data
+        target: /data
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /opt/maddy/config/maddy.conf
+        target: /data/maddy.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${MAIL_ADMIN_TLS_DIRECTORY:?Set validated immutable certificate generation}
+        target: /data/tls
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /var/lib/mail-admin-helper
+        target: /var/lib/mail-admin-helper
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /run/lock/mail-admin-maddy.lock
+        target: /run/lock/mail-admin-maddy.lock
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /etc/mail-admin/deployment.json
+        target: /run/mail-admin-host/deployment.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /etc/mail-admin/helper-policy.json
+        target: /run/mail-admin-host/helper-policy.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /var/lib/mail-admin-backup/manifest.json
+        target: /run/mail-admin-host/backup-manifest.json
         read_only: true
         bind:
           create_host_path: false
@@ -72,6 +111,8 @@ services:
         tmpfs:
           size: ${MAIL_ADMIN_TMPFS_LIMIT:?Set measured temporary filesystem limit}
           mode: 01777
+    tmpfs:
+      - /run/maddy:size=1048576,mode=0700,uid=${MAIL_ADMIN_UID},gid=${MAIL_ADMIN_GID}
     environment:
       - ADMIN_EMAIL=rsalehin24@gmail.com
       - PRIMARY_DOMAIN=rsalehin24.me
@@ -81,13 +122,13 @@ services:
       - PERMANENT_DELETION_ENABLED=${MAIL_ADMIN_PERMANENT_DELETION_ENABLED:-false}
 ```
 
-Prepare the data directory for the service UID/GID. Keep helper code, its socket directory, secret files, and `/etc/mail-admin/installation.json` root-owned; grant the dedicated group only the access it needs. The socket must be `0660` in a `0750` directory, and secret files/installation marker must be `0640` or stricter. Match the socket group to the container GID and verify unauthorized local users cannot connect. Provision the marker and its expected database identity before startup. The Compose example caps the dashboard's rotated logs at three 10 MB files using the [Docker local logging driver](https://docs.docker.com/engine/logging/drivers/local/).
+Prepare the data directory for the service UID/GID. Keep the host records mounted under `/run/mail-admin-host`, secret files, and `/etc/mail-admin/installation.json` root-owned; grant the dedicated group only the access it needs. The `maddy` service in the shipped `docker-compose.yml` runs as the same UID/GID, and `/opt/maddy/data` belongs to that user. Secret files, the installation marker and the host records must be `0640` or stricter and root-owned with the container GID as group. Provision the marker and its expected database identity before startup. The Compose example caps the dashboard's rotated logs at three 10 MB files using the [Docker local logging driver](https://docs.docker.com/engine/logging/drivers/local/).
 
-Provision every bind source deliberately and verify its expected type, ownership, and contents. Long syntax with `create_host_path: false` rejects missing sources rather than creating directories; application checks still reject a missing database, incorrect marker, unreadable key, or empty certificate mount. Keep the helper directory inode stable across restarts as specified in the [helper contract](helper.md).
+Provision every bind source deliberately and verify its expected type, ownership, and contents. Long syntax with `create_host_path: false` rejects missing sources rather than creating directories; application checks still reject a missing database, incorrect marker, unreadable key, or empty certificate mount. The dashboard runs the helper operations in-process, so the state directory and lock file are bind-mounted from the host and owned by the service user.
 
 Render capability flags from the reviewed deployment inputs and compare them with the effective container environment. Missing flags default to disabled; parse only literal `true`/`false` and fail startup for other values. The root helper independently reads deletion enablement from the root-owned deployment record; never trust web-supplied enablement. Email OTP enablement also requires current relay readiness, so enabling its deployment flag alone never authorizes sending.
 
-The existing TLS private key is `0640`; grant the dedicated group read access without making it world-readable. Preserve that ownership/group and mode in every certificate generation, including directory traversal access for the dedicated group. Verify the non-root container can read the certificate and key, write only its data/temporary paths, and use only the helper's permitted protocol. Confirm host and GCP firewall ingress for HTTPS before external rollout; the absence of a current 443 listener does not establish the firewall policy.
+The existing TLS private key is `0640`; grant the dedicated group read access without making it world-readable. Preserve that ownership/group and mode in every certificate generation, including directory traversal access for the dedicated group. Verify the non-root container can read the certificate and key, write only its data, state and temporary paths, and never gain Docker access. Confirm host and GCP firewall ingress for HTTPS before external rollout; the absence of a current 443 listener does not establish the firewall policy.
 
 #### [MODIFY] Existing Maddy Data Permissions
 
@@ -104,7 +145,7 @@ exec /bin/maddy "$@"
 
 The launcher sets permissions and forwards argument boundaries to one fixed executable; it interprets no request text and requires no additional runtime/compiler dependency. Keep the file and all writable parent directories under root control. Preserve the verified Maddy configuration by setting its entrypoint to `["/usr/local/libexec/mail-admin-maddy", "-config", "/data/maddy.conf"]` and its command to `["run"]`; retain all existing mounts/environment/ports and the recorded image identity. The helper invokes `docker exec -i maddy /usr/local/libexec/mail-admin-maddy` followed by its fixed validated CLI arguments. Document the same launcher for operator CLI mutations so they cannot accidentally recreate permissive files.
 
-Changing the Maddy entrypoint/mount requires container recreation in the maintenance window; it does not authorize an image upgrade. Verify the daemon's process umask and helper-path behavior in isolation, then verify newly delivered messages, newly created accounts/folders, and recreated SQLite companion files retain restrictive modes. Denied read/traversal checks as `nobody` must pass while normal SMTP delivery, IMAP reads/writes, credential management, and backups still succeed. The dashboard UID must have no direct host access to Maddy data.
+Changing the Maddy entrypoint/mount requires container recreation in the maintenance window; it does not authorize an image upgrade. Verify the daemon's process umask and helper-path behavior in isolation, then verify newly delivered messages, newly created accounts/folders, and recreated SQLite companion files retain restrictive modes. Denied read/traversal checks as `nobody` must pass while normal SMTP delivery, IMAP reads/writes, credential management, and backups still succeed. The dashboard runs as the same user as Maddy and mounts its data directory (accepted risk D-019); it must still have no Docker access.
 
 #### [MODIFY] Host Swap Configuration
 

@@ -4,7 +4,7 @@ from contextlib import closing
 
 from shared.validation import SCHEMA_VERSION
 from tests.runtime_auth_support import RuntimeAuthentication
-from tests.runtime_support import RuntimeFixture
+from tests.runtime_support import AUTHENTICATED_PROBE, RuntimeFixture
 from tests.schema_fault_support import interrupted_schema
 
 
@@ -32,7 +32,7 @@ class SchemaStartupTests(unittest.TestCase):
     def assert_compatible_restart(self):
         self.fixture.command(('start', self.fixture.identifier))
         self.fixture.ready()
-        self.assertEqual(self.fixture.api('GET', '/api/accounts')[0], 200)
+        self.assertEqual(self.fixture.api('GET', AUTHENTICATED_PROBE)[0], 200)
         self.assertEqual(self.fixture.api('POST', '/api/setup', {'token': 'invented'})[0], 403)
 
     def test_incompatible_schema_exits_without_accepting_writes_or_replacing_existing_state(self):

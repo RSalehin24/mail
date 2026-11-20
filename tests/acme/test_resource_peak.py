@@ -6,7 +6,7 @@ import uuid
 from pathlib import Path
 
 from tests.resource_support import container_memory, wait_for_probe
-from tests.runtime.test_mail_flow import MailFlowFixture
+from tests.runtime_mail_support import MailFlowFixture
 from tools.resources import MADDY_MEMORY_MIB, WEB_MEMORY_MIB, fixture_budget
 from tools.run_tests import controller_memory, source_digest
 

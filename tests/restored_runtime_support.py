@@ -25,5 +25,4 @@ class RestoredRuntimeFixture(RuntimeFixture):
             (self.restored / "dashboard", "/app/data"),
             (self.restored / "operator/secrets", "/run/secrets/mail-admin"),
             (self.restored / "operator/installation.json", "/run/mail-admin-installation.json"),
-            (self.directories["socket"], "/run/mail-admin-helper"),
-        )
+        ) + self.host_sources()

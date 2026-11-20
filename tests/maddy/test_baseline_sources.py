@@ -7,7 +7,7 @@ from host.backup import FULL_STATE_SOURCES
 from host.baseline import BaselineServices
 from shared.errors import ServiceError
 from tests.runtime_auth_support import RuntimeAuthentication
-from tests.runtime_support import RuntimeFixture
+from tests.runtime_support import AUTHENTICATED_PROBE, RuntimeFixture
 
 
 class BaselineWeb(RuntimeFixture):
@@ -57,7 +57,7 @@ class BaselineSourceTests(unittest.TestCase):
                 ServiceError, 'baseline_dashboard_sources_incomplete',
             ):
                 self.services(FULL_STATE_SOURCES - {missing}).require_existing_dashboard_sources()
-        self.assertEqual(self.web.api('GET', '/api/accounts')[0], 200)
+        self.assertEqual(self.web.api('GET', AUTHENTICATED_PROBE)[0], 200)
         self.services(FULL_STATE_SOURCES).require_existing_dashboard_sources()
         self.web.command(('stop', '--time', '30', self.web.identifier))
         with self.assertRaisesRegex(ServiceError, 'baseline_dashboard_sources_incomplete'):

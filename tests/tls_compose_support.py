@@ -6,12 +6,14 @@ import uuid
 from pathlib import Path
 
 from host.docker import Docker
+from tests.maddy_support import maddy_runtime_tmpfs
+from tests.runtime_support import RuntimeFixture
 from tools.resources import MADDY_MEMORY_MIB, WEB_MEMORY_MIB
 
 
 def bind(source, target):
     return {'type': 'bind', 'source': str(source), 'target': target,
-            'read_only': target != '/data' and target != '/app/data',
+            'read_only': target not in RuntimeFixture.writable_targets,
             'bind': {'create_host_path': False}}
 
 
@@ -54,7 +56,8 @@ class ConsumerCompose:
         web = self.base('mail-admin', os.environ['MAIL_ADMIN_RUNTIME_REFERENCE'], WEB_MEMORY_MIB)
         web.update({'user': '10001:10001', 'read_only': True, 'cap_drop': ['ALL'],
                     'security_opt': ['no-new-privileges:true'], 'ports': ['127.0.0.1::8443'],
-                    'tmpfs': ['/tmp:size=8388608,mode=1777'],  # noqa: S108 -- private tmpfs.
+                    'tmpfs': ['/tmp:size=8388608,mode=1777',  # noqa: S108 -- private tmpfs.
+                              maddy_runtime_tmpfs()],
                     'environment': {'HASH_MEMORY_KIB': '8192', 'HASH_PARALLELISM': '1',
                                     'HTTP_CONCURRENCY': '4', 'OPERATION_TIMEOUT_SECONDS': '5'},
                     'volumes': [bind(self.web.daemon_path(source), target)

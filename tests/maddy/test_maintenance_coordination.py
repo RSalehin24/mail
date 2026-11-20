@@ -11,6 +11,7 @@ from shared.errors import ServiceError
 from tests.offline_consumer_support import OfflineFixtureConsumer
 from tests.process_fault_support import kill_at_observed_boundary
 from tests.runtime_auth_support import RuntimeAuthentication
+from tests.runtime_support import AUTHENTICATED_PROBE
 from tests.standalone_tls_support import StandaloneTls
 
 
@@ -87,7 +88,7 @@ class MaintenanceCoordinationTests(unittest.TestCase):
         self.assertEqual(web.api('GET', '/api/accounts')[0], 401)
         self.authentication.codes = list(operation.consumer.material.codes)
         self.authentication.login()
-        self.assertEqual(web.api('GET', '/api/accounts')[0], 200)
+        self.assertEqual(web.api('GET', AUTHENTICATED_PROBE)[0], 200)
 
     def test_first_dashboard_registration_cannot_race_real_renewal_activation(self):
         services = self.scene.services

@@ -2,15 +2,12 @@ import subprocess
 import unittest
 
 from tests.runtime_compose_support import RuntimeCompose, displaced_source
-from tests.runtime_local_support import LocalHostRuntime, UnprivilegedMaddyFixture
+from tests.runtime_support import RuntimeFixture
 
 
 class BindAdmissionTests(unittest.TestCase):
     def setUp(self):
-        maddy = UnprivilegedMaddyFixture()
-        self.addCleanup(maddy.close)
-        maddy.start()
-        self.fixture = LocalHostRuntime(maddy)
+        self.fixture = RuntimeFixture()
         self.addCleanup(self.fixture.close)
         self.compose = RuntimeCompose(self.fixture)
         self.addCleanup(self.compose.close)

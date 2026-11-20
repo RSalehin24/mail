@@ -1,24 +1,30 @@
-"""Actual non-root HTTPS runtime with real filesystem and Unix helper transport."""
+"""Actual non-root HTTPS runtime: the dashboard runs the host operations in-process."""
 
 import http.client
 import json
 import os
 import ssl
-import threading
 import time
 import uuid
 from pathlib import Path
 
 from backend.provisioning import InstallationPaths, create_installation
-from helper.server import HelperServer, SocketPolicy
+from helper.journal import Journal
 from host.docker import Docker
 from host.image_tools import ImageTools
 from shared.runtime_policy import RUNTIME_POLICY_NAME
-from tests.helper_support import HelperFixture
+from tests.maddy_support import SERVICE_ID, maddy_runtime_tmpfs
+from tests.support import StateFixture
 from tests.tls_support import CertificateFixture
 from tools.resources import WEB_MEMORY_MIB
 
 STARTUP_TIMEOUT_SECONDS = 15
+# An authenticated read that needs no Maddy, for fixtures that run without a mail server.
+AUTHENTICATED_PROBE = "/api/session"
+OPERATION_TIMEOUT_SECONDS = 5
+STATE_TARGET = "/var/lib/mail-admin-helper"
+LOCK_TARGET = "/run/lock/mail-admin-maddy.lock"
+HOST_RECORDS_TARGET = "/run/mail-admin-host/"
 RESOURCE_OBSERVATION = """import json
 from pathlib import Path
 fields = {'Name', 'State', 'Threads', 'VmRSS', 'VmHWM'}
@@ -35,15 +41,37 @@ print(json.dumps({
 """
 
 
-class RuntimeFixture:
-    writable_targets = frozenset({"/app/data"})
-    extra_arguments = ()
-    extra_environment = ()
+class MaddyFiles:
+    """The paths the dashboard mounts from Maddy; a started Maddy fixture supplies real ones."""
 
-    def __init__(self, helper=None):
-        self.host = HelperFixture()
-        self.root = self.host.root
-        self.directories = {name: self.root / name for name in ("data", "keys", "socket")}
+    def __init__(self, data, configuration, tls):
+        self.data, self.configuration, self.tls = data, configuration, tls
+
+    @classmethod
+    def empty(cls, root):
+        """Placeholders for tests that never touch a mailbox; no Maddy server runs."""
+        files = cls(root / "maddy-data", root / "maddy.conf", root / "maddy-tls")
+        for directory in (files.data, files.tls):
+            directory.mkdir(mode=0o700)
+            os.chown(directory, SERVICE_ID, SERVICE_ID)
+        files.configuration.touch(mode=0o600)
+        os.chown(files.configuration, SERVICE_ID, SERVICE_ID)
+        return files
+
+
+class RuntimeFixture:
+    writable_targets = frozenset({"/app/data", "/data", STATE_TARGET, LOCK_TARGET})
+
+    def __init__(self, maddy=None, deployment_inputs=None):
+        self.state_fixture = StateFixture()
+        self.root = self.state_fixture.root
+        self.maddy = maddy
+        self.maddy_files = (
+            MaddyFiles(maddy.data, maddy.configuration, maddy.tls)
+            if maddy is not None
+            else MaddyFiles.empty(self.root)
+        )
+        self.directories = {name: self.root / name for name in ("data", "keys")}
         self.provision_directories()
         paths = InstallationPaths(
             self.directories["data"] / "admin_data.db",
@@ -57,31 +85,58 @@ class RuntimeFixture:
             paths.secrets / "verifier.key",
             paths.secrets / RUNTIME_POLICY_NAME,
         ):
-            os.chown(path, 0, 10001)
+            os.chown(path, 0, SERVICE_ID)
             path.chmod(0o640)
-        os.chown(paths.database, 10001, 10001)
-        os.chown(self.directories["data"], 10001, 10001)
+        os.chown(paths.database, SERVICE_ID, SERVICE_ID)
+        os.chown(self.directories["data"], SERVICE_ID, SERVICE_ID)
         self.certificates = CertificateFixture(self.root)
         self.tls = self.certificates.issue()
-        os.chown(self.tls, 0, 10001)
+        os.chown(self.tls, 0, SERVICE_ID)
         self.tls.chmod(0o750)
         for path in self.tls.iterdir():
-            os.chown(path, 0, 10001)
+            os.chown(path, 0, SERVICE_ID)
             path.chmod(0o640)
         self.identifier = ""
-        self.server = HelperServer(
-            self.directories["socket"] / "control.sock",
-            (helper if helper is not None else self.host.helper, SocketPolicy(10001, 10001, 5)),
-        )
-        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
-        self.thread.start()
         self.cookie = ""
+        self.provision_host(deployment_inputs or {})
 
     def provision_directories(self):
         for path in self.directories.values():
             path.mkdir(mode=0o750)
-            os.chown(path, 0, 10001)
+            os.chown(path, 0, SERVICE_ID)
             path.chmod(0o750)
+
+    def provision_host(self, deployment_inputs):
+        """State, lock and records the in-process host expects, owned as production owns them."""
+        self.state = self.root / "state"
+        self.state.mkdir(mode=0o700)
+        self.lock = self.root / "maddy.lock"
+        self.lock.touch(mode=0o600)
+        for path in (self.state, self.lock):
+            os.chown(path, SERVICE_ID, SERVICE_ID)
+        self.deployment = {
+            "inputs": {
+                "lock_wait_seconds": OPERATION_TIMEOUT_SECONDS,
+                "operation_timeout_seconds": OPERATION_TIMEOUT_SECONDS,
+                **deployment_inputs,
+            },
+            "backup_sources": {},
+            "maddy_cli_version": "0.9.6",
+            "state_owner_uid": SERVICE_ID,
+        }
+        self.records = {name: self.root / name for name in
+                        ("deployment.json", "helper-policy.json", "backup-manifest.json")}
+        for name, path in self.records.items():
+            path.touch(mode=0o640)
+            os.chown(path, 0, SERVICE_ID)
+            self.write_record(name, self.deployment if name == "deployment.json" else {})
+
+    def write_record(self, name, content):
+        """Rewrite in place: the container binds the file, so its inode must not change."""
+        self.records[name].write_text(json.dumps(content))
+
+    def journal(self):
+        return Journal(self.state / "journal.db", SERVICE_ID)
 
     def command(self, arguments):
         import subprocess
@@ -102,12 +157,22 @@ class RuntimeFixture:
         self._start_container()
 
     def bind_sources(self):
-        return tuple((self.mount_root / source, target) for source, target in (
+        application = tuple((self.mount_root / source, target) for source, target in (
             ("data", "/app/data"),
             ("keys", "/run/secrets/mail-admin"),
             ("installation.json", "/run/mail-admin-installation.json"),
-            ("socket", "/run/mail-admin-helper"),
         ))
+        return application + self.host_sources()
+
+    def host_sources(self):
+        files = self.maddy_files
+        return (
+            (files.data, "/data"),
+            (files.configuration, "/data/maddy.conf"),
+            (files.tls, "/data/tls"),
+            (self.state, STATE_TARGET),
+            (self.lock, LOCK_TARGET),
+        ) + tuple((path, HOST_RECORDS_TARGET + name) for name, path in self.records.items())
 
     def _start_container(self):
         self.launch()
@@ -137,6 +202,8 @@ class RuntimeFixture:
             "128",
             "--tmpfs",
             "/tmp:size=8388608,mode=1777",  # noqa: S108 -- private bounded container tmpfs.
+            "--tmpfs",
+            maddy_runtime_tmpfs(),
             "-p",
             "127.0.0.1::8443",
         )
@@ -154,9 +221,9 @@ class RuntimeFixture:
             "HASH_PARALLELISM=1",
             "HTTP_CONCURRENCY=4",
             "OPERATION_TIMEOUT_SECONDS=5",
-        ) + self.extra_environment:
+        ):
             command += ("-e", value)
-        command += self.extra_arguments + (os.environ["MAIL_ADMIN_RUNTIME_REFERENCE"],)
+        command += (os.environ["MAIL_ADMIN_RUNTIME_REFERENCE"],)
         self.identifier = self.command(command).stdout.strip()
         self.command(("start", self.identifier))
 
@@ -282,7 +349,4 @@ class RuntimeFixture:
     def close(self):
         if self.identifier:
             self.command(("rm", "--force", self.identifier))
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(2)
-        self.host.close()
+        self.state_fixture.close()

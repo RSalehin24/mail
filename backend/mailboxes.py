@@ -5,7 +5,7 @@ from collections.abc import Callable
 from typing import Any
 
 from backend.database import Database
-from backend.helper_client import HelperAccess
+from backend.local_host import HelperAccess
 from shared.errors import ServiceError
 from shared.validation import address, bounded_text, mailbox_password, new_address, request_id
 

@@ -1,4 +1,3 @@
-import json
 import os
 import tempfile
 import unittest
@@ -83,6 +82,10 @@ class LocalHostTests(unittest.TestCase):
     def test_invalid_requests_and_disabled_deletion_are_helper_errors(self):
         with self.assertRaises(ServiceError):
             self.host.call({"operation": "create", "request_id": "not-a-uuid"})
-        deletion = self.request("delete", email="x@rsalehin24.me", recovery=None)
-        with self.assertRaises((ServiceError, FileNotFoundError, json.JSONDecodeError)):
+        email = "x@rsalehin24.me"
+        deletion = self.request(
+            "delete", email=email, confirmation=email, acknowledged=True, cutoff="synthetic"
+        )
+        # The missing host record is an OSError inside; callers only ever see a safe 503.
+        with self.assertRaisesRegex(ServiceError, "helper_unavailable"):
             self.host.call(deletion)

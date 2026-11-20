@@ -6,15 +6,15 @@ import uuid
 from unittest.mock import patch
 
 import helper.maddy
+from backend.local_host import LocalHost
 from helper.deletion import DeletionGuard, DeletionPaths
 from helper.maddy import LAUNCHER
-from helper.server import SocketPolicy
 from helper.status import _observation
+from shared.errors import ServiceError
 from shared.files import atomic_json
 from tests.helper_support import MAILBOX_PASSWORD
 from tests.maddy_support import RealMaddyFixture, imap_login
 from tests.protocol_support import INVALID_ADDRESSES, INVALID_PASSWORDS
-from tests.socket_support import SocketFixture
 
 
 class RealHelperProtocolTests(unittest.TestCase):
@@ -22,12 +22,16 @@ class RealHelperProtocolTests(unittest.TestCase):
         self.fixture = RealMaddyFixture()
         self.addCleanup(self.fixture.close)
         self.fixture.start()
-        self.socket = SocketFixture(self.fixture.root,
-                                    (self.fixture.helper, SocketPolicy(10001, 10001, 30)))
-        self.addCleanup(self.socket.close)
+        # The in-process facade the dashboard uses; it supplies the protocol version itself.
+        self.host = LocalHost(self.fixture.helper)
+
+    def rejected(self, request):
+        with self.assertRaises(ServiceError) as caught:
+            self.host.call(request)
+        return caught.exception
 
     def request(self):
-        return {'protocol': 1, 'operation': 'create', 'request_id': str(uuid.uuid4()),
+        return {'operation': 'create', 'request_id': str(uuid.uuid4()),
                 'email': 'demo_user.library@rsalehin24.me', 'password': MAILBOX_PASSWORD}
 
     def test_invalid_schema_address_and_password_requests_never_execute_real_cli(self):
@@ -38,16 +42,14 @@ class RealHelperProtocolTests(unittest.TestCase):
         requests = [{**base, **extra} for extra in variants]
         requests += [{key: value for key, value in base.items() if key != missing}
                      for missing in base]
-        requests += [None, [], True, 'not-a-request', {**base, 'request_id': 'invalid'},
-                     {**base, 'password': []}, {**base, 'email': 42}]
+        requests += [{**base, 'request_id': 'invalid'}, {**base, 'password': []},
+                     {**base, 'email': 42}]
         requests += [{**base, 'email': value} for value in INVALID_ADDRESSES]
         requests += [{**base, 'password': value} for value in INVALID_PASSWORDS]
         with patch.object(self.fixture.maddy, 'change',
                           wraps=self.fixture.maddy.change) as commands:
             for index, request in enumerate(requests):
-                response = self.socket.client(request)
-                self.assertFalse(response['ok'], str(index))
-                self.assertEqual(response['status'], 400, str(index))
+                self.assertEqual(self.rejected(request).status, 400, str(index))
         commands.assert_not_called()
         self.assertEqual(self.fixture.maddy.inventories(), {'credentials': [], 'storage': []})
         self.assertIsNone(self.fixture.helper.journal.lookup(base['request_id']))
@@ -63,8 +65,7 @@ class RealHelperProtocolTests(unittest.TestCase):
             return execute(command)
 
         with patch('helper.maddy.execute', side_effect=record):
-            response = self.socket.client(request)
-        self.assertTrue(response['ok'])
+            response = self.host.call(request)
         self.assertEqual(response['state'], 'complete')
         commands = [command for command in observed if command.arguments[1] == 'exec']
         self.assertTrue(commands)
@@ -81,20 +82,16 @@ class RealHelperProtocolTests(unittest.TestCase):
         logs = self.fixture.command(('logs', self.fixture.identifier))
         self.assertTrue(request['password'] not in logs.stdout + logs.stderr)
 
-    def test_request_conflicts_and_unauthorized_peer_cannot_repeat_a_completed_mutation(self):
+    def test_request_conflicts_cannot_repeat_a_completed_mutation(self):
         request = self.request()
-        self.assertEqual(self.socket.client(request)['state'], 'complete')
+        self.assertEqual(self.host.call(request)['state'], 'complete')
         with patch.object(self.fixture.maddy, 'change',
                           wraps=self.fixture.maddy.change) as commands:
             repeated = {**request, 'password': ' ignored replacement fixture password '}
-            self.assertEqual(self.socket.client(repeated)['state'], 'complete')
+            self.assertEqual(self.host.call(repeated)['state'], 'complete')
             for changed in ({'email': 'another@rsalehin24.me'}, {'operation': 'password'}):
-                response = self.socket.client({**repeated, **changed})
-                self.assertEqual((response['status'], response['error']),
-                                 (409, 'request_id_conflict'))
-            denied = self.socket.client(self.request(), 65534)
-            self.assertFalse(denied['ok'])
-            self.assertIn(denied['error'], {'helper_access_denied', 'peer_disconnected'})
+                error = self.rejected({**repeated, **changed})
+                self.assertEqual((error.status, error.code), (409, 'request_id_conflict'))
         commands.assert_not_called()
         with imap_login(self.fixture, request['email'], request['password']) as connection:
             self.assertEqual(connection.noop()[0], 'OK')
@@ -108,9 +105,9 @@ class RealHelperProtocolTests(unittest.TestCase):
         self.fixture.helper.dependencies = dataclasses.replace(
             self.fixture.helper.dependencies, status=lambda: _observation(path, time.time()),
         )
-        request = {'protocol': 1, 'operation': 'status', 'request_id': str(uuid.uuid4())}
-        response = self.socket.client(request)
-        self.assertEqual(set(response), {'ok', 'protocol', 'summary', 'maddy', 'unresolved'})
+        request = {'operation': 'status', 'request_id': str(uuid.uuid4())}
+        response = self.host.call(request)
+        self.assertEqual(set(response), {'protocol', 'summary', 'maddy', 'unresolved'})
         self.assertEqual(set(response['maddy']),
                          {'state', 'credential_count', 'storage_count', 'observed_at'})
         self.assertIsInstance(response['maddy']['observed_at'], (int, float))
@@ -119,15 +116,14 @@ class RealHelperProtocolTests(unittest.TestCase):
                          {'intent': 'expected_running', 'state': 'active'})
         self.assertTrue('fixture-private' not in json.dumps(response))
         atomic_json(path, {**source, 'observed_at': []})
-        response = self.socket.client(request)
-        self.assertTrue(response['ok'])
+        response = self.host.call(request)
         self.assertEqual(response['summary'], {'state': 'unknown', 'reason': 'unavailable'})
-        denied = self.socket.client({**request, 'path': str(path)})
-        self.assertEqual(denied['error'], 'invalid_helper_fields')
+        self.assertEqual(self.rejected({**request, 'path': str(path)}).code,
+                         'invalid_helper_fields')
 
     def test_missing_malformed_or_disabled_root_deletion_capability_prevents_all_cli(self):
         email = self.request()['email']
-        request = {'protocol': 1, 'operation': 'delete', 'request_id': str(uuid.uuid4()),
+        request = {'operation': 'delete', 'request_id': str(uuid.uuid4()),
                    'email': email, 'confirmation': email,
                    'acknowledged': True, 'cutoff': 'untrusted'}
         records = (None, {}, {'inputs': None}, {'inputs': []}, {'inputs': {}},
@@ -137,8 +133,8 @@ class RealHelperProtocolTests(unittest.TestCase):
                           wraps=self.fixture.maddy.change) as commands:
             for index, record in enumerate(records):
                 self.assert_deletion_denied((index, record), request)
-            injected = self.socket.client({**request, 'permanent_deletion_enabled': True})
-            self.assertEqual(injected['error'], 'invalid_helper_fields')
+            injected = self.rejected({**request, 'permanent_deletion_enabled': True})
+            self.assertEqual(injected.code, 'invalid_helper_fields')
         commands.assert_not_called()
         self.assertIsNone(self.fixture.helper.journal.lookup(request['request_id']))
 
@@ -152,6 +148,4 @@ class RealHelperProtocolTests(unittest.TestCase):
         self.fixture.helper.dependencies = dataclasses.replace(
             self.fixture.helper.dependencies, deletion=guard,
         )
-        response = self.socket.client(request)
-        self.assertFalse(response['ok'])
-        self.assertEqual(response['status'], 503 if record is None else 403)
+        self.assertEqual(self.rejected(request).status, 503 if record is None else 403)

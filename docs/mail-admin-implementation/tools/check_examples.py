@@ -35,14 +35,18 @@ def compose_fixtures():
             'MAIL_ADMIN_TLS_DIRECTORY': '/opt/maddy/tls/generations/documentation-validation'}
 
 
+WRITABLE_TARGETS = {'/app/data', '/data', '/var/lib/mail-admin-helper',
+                    '/run/lock/mail-admin-maddy.lock'}
+
+
 def validate_mounts(service):
     binds = [item for item in service['volumes'] if item['type'] == 'bind']
-    require(len(binds) == 5, 'Unexpected Compose bind count')
+    require(len(binds) == 12, 'Unexpected Compose bind count')
     require(all(item['bind']['create_host_path'] is False for item in binds), 'Automatic bind creation')
-    require(all(item.get('read_only', False) == (item['target'] != '/app/data') for item in binds),
-            'Incorrect bind write permissions')
-    require(all('docker.sock' not in item['source'] and '/opt/maddy/data' not in item['source']
-                for item in binds), 'Forbidden web-container mount')
+    require(all(item.get('read_only', False) == (item['target'] not in WRITABLE_TARGETS)
+                for item in binds), 'Incorrect bind write permissions')
+    require(all('docker.sock' not in item['source'] for item in binds), 'Forbidden web-container mount')
+    require(not any(item['target'] == '/run/mail-admin-helper' for item in binds), 'Helper socket mount')
     temporary = next(item for item in service['volumes'] if item['type'] == 'tmpfs')
     require(int(temporary['tmpfs']['size']) == 16 * 1024 ** 2 and temporary['tmpfs']['mode'] == 0o1777,
             'Unexpected temporary storage budget/mode')

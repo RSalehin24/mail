@@ -30,6 +30,11 @@ COPY helper /app/helper
 # Only the host modules backend.local_host imports (its AST import closure).
 COPY host/__init__.py host/certificates.py host/container_policy.py host/docker.py host/locks.py \
      host/mailbox_archive.py host/mailbox_store.py host/preflight.py host/rollout.py /app/host/
+# The recovery qualification proof is checked against these files' hashes (QUALIFIED_FILES),
+# so the dashboard needs them present although it never imports them.
+COPY host/mailbox_recovery.py host/mailbox_transaction.py host/backup_control.py host/backup_merge.py \
+     host/backup_operations.py host/repository_backup.py host/daily_retention.py \
+     host/restic_repository.py host/initial_cleanup.py /app/host/
 COPY --from=maddy-binary /bin/maddy /usr/local/bin/maddy
 COPY --from=maddy-binary /lib/ld-musl-x86_64.so.1 /lib/ld-musl-x86_64.so.1
 RUN python -m compileall --invalidation-mode checked-hash -q \

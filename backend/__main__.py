@@ -14,7 +14,7 @@ def main() -> None:
     settings = Settings.from_environment()
     require_existing_database(Path("/app/data/admin_data.db"))
     RuntimePolicy().require_running()
-    require_runtime_sources(local_host=settings.local_host)
+    require_runtime_sources()
     # Reject a lost data mount before loading the HTTP and cryptographic dependency graph.
     import uvicorn
 

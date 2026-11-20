@@ -5,7 +5,7 @@ from itertools import product
 
 from tests.key_fault_support import missing_key, unreadable_key, wrong_key
 from tests.runtime_auth_support import RuntimeAuthentication
-from tests.runtime_support import RuntimeFixture
+from tests.runtime_support import AUTHENTICATED_PROBE, RuntimeFixture
 
 
 class RuntimeSecretKeyTests(unittest.TestCase):
@@ -31,7 +31,7 @@ class RuntimeSecretKeyTests(unittest.TestCase):
         self.fixture._start_container()
         self.assertNotEqual(self.fixture.identifier, previous)
         self.assertEqual(self.materials(), before)
-        self.assertEqual(self.fixture.api('GET', '/api/accounts')[0], 200)
+        self.assertEqual(self.fixture.api('GET', AUTHENTICATED_PROBE)[0], 200)
         self.assertEqual(self.fixture.api('POST', '/api/setup', {'token': 'invented'})[0], 403)
 
     def test_missing_wrong_and_unreadable_keys_refuse_startup_without_generating_replacements(self):
@@ -44,7 +44,7 @@ class RuntimeSecretKeyTests(unittest.TestCase):
                 self.assertEqual(self.materials(), before)
                 self.fixture.command(('start', self.fixture.identifier))
                 self.fixture.ready()
-                self.assertEqual(self.fixture.api('GET', '/api/accounts')[0], 200)
+                self.assertEqual(self.fixture.api('GET', AUTHENTICATED_PROBE)[0], 200)
 
     def assert_rejected_key(self, path, fault):
         self.fixture.command(('stop', self.fixture.identifier))

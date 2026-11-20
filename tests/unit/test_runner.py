@@ -183,14 +183,14 @@ class RunnerTests(unittest.TestCase):
         state = StateFixture()
         self.addCleanup(state.close)
         fixture = RuntimeFixture.__new__(RuntimeFixture)
-        fixture.directories = {name: state.root / name for name in ("data", "keys", "socket")}
+        fixture.directories = {name: state.root / name for name in ("data", "keys")}
         previous = os.umask(0o077)
         try:
             with patch("tests.runtime_support.os.chown") as ownership:
                 fixture.provision_directories()
         finally:
             os.umask(previous)
-        self.assertEqual(ownership.call_count, 3)
+        self.assertEqual(ownership.call_count, 2)
         for path in fixture.directories.values():
             self.assertEqual(path.stat().st_mode & 0o777, 0o750)
             self.assertIn(unittest.mock.call(path, 0, 10001), ownership.call_args_list)
