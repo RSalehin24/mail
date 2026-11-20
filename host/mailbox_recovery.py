@@ -18,14 +18,16 @@ from host.mailbox_archive import MailboxArchives
 from host.mailbox_store import body_mapping, body_path, connect, import_rows, stage_bodies, validate
 from host.mailbox_transaction import mailbox_transaction
 from shared.errors import ServiceError
-from shared.files import protected_json, sync_directory
+from shared.files import protected_json, state_owner_uid, sync_directory
 
 
 class MailboxRecovery:
     def __init__(self, context: HostContext, root: Path) -> None:
         self.context, self.root = context, root
         self.records = RecoveryRecords(root / "recovery.db")
-        self.control = RecoveryControl(root, self.records)
+        self.control = RecoveryControl(
+            root, self.records, policy_owner=state_owner_uid(context.deployment)
+        )
         if not (root / 'recovery.key').exists() and self.records.pinned_snapshots():
             raise ServiceError('recovery_key_missing', 503)
         self.archives = MailboxArchives(root / "recovery-points", root / "recovery.key")

@@ -59,8 +59,10 @@ def validate_forwarding(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 class ForwardingControl:
-    def __init__(self, root: Path, data: Path) -> None:
+    def __init__(self, root: Path, data: Path, worker_owner: int | None = None) -> None:
         self.root, self.data = root, data
+        # Who writes the Cloudflare worker's records: the state owner unless told otherwise.
+        self.worker_owner = root.stat().st_uid if worker_owner is None else worker_owner
         self.path = root / "forwarding.db"
         if self.path.is_symlink() or (
             self.path.exists()
@@ -138,7 +140,7 @@ class ForwardingControl:
                 ).fetchone()[0]
                 rules.append(item)
             path = self.root / "cloudflare-forwarding.json"
-            cloudflare: dict[str, Any] = (protected_json(path, self.root.stat().st_uid)
+            cloudflare: dict[str, Any] = (protected_json(path, self.worker_owner)
                                          if path.exists() else {
                 "configured": False, "state": "not_connected", "observed_at": None,
                 "reason": "cloudflare_credentials_required"})
@@ -166,7 +168,7 @@ class ForwardingControl:
                 "mode": "transparent",
                 "keep_local": True,
                 "worker": protected_json(
-                    self.root / "forwarding-worker-status.json", self.root.stat().st_uid
+                    self.root / "forwarding-worker-status.json", self.worker_owner
                 )
                 if (self.root / "forwarding-worker-status.json").exists()
                 else None,

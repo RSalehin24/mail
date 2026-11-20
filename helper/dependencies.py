@@ -2,6 +2,7 @@
 
 import time
 from dataclasses import dataclass, field, replace
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +14,7 @@ from helper.maddy import MaddyAccess
 from helper.recovery import RecoveryControl
 from helper.recovery_records import RecoveryRecords
 from helper.service import HelperDependencies
-from helper.status import host_status
+from helper.status import HostStatusPaths, host_status
 from helper.submission import RelayActions, SubmissionControl
 from host.locks import HostLock, LockPolicy
 
@@ -32,6 +33,7 @@ class HostLocations:
         DEPLOYMENT_RECORD, Path("/etc/mail-admin/helper-policy.json"),
         Path("/var/lib/mail-admin-backup/manifest.json"),
     ))
+    status: HostStatusPaths = field(default_factory=HostStatusPaths)
 
 
 def build_dependencies(
@@ -47,12 +49,14 @@ def build_dependencies(
         locations.lock,
         LockPolicy(inputs["lock_wait_seconds"], locations.owner),
         time.time,
-        host_status,
-        RecoveryControl(state, RecoveryRecords(state / "recovery.db"))
+        partial(host_status, locations.status),
+        RecoveryControl(state, RecoveryRecords(state / "recovery.db"),
+                        policy_owner=locations.owner)
         if (state / "recovery-policy.json").is_file()
         else None,
         BackupControl(state),
-        ForwardingControl(state, data),
+        # Root workers write the Cloudflare records the forwarding page reads.
+        ForwardingControl(state, data, worker_owner=0),
         read_lock_policy=LockPolicy(max(
             inputs["lock_wait_seconds"], inputs["operation_timeout_seconds"] * 0.75,
         ), locations.owner),

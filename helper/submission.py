@@ -75,6 +75,8 @@ class SubmissionControl:
     def __init__(self, data: Path, database: Path | None = None,
                  actions: RelayActions | None = None) -> None:
         self.actions = actions or RelayActions()
+        # Whoever owns Maddy's data directory writes these files (the dashboard, in-process).
+        self.owner = data.stat().st_uid
         self.path = data / "submission-relay.conf"
         self.rollback = data / "submission-relay.rollback"
         self.pending = data / "submission-relay.pending.json"
@@ -89,16 +91,16 @@ class SubmissionControl:
             return
         committed = False
         if self.pending.exists() and self.database is not None:
-            pending = protected_json(self.pending)
+            pending = protected_json(self.pending, self.owner)
             with sqlite3.connect(self.database.as_uri() + "?mode=ro", uri=True,
                                  timeout=0.25) as connection:
                 row = connection.execute(
                     "SELECT revision FROM relay_settings WHERE id=1").fetchone()
             committed = bool(row and row[0] == pending["revision"] and
-                             hashlib.sha256(protected_bytes(self.path)).hexdigest()
+                             hashlib.sha256(protected_bytes(self.path, self.owner)).hexdigest()
                              == pending["sha256"])
         if not committed:
-            write_configuration(self.path, protected_bytes(self.rollback))
+            write_configuration(self.path, protected_bytes(self.rollback, self.owner))
             self.restart()
         self.rollback.unlink()
         sync_directory(self.path.parent)
@@ -113,7 +115,7 @@ class SubmissionControl:
         revision = values["revision"]
         candidate = relay_configuration({key: values[key]
                                          for key in ("username", "credential")}).encode()
-        previous = protected_bytes(self.path)
+        previous = protected_bytes(self.path, self.owner)
         if candidate == previous:
             return {"synchronized": True}
         write_configuration(self.rollback, previous)

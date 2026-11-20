@@ -92,11 +92,26 @@ def atomic_owned_json(path: Path, value: dict[str, Any], owner: int) -> None:
     _atomic_json(path, value, lambda descriptor: os.fchown(descriptor, owner, -1))
 
 
+def _keep_sharing(path: Path, descriptor: int) -> None:
+    """A replaced file keeps its group and mode, so a one-time grant to a reader survives rewrites.
+
+    New files and files never shared stay as the caller makes them (0600); nothing is widened.
+    """
+    try:
+        previous = path.lstat()
+    except FileNotFoundError:
+        return
+    if stat.S_ISREG(previous.st_mode):
+        os.fchown(descriptor, -1, previous.st_gid)
+        os.fchmod(descriptor, stat.S_IMODE(previous.st_mode))
+
+
 def _atomic_json(
     path: Path, value: dict[str, Any], prepare: Callable[[int], None] | None
 ) -> None:
     descriptor, temporary = tempfile.mkstemp(prefix=".staging-", dir=path.parent)
     with os.fdopen(descriptor, "w") as stream:
+        _keep_sharing(path, stream.fileno())
         if prepare is not None:
             prepare(stream.fileno())
         json.dump(value, stream, sort_keys=True)

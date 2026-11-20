@@ -65,57 +65,75 @@ services:
       options: {max-size: "10m", max-file: "3"}
     ports: ["443:8443"]
     volumes:
+      # The dashboard's own database.
       - type: bind
         source: ./data
         target: /app/data
         bind: {create_host_path: false}
+      # The certificate generation the dashboard serves HTTPS with.
       - type: bind
         source: ${MAIL_ADMIN_TLS_DIRECTORY:?Set validated immutable certificate generation}
         target: /tls
         read_only: true
         bind: {create_host_path: false}
+      # Maddy's data: the Maddy CLI the dashboard runs creates and removes mailboxes here.
       - type: bind
         source: /opt/maddy/data
         target: /data
         bind: {create_host_path: false}
+      # The Maddy CLI parses this config; never replaced by a worker, so a file mount is safe.
       - type: bind
         source: /opt/maddy/config/maddy.conf
         target: /data/maddy.conf
         read_only: true
         bind: {create_host_path: false}
+      # The CLI loads the certificate files the config names.
       - type: bind
         source: ${MAIL_ADMIN_TLS_DIRECTORY:?Set validated immutable certificate generation}
         target: /data/tls
         read_only: true
         bind: {create_host_path: false}
+      # Journal, queues and recovery records, shared with the root workers (a directory, so replaced files stay visible).
       - type: bind
         source: /var/lib/mail-admin-helper
         target: /var/lib/mail-admin-helper
         bind: {create_host_path: false}
+      # The lock the root workers also take; recreated by tmpfiles before start, never replaced.
       - type: bind
         source: /run/lock/mail-admin-maddy.lock
         target: /run/lock/mail-admin-maddy.lock
         bind: {create_host_path: false}
+      # deployment.json (status thresholds, deletion switch) and helper-policy.json; a directory because tools rewrite them atomically.
       - type: bind
-        source: /etc/mail-admin/deployment.json
-        target: /run/mail-admin-host/deployment.json
+        source: /etc/mail-admin
+        target: /run/mail-admin-host/etc
         read_only: true
         bind: {create_host_path: false}
+      # manifest.json for the Server page's backup tile and the deletion guard; rewritten atomically.
       - type: bind
-        source: /etc/mail-admin/helper-policy.json
-        target: /run/mail-admin-host/helper-policy.json
+        source: /var/lib/mail-admin-backup
+        target: /var/lib/mail-admin-backup
         read_only: true
         bind: {create_host_path: false}
+      # Monitor and served-certificate observations the root monitors rewrite.
       - type: bind
-        source: /var/lib/mail-admin-backup/manifest.json
-        target: /run/mail-admin-host/backup-manifest.json
+        source: /var/lib/mail-admin-alerts
+        target: /var/lib/mail-admin-alerts
         read_only: true
         bind: {create_host_path: false}
+      # state.json written by certificate renewal.
+      - type: bind
+        source: /var/lib/mail-admin-certificates
+        target: /var/lib/mail-admin-certificates
+        read_only: true
+        bind: {create_host_path: false}
+      # Application keys.
       - type: bind
         source: /etc/mail-admin/secrets
         target: /run/secrets/mail-admin
         read_only: true
         bind: {create_host_path: false}
+      # Installation marker; written once at provisioning.
       - type: bind
         source: /etc/mail-admin/installation.json
         target: /run/mail-admin-installation.json

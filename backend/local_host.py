@@ -12,6 +12,7 @@ from helper.maddy import LocalMaddy
 from helper.maddy_restart import local_relay_actions
 from helper.protocol import HelperRequest
 from helper.service import HostHelper
+from helper.status import HostStatusPaths
 from host.preflight import provision_lock
 from shared.errors import ServiceError
 from shared.files import protected_json
@@ -21,7 +22,10 @@ from shared.validation import HELPER_PROTOCOL
 MADDY_BINARY = Path("/usr/local/bin/maddy")
 MADDY_DATA = Path("/data")
 APPLICATION_DATA = Path("/app/data")
-HOST_RECORDS = Path("/run/mail-admin-host")
+# Root writes these records and workers replace them atomically, so the compose file mounts their
+# directories (a single-file mount would keep the old inode) read-only.
+ETC_RECORDS = Path("/run/mail-admin-host/etc")
+BACKUP_MANIFEST = Path("/var/lib/mail-admin-backup/manifest.json")
 DEFAULT_CLI_VERSION = "0.9.5"
 
 # State and the mailbox lock are the host paths the root workers also use, bind-mounted
@@ -31,10 +35,10 @@ LOCAL_LOCATIONS = HostLocations(
     lock=Path("/run/lock/mail-admin-maddy.lock"),
     owner=os.geteuid(),
     deletion=DeletionPaths(
-        HOST_RECORDS / "deployment.json",
-        HOST_RECORDS / "helper-policy.json",
-        HOST_RECORDS / "backup-manifest.json",
+        ETC_RECORDS / "deployment.json", ETC_RECORDS / "helper-policy.json", BACKUP_MANIFEST
     ),
+    # The alert and certificate observations sit at their host paths; only these two differ.
+    status=HostStatusPaths(maddy_data=MADDY_DATA, deployment=ETC_RECORDS / "deployment.json"),
 )
 
 

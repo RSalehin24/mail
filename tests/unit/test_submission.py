@@ -1,5 +1,6 @@
 """Credential injection guards and rollback of failed host synchronization."""
 
+import json
 import os
 import tempfile
 import unittest
@@ -38,7 +39,7 @@ class SubmissionControlTests(unittest.TestCase):
             path.chmod(0o600)
             control = SubmissionControl(root)
             with patch('helper.submission.protected_bytes',
-                       side_effect=lambda p: p.read_bytes()), \
+                       side_effect=lambda p, owner: p.read_bytes()), \
                     patch.object(control, 'restart') as restart, \
                     patch('helper.submission.execute', return_value=CommandResult(1, 'failure')):
                 with self.assertRaisesRegex(ServiceError, 'submission_synchronization_failed'):
@@ -71,9 +72,9 @@ class SubmissionControlTests(unittest.TestCase):
                 atomic_json(root / 'submission-relay.pending.json', {
                     'revision': 2, 'sha256': hashlib.sha256(candidate).hexdigest()})
                 with patch('helper.submission.protected_bytes',
-                           side_effect=lambda p: p.read_bytes()), \
+                           side_effect=lambda p, owner: p.read_bytes()), \
                         patch('helper.submission.protected_json',
-                              side_effect=lambda p: __import__('json').loads(p.read_text())), \
+                              side_effect=lambda p, owner: json.loads(p.read_text())), \
                         patch.object(SubmissionControl, 'restart') as restart:
                     control = SubmissionControl(root, database)
                 self.assertEqual(control.path.read_bytes(),
