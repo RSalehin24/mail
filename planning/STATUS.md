@@ -18,6 +18,9 @@ All suites pass locally: lint, typecheck, reads, unit (537), integration (94), b
 ## Update to Python 3.15 and latest libraries (2026-11-20, D-016, D-017)
 Repo and image only, not deployed. Python 3.15.2 base image (digest-pinned), 18 Python and 3 npm packages updated within their majors; locks regenerated with the documented commands. Needed two fixes: PyOTP 2.12.1 keyword-only `name` (real runtime break, caught by mypy) and a 160-bit test TOTP secret; ruff dropped 16 unneeded annotation quotes. Passing: lint, typecheck, reads, unit and integration (local `.venv` is Python 3.14), `make build`, `make browser`, `make linux-check` (Maddy, runtime, ACME, unit and integration inside the 3.15 image). Not done: deploy; Debian bookworm base images and the Node, Docker CLI and Maddy pins are unchanged.
 
+## Timer CPU measurement (2026-11-20 17:54 UTC, read-only)
+Starts in the last hour: recovery 932 (timer: 2 s after each run), backup-control 845 (3 s), forwarding 111 (30 s), tls-observation 29 (2 min), monitor 12 (5 min), independent-monitor 4 (15 min). Last-run CPU per start is about 0.3-0.4 s each, so these timers cost roughly 675 CPU-s per hour (about 19% of one core, estimate from last-run values); recovery and backup-control are about 90% of it. CPU pressure avg300 is 11%; memory 468 of 953 MB used; no swap.
+
 ## Backup check (2026-11-20, read-only)
 - The 9:46 PM Dhaka backup (15:47 UTC) succeeded: verified, all 9 mailboxes, snapshot `0e9c0c45`, recovered alert sent. `restore_passed` is false: no restore test has run.
 - The 9:13 PM run (15:13 UTC, right after the reboot) exited 1 after 22 s with no reason in the journal: `host/cli.py` turns any `OSError`/`ServiceError` into an alert and exit 1 without logging it. In the same 15:13-15:14 window `mail-admin-backup-control` and `mail-admin-forwarding` also failed, so a boot-time race (Docker, network or Maddy not ready) is the likely cause. Not proven.
