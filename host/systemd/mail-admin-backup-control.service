@@ -1,6 +1,6 @@
 [Unit]
 Description=Process administrator backup and mail recovery operations
-After=docker.service mail-admin-helper.service network-online.target
+After=docker.service network-online.target
 Requires=docker.service
 [Service]
 Type=oneshot

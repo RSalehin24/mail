@@ -64,7 +64,6 @@ class RootCutoverHost:
                 str(root / "helper/service.py"),
                 str(root / "host/cli.py"),
                 LAUNCHER,
-                "/etc/systemd/system/mail-admin-helper.service",
             }
         )
         sources = self.configuration.get("support_files")

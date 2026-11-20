@@ -11,3 +11,7 @@ local-state
 *.key
 .mypy_cache
 .ruff_cache
+# Kept in git only; no image stage copies them (the runtime image copies explicit paths).
+.claude
+planning
+verification

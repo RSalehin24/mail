@@ -4,7 +4,6 @@ import time
 from unittest.mock import patch
 
 from backend.dns import observe_mx
-from backend.helper_client import HelperClient
 from backend.relay import Relay, RelayDependencies, SmtpTransport
 from tests.api_support import ApiTestCase
 from tests.silent_peer_support import SilentPeer
@@ -78,21 +77,3 @@ class NetworkDeadlineApiTests(ApiTestCase):
         self.assertTrue(refused)
         self.assertTrue(all(response.json()['error'] == 'work_overloaded' for response in refused))
         self.assertTrue(all(response.headers['retry-after'] == '1' for response in refused))
-
-    async def test_stalled_unix_helper_fails_safely_without_blocking_health(self):
-        path = self.fixture.root / 'silent-helper.sock'
-        peer = SilentPeer('unix', str(path))
-        self.addCleanup(peer.close)
-        self.fixture.services.mailboxes.helper = HelperClient(path, 2)
-        started = time.monotonic()
-        request = asyncio.create_task(self.client.get('/api/accounts'))
-        self.assertTrue(await asyncio.to_thread(peer.received.wait, 1))
-        await self.assert_health_responsive()
-        result = await request
-        self.assertLess(time.monotonic() - started, 3)
-        self.assertEqual(result.status_code, 503)
-        self.assertEqual(result.json()['error'], 'helper_unavailable')
-        self.assertEqual(result.headers['cache-control'], 'no-store')
-        self.assertEqual(self.fixture.host.maddy.calls, [])
-        with self.fixture.database.transaction() as database:
-            self.assertEqual(database.execute('SELECT COUNT(*) FROM mailboxes').fetchone()[0], 0)

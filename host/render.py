@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 from shared.errors import ServiceError
-from shared.files import protected_json
+from shared.files import protected_json, state_owner_uid
 
 
 def rendered_files(
@@ -26,6 +26,7 @@ def rendered_files(
     rendered = {}
     for name, content in sources.items():
         content = content.replace("@SERVICE_GID@", str(inputs["service_gid"]))
+        content = content.replace("@STATE_OWNER_UID@", str(state_owner_uid(configuration)))
         content = content.replace("@BACKUP_CALENDAR@", calendar)
         content = content.replace("@BACKUP_MEMORY_LIMIT@", str(memory))
         content = content.replace("@BACKUP_CPU_PERCENT@", str(cpu))

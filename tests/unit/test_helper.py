@@ -1,5 +1,3 @@
-import io
-import json
 import unittest
 import uuid
 from pathlib import Path
@@ -9,7 +7,6 @@ from unittest.mock import MagicMock, patch
 from helper.maddy import LAUNCHER, DockerMaddy, cli_reported_error
 from helper.process import CommandResult
 from helper.protocol import HelperRequest
-from helper.server import HelperHandler
 from helper.service import HostHelper
 from shared.errors import ServiceError
 from tests.helper_support import MAILBOX_PASSWORD, HelperFixture
@@ -46,32 +43,6 @@ class HelperTests(unittest.TestCase):
             with self.assertRaises(ServiceError):
                 self.fixture.helper.handle(self.fixture.request("create", "orphan@rsalehin24.me"))
             self.assertEqual(self.fixture.maddy.calls, [])
-
-    def test_lost_socket_response_keeps_the_committed_outcome_and_logs_no_payload(self):
-        request = self.fixture.request("create")
-        handler = object.__new__(HelperHandler)
-        handler.connection = MagicMock()
-        handler.server = SimpleNamespace(
-            policy=SimpleNamespace(timeout=5), authorized=lambda _: True, helper=self.fixture.helper
-        )
-        handler.rfile = io.BytesIO(
-            json.dumps(
-                {
-                    "protocol": 1,
-                    "operation": request.operation,
-                    "request_id": request.request_id,
-                    "email": request.email,
-                    "password": request.password,
-                }
-            ).encode()
-            + b"\n"
-        )
-        handler.wfile = MagicMock()
-        handler.wfile.write.side_effect = BrokenPipeError("fixture disconnected caller")
-        with self.assertLogs("helper.server", level="WARNING") as events:
-            handler.handle()
-        self.assertEqual(self.fixture.journal.lookup(request.request_id)["state"], "complete")
-        self.assertEqual(events.output, ["WARNING:helper.server:helper_response_lost"])
 
     def test_duplicate_password_request_executes_only_once_and_conflict_fails(self):
         self.fixture.maddy.credentials.add("fixture@rsalehin24.me")

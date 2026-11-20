@@ -93,7 +93,6 @@ def validate_binds(deployment: dict[str, Any]) -> None:
     inputs = deployment["inputs"]
     sources = (
         (Path("/opt/mail-admin/data"), "directory", inputs["service_uid"]),
-        (Path("/run/mail-admin-helper"), "directory", 0),
         (Path("/etc/mail-admin/secrets"), "directory", 0),
         (Path("/etc/mail-admin/installation.json"), "file", 0),
         (Path("/etc/mail-admin/secrets") / RUNTIME_POLICY_NAME, "file", 0),

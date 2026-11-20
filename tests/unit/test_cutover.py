@@ -332,7 +332,7 @@ class CutoverAdapterTests(ReleaseFixture):
         }
         paths = ['/usr/local/lib/mail-admin/helper/service.py',
                  '/usr/local/lib/mail-admin/host/cli.py',
-                 '/etc/systemd/system/mail-admin-helper.service', LAUNCHER]
+                 LAUNCHER]
         self.host.configuration = {'support_files': paths}
         with patch('host.cutover_host.Path.rglob', return_value=[]):
             self.host._validate_plan()

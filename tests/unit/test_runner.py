@@ -280,7 +280,8 @@ class RunnerTests(unittest.TestCase):
 
     def test_source_identity_includes_launcher_boot_units_and_build_inputs(self):
         baseline, read = source_digest(), Path.read_bytes
-        for name in ("host/maddy-launcher", "host/systemd/mail-admin-helper.service", "Makefile"):
+        sources = ("host/maddy-launcher", "host/systemd/mail-admin-maddy-restart.service")
+        for name in (*sources, "Makefile"):
             target = ROOT / name
 
             def changed(path, target=target):

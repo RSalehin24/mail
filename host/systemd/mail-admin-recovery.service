@@ -1,6 +1,6 @@
 [Unit]
 Description=Process administrator mailbox recovery operations
-After=docker.service mail-admin-helper.service
+After=docker.service
 Requires=docker.service
 [Service]
 Type=oneshot
