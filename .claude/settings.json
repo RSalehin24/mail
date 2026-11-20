@@ -1,0 +1,67 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(ls:*)",
+      "Bash(wc:*)",
+      "Bash(rg:*)",
+      "Bash(grep:*)",
+      "Bash(dig:*)",
+      "Bash(gcloud compute instances list:*)",
+      "Bash(gcloud compute instances describe:*)",
+      "Bash(gcloud compute addresses list:*)",
+      "Bash(gcloud compute disks list:*)",
+      "Bash(gcloud compute snapshots list:*)",
+      "Bash(gcloud compute firewall-rules list:*)",
+      "Bash(gcloud compute firewall-rules describe:*)",
+      "Bash(gcloud auth list:*)",
+      "Bash(gcloud config list:*)",
+      "Bash(make lint)",
+      "Bash(make typecheck)",
+      "Bash(make reads)",
+      "Bash(make unit)",
+      "Bash(make integration)",
+      "Bash(make check)",
+      "Bash(make plan)"
+    ],
+    "ask": [
+      "Bash(gcloud compute instances delete:*)",
+      "Bash(gcloud compute instances stop:*)",
+      "Bash(gcloud compute instances start:*)",
+      "Bash(gcloud compute instances add-access-config:*)",
+      "Bash(gcloud compute instances delete-access-config:*)",
+      "Bash(gcloud compute firewall-rules delete:*)",
+      "Bash(gcloud compute firewall-rules update:*)",
+      "Bash(gcloud compute firewall-rules create:*)",
+      "Bash(gcloud compute disks delete:*)",
+      "Bash(gcloud compute addresses create:*)",
+      "Bash(gcloud projects delete:*)",
+      "Bash(gcloud billing:*)",
+      "Bash(curl -X:*)",
+      "Bash(curl --request:*)",
+      "Bash(scp:*)",
+      "Bash(rsync:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/.env)",
+      "Read(./**/.env.*)",
+      "Read(~/.cf_token)",
+      "Read(./**/*.key)",
+      "Read(./local-state/**)",
+      "Bash(cat ~/.cf_token:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)"
+    ]
+  },
+  "env": {
+    "BASH_DEFAULT_TIMEOUT_MS": "120000",
+    "MAX_MCP_OUTPUT_TOKENS": "10000"
+  }
+}
