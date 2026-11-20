@@ -1,6 +1,7 @@
 """The dashboard runs the host operations itself, with the same code as the root helper."""
 
 import os
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +9,7 @@ from helper.deletion import DeletionPaths
 from helper.dependencies import HostLocations, build_dependencies
 from helper.journal import Journal
 from helper.maddy import LocalMaddy
+from helper.maddy_restart import local_relay_actions
 from helper.protocol import HelperRequest
 from helper.service import HostHelper
 from host.preflight import provision_lock
@@ -60,4 +62,6 @@ def create_local_host(timeout: float, locations: HostLocations = LOCAL_LOCATIONS
     provision_lock(locations.lock, locations.owner)
     if not (locations.state / "journal.db").exists():
         Journal.provision(locations.state / "journal.db")
-    return LocalHost(HostHelper(build_dependencies(deployment, maddy, locations)))
+    relay = local_relay_actions(maddy, locations.state, locations.owner)
+    return LocalHost(HostHelper(build_dependencies(
+        deployment, maddy, replace(locations, relay=relay))))

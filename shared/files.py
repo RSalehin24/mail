@@ -5,6 +5,7 @@ import math
 import os
 import stat
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -79,15 +80,25 @@ def atomic_json(path: Path, value: dict[str, Any]) -> None:
 
 
 def atomic_group_json(path: Path, value: dict[str, Any], group: int) -> None:
-    _atomic_json(path, value, group)
+    def share_with_group(descriptor: int) -> None:
+        os.fchown(descriptor, -1, group)
+        os.fchmod(descriptor, 0o640)
+
+    _atomic_json(path, value, share_with_group)
 
 
-def _atomic_json(path: Path, value: dict[str, Any], group: int | None) -> None:
+def atomic_owned_json(path: Path, value: dict[str, Any], owner: int) -> None:
+    """Hand the file to its reader before it appears, so no root-only version is ever visible."""
+    _atomic_json(path, value, lambda descriptor: os.fchown(descriptor, owner, -1))
+
+
+def _atomic_json(
+    path: Path, value: dict[str, Any], prepare: Callable[[int], None] | None
+) -> None:
     descriptor, temporary = tempfile.mkstemp(prefix=".staging-", dir=path.parent)
     with os.fdopen(descriptor, "w") as stream:
-        if group is not None:
-            os.fchown(stream.fileno(), -1, group)
-            os.fchmod(stream.fileno(), 0o640)
+        if prepare is not None:
+            prepare(stream.fileno())
         json.dump(value, stream, sort_keys=True)
         stream.flush()
         os.fsync(stream.fileno())
