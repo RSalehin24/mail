@@ -10,3 +10,6 @@ build/
 local-state/
 .env
 *.key
+
+# Agent worktrees
+.claude/worktrees/
