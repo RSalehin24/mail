@@ -24,6 +24,9 @@ Starts in the last hour: recovery 932 (timer: 2 s after each run), backup-contro
 ## Simplification (D-019)
 Owner chose all three stages and keeps all four features. Plan: [SIMPLIFY](SIMPLIFY.md). Stage 1 (repo-only removal of qualification/evidence tooling and historical docs) awaits owner approval of the deletion list.
 
+## Stage 2 step 1 done (repo only, D-022)
+`helper/maddy.py` now has a shared `MaddyCli` base and `LocalMaddy` (runs the pinned Maddy binary directly with `-config`). Tests: `tests/unit/test_local_maddy.py` (stub binary) and `tests/maddy/test_local_maddy.py` (real binary against the real server, passing). Findings: the stock Maddy binary runs on the Debian image with the musl loader copied beside it; the CLI loads the TLS files named in the config, so the dashboard needs `/data`, `/data/maddy.conf`, `/data/tls` and a `/run/maddy` tmpfs. The Makefile is now `.NOTPARALLEL` because `make -j` ran the Docker suites at once and they replaced each other's test image. Next: step 2 in SIMPLIFY.md, a local host facade with the `HelperClient.call` interface behind a setting.
+
 ## Stage 2 spike done (see SIMPLIFY.md)
 The app can run the Maddy account commands itself if Maddy runs as 10001 and owns/shares the data directory. Needed on the VM later (T3, approval + restore point): Maddy container as 10001:10001, chown of `/opt/maddy/data`, TLS files readable, `/run/maddy` tmpfs owned by 10001. Next in the repo: let the backend run the helper logic in-process with a local-subprocess Maddy. Spike test kept outside the repo (scratchpad `test_spike_direct_cli.py`).
 

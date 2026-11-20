@@ -1,5 +1,8 @@
 PYTHON ?= .venv/bin/python
 
+# Every Docker suite rebuilds and retags mail-admin:qualification; parallel runs replace each other's image.
+.NOTPARALLEL:
+
 .PHONY: fixture-space wheels restic build lint typecheck unit integration maddy-integration runtime-integration acme-integration linux-check browser check plan
 fixture-space:
 	$(PYTHON) tools/check_fixture_disk.py

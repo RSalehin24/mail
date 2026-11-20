@@ -1,6 +1,7 @@
 """Fixed Docker/Maddy argv and host-side identity/mount/database preflight."""
 
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any, Protocol
@@ -36,7 +37,37 @@ class MaddyAccess(Protocol):
     def change(self, arguments: tuple[str, ...], password: str = "") -> CommandResult: ...
 
 
-class DockerMaddy:
+class MaddyCli:
+    """Shared account-command logic; subclasses decide how the pinned Maddy CLI is run."""
+
+    def change(self, arguments: tuple[str, ...], password: str = "") -> CommandResult:
+        raise NotImplementedError
+
+    def expected_cli_version(self) -> str:
+        raise NotImplementedError
+
+    def inventories(self) -> dict[str, list[str]]:
+        result: dict[str, list[str]] = {}
+        for key, command in (("credentials", "creds"), ("storage", "imap-acct")):
+            response = self.change((command, "list"))
+            if not cli_succeeded(response):
+                raise ServiceError("inventory_unavailable", 503)
+            if response.output.strip() == "No users.":
+                result[key] = []
+                continue
+            result[key] = sorted(
+                address(line.strip()) for line in response.output.splitlines() if line.strip()
+            )
+        return result
+
+    def validate_cli_version(self) -> None:
+        result = self.change(("version",))
+        pattern = r'(?<![0-9.])' + re.escape(self.expected_cli_version()) + r'(?=$|\s)'
+        if not cli_succeeded(result) or not re.search(pattern, result.output):
+            raise ServiceError("maddy_version_mismatch", 503)
+
+
+class DockerMaddy(MaddyCli):
     def __init__(self, deployment: dict[str, Any], executable: str = "/usr/bin/docker") -> None:
         self.deployment = deployment
         self.executable = executable
@@ -78,12 +109,6 @@ class DockerMaddy:
             raise ServiceError('maddy_version_unsupported', 503)
         return str(version)
 
-    def validate_cli_version(self) -> None:
-        result = self.change(("version",))
-        pattern = r'(?<![0-9.])' + re.escape(self.expected_cli_version()) + r'(?=$|\s)'
-        if not cli_succeeded(result) or not re.search(pattern, result.output):
-            raise ServiceError("maddy_version_mismatch", 503)
-
     def expected_mounts(self) -> dict[str, str]:
         expected = dict(self.deployment["maddy_mounts"])
         state_path = self.deployment.get("certificate_state")
@@ -99,21 +124,33 @@ class DockerMaddy:
         expected[target] = str(Path(self.deployment["tls_generations_directory"]) / generation)
         return expected
 
-    def inventories(self) -> dict[str, list[str]]:
-        result: dict[str, list[str]] = {}
-        for key, command in (("credentials", "creds"), ("storage", "imap-acct")):
-            response = self.change((command, "list"))
-            if not cli_succeeded(response):
-                raise ServiceError("inventory_unavailable", 503)
-            if response.output.strip() == "No users.":
-                result[key] = []
-                continue
-            result[key] = sorted(
-                address(line.strip()) for line in response.output.splitlines() if line.strip()
-            )
-        return result
-
     def change(self, arguments: tuple[str, ...], password: str = "") -> CommandResult:
         prefix = (self.executable, "exec", "-i", "maddy", LAUNCHER)
         payload = (password + "\n" + password + "\n").encode() if password else b""
         return execute(Command(prefix + arguments, payload, self.timeout))
+
+
+class LocalMaddy(MaddyCli):
+    """Runs the pinned Maddy binary directly against a data directory this process may use."""
+
+    def __init__(self, binary: Path, config: Path, data: Path, cli_version: str, timeout: float):
+        self.binary, self.config, self.data = binary, config, data
+        self.cli_version, self.timeout = cli_version, timeout
+
+    def expected_cli_version(self) -> str:
+        return self.cli_version
+
+    def validate(self) -> None:
+        if not self.binary.is_file() or not os.access(self.binary, os.X_OK):
+            raise ServiceError("maddy_unavailable", 503)
+        if any(
+            not (self.data / name).is_file() or (self.data / name).is_symlink()
+            for name in ("credentials.db", "imapsql.db")
+        ):
+            raise ServiceError("maddy_storage_missing", 503)
+        self.validate_cli_version()
+
+    def change(self, arguments: tuple[str, ...], password: str = "") -> CommandResult:
+        payload = (password + "\n" + password + "\n").encode() if password else b""
+        command = (str(self.binary), "-config", str(self.config)) + arguments
+        return execute(Command(command, payload, self.timeout))
