@@ -24,6 +24,9 @@ Starts in the last hour: recovery 932 (timer: 2 s after each run), backup-contro
 ## Simplification (D-019)
 Owner chose all three stages and keeps all four features. Plan: [SIMPLIFY](SIMPLIFY.md). Stage 1 (repo-only removal of qualification/evidence tooling and historical docs) awaits owner approval of the deletion list.
 
+## Timer fix DEPLOYED 2026-11-21 03:50 Dhaka (D-029; units only, no code, no downtime)
+Installed on the VM: `mail-admin-backup-control.path`, `mail-admin-recovery.path` (start the worker when its request database is written) and the two timers as 5-minute fallbacks (were 3 s and 2 s); helper and workers unchanged. Verified on the real VM: writing to each queue database started its worker within the same second and it exited successfully. Before: about 137 and 156 starts per 10 minutes (about 14 per minute each). First two minutes after the change: 2 starts each (my own two trigger tests); CPU pressure avg60 fell from about 10 to 2.4. Final figures to follow once avg300 settles. Rollback: `/root/cutover-20261121/rollback-timers.sh`.
+
 ## VM cutover paused 2026-11-21 (D-027, D-028): production gaps in the in-process mode
 Staged on the VM and harmless: `/root/cutover-20261121` (restore point, rollback script, new library and rendered units), image `mail-admin:stage2`, old image tagged `mail-admin:pre-stage2`. No service, ownership, unit or compose change was made; production is healthy. Blockers (see [VM-CUTOVER](VM-CUTOVER.md)): the recovery proof pins nine changed files (owner chose re-attestation, D-028), and the dashboard cannot read root-only worker files it needs for the Server, Forwarding and recovery features. The earlier "works normally" confirmation covered the local fixture only.
 
