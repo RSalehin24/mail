@@ -170,7 +170,7 @@ def fixture_support_files() -> tuple[Path, ...]:
     return tuple(ROOT / "tools" / name for name in (
         "run_linux.py", "resources.py", "maddy_modules.py", "run_tests.py",
         'run_remote.py', 'fixture_images.py',
-        'catalogue_modules.py', 'maddy_fixture.py',
+        'maddy_fixture.py',
     ))
 
 

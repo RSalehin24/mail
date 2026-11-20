@@ -48,7 +48,7 @@ The following command must reject the untouched template because no application 
 PYTHONDONTWRITEBYTECODE=1 python3 docs/mail-admin-implementation/tools/check_release.py docs/mail-admin-implementation/verification/runtime-evidence.template.json
 ```
 
-Application build/test commands delivered by W01 are documented in the repository-root `README.md`. Documentation and model results do not substitute for application tests. See repository-root `verification/status.md` for recorded checks and remaining qualification, and `verification/linux-continuation.md` for the new workstation. Historical private build artifacts require separate transfer.
+Application build/test commands delivered by W01 are documented in the repository-root `README.md`. Documentation and model results do not substitute for application tests. See repository-root `planning/STATUS.md` for recorded checks, and `verification/linux-continuation.md` for the new workstation. Historical private build artifacts require separate transfer.
 
 To reproduce the complete local check record, including verifier regression tests and Docker Compose/shell examples:
 

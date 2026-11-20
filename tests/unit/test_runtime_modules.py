@@ -44,13 +44,11 @@ class RuntimeModuleTests(test_maddy_modules.MaddyModuleTests):
             module_inventory('pinned-image', docker, 'runtime')
 
     def test_partial_runtime_selection_is_not_a_complete_suite_report(self):
-        arguments = suite_command('runtime', None, 'test_mail_flow')
+        arguments = suite_command('runtime', 'test_mail_flow')
         self.assertEqual(arguments[:5], ('python', 'tools/run_tests.py', 'runtime',
                                          '--module', 'test_mail_flow'))
         self.assertTrue(arguments[-1].startswith('build/runtime-partial-'))
         self.assertTrue(arguments[-1].endswith('/test_mail_flow'))
-        with self.assertRaises(ValueError):
-            suite_command('runtime', self.root / 'evidence.json', 'test_mail_flow')
 
     def test_malformed_report_or_invalid_inventory_is_an_explicit_failure(self):
         self.write('test_second', {'tests': 'invalid'})

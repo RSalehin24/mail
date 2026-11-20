@@ -3,15 +3,19 @@
 import hashlib
 import json
 import os
+import sys
 import unittest
 from datetime import UTC, datetime
+from pathlib import Path
 
 from host.rollout import RolloutGuard, RolloutPaths
 from shared.errors import ServiceError
 from shared.files import atomic_json, protected_json
 from tests.rollout_support import write_gate_fixtures
 from tests.support import StateFixture
-from tools.qualification_bundle import ROOT
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "docs/mail-admin-implementation/tools"))
 
 
 class RolloutGateTests(unittest.TestCase):

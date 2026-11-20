@@ -49,7 +49,7 @@ Precedence: the user's explicit instruction, then the nearest `AGENTS.md`, then 
 `backend/` FastAPI app and API; `helper/` root Unix-socket service (the only code that changes Maddy); `host/` root lifecycle tools and systemd units; `shared/` validators and Maddy config generation; `frontend/` React/MUI; `tools/` build and evidence tooling; `tests/`; `docs/mail-admin-implementation/` the reviewed contract; `verification/` historical evidence.
 
 ## Working style
-- `verification/status.md` (1,294 lines) and the other `verification/*` handovers are historical; do not read them in full. Start from `verification/mail-admin-completion.md` only when production history matters.
+- `verification/*` handovers are historical; do not read them in full. Start from `verification/mail-admin-completion.md` only when production history matters.
 - Read by section (`offset`/`limit`) or `rg`; never re-read a file already in context. Delegate broad searches to `Explore` and keep conclusions.
 - Independent work goes in parallel in one message. Keep replies short: changes, not content.
 - Write durations as hours and minutes ("3 h 8 min").

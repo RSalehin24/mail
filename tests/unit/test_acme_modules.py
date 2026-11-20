@@ -27,13 +27,11 @@ class AcmeModuleTests(test_maddy_modules.MaddyModuleTests):
         self.assertEqual(report['controller_memory']['limit_bytes'], 192 * 1024**2)
         self.assertEqual(before, {p: p.read_bytes() for p in before})
 
-    def test_inventory_is_bound_to_acme_and_partial_selection_cannot_accept_evidence(self):
+    def test_inventory_is_bound_to_acme_and_partial_selection_builds_a_module_command(self):
         self.assertEqual(module_inventory('image', lambda _: json.dumps(self.inventory), 'acme'),
                          self.inventory)
         with patch.dict(self.inventory, {'suite': 'runtime'}), self.assertRaises(ValueError):
             module_inventory('image', lambda _: json.dumps(self.inventory), 'acme')
-        arguments = suite_command('acme', None, 'test_generation_crashes')
+        arguments = suite_command('acme', 'test_generation_crashes')
         self.assertEqual(arguments[:5], ('python', 'tools/run_tests.py', 'acme',
                                          '--module', 'test_generation_crashes'))
-        with self.assertRaises(ValueError):
-            suite_command('acme', self.root / 'evidence.json', 'test_generation_crashes')

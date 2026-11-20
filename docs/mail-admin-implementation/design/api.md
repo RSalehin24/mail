@@ -2,7 +2,7 @@
 
 These paths define the required application API. The API is implemented locally;
 qualification and production deployment remain pending. See the
-repository-root `verification/status.md` for source-specific results.
+repository-root `planning/STATUS.md` for current results.
 
 #### [NEW] `/opt/mail-admin/backend/main.py`
 

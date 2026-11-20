@@ -27,8 +27,7 @@ recreated from those verified archives. Go's recorded VCS metadata identifies th
 containing workspace; source provenance is established by the pinned source and
 patch hashes. A rebuild must retain its own executable/image receipt.
 These ignored build artifacts are retained on the original workstation and are not
-included in this source checkout. Transfer them privately as described in the
-[handover](../../verification/ubuntu-handover.md); do not substitute an unpatched
+included in this source checkout. Transfer them privately from that workstation; do not substitute an unpatched
 upstream image when the pinned fixture is unavailable.
 
 The Dockerfile replaces `/bin/maddy` in the pinned original runtime base. The

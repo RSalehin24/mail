@@ -13,7 +13,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from tools.catalogue_modules import run_catalogue  # noqa: E402
 from tools.maddy_modules import run_maddy, run_modules  # noqa: E402
 from tools.resources import fixture_budget, require_fixture_disk  # noqa: E402
 from tools.run_tests import validate_module  # noqa: E402
@@ -37,38 +36,19 @@ def pinned_runtime_image(image_id: str) -> Iterator[str]:
         docker(("image", "rm", reference))
 
 
-def suite_command(
-    suite: str,
-    evidence: Path | None,
-    module: str | None = None,
-) -> tuple[str, ...]:
+def suite_command(suite: str, module: str | None = None) -> tuple[str, ...]:
     validate_module(suite, module)
-    if module is not None:
-        if evidence is not None:
-            raise ValueError("Partial module checks cannot consume qualification evidence")
-        report = "build/" + suite + "-partial-" + str(uuid.uuid4()) + "/" + module
-        return (
-            "python",
-            "tools/run_tests.py",
-            suite,
-            "--module",
-            module,
-            "--report-directory",
-            report,
-        )
-    if suite != "qualification":
-        if evidence is not None:
-            raise ValueError("An evidence bundle is only accepted for catalogue qualification")
+    if module is None:
         return "python", "tools/run_tests.py", suite
-    if evidence is None or not evidence.is_file():
-        raise ValueError("Catalogue qualification requires a frozen evidence bundle")
-    selected = evidence.resolve()
-    if not selected.is_relative_to(ROOT / "build"):
-        raise ValueError("Qualification bundle must be inside the mounted build directory")
+    report = "build/" + suite + "-partial-" + str(uuid.uuid4()) + "/" + module
     return (
         "python",
-        "tools/run_qualification.py",
-        str(Path("/app/build") / selected.relative_to(ROOT / "build")),
+        "tools/run_tests.py",
+        suite,
+        "--module",
+        module,
+        "--report-directory",
+        report,
     )
 
 
@@ -76,16 +56,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--suite",
-        choices=("unit", "integration", "maddy", "runtime", "acme", "qualification"),
+        choices=("unit", "integration", "maddy", "runtime", "acme"),
         default="maddy",
     )
-    parser.add_argument("--evidence", type=Path)
     parser.add_argument("--module", help="Run one Maddy/runtime/ACME module; partial suite")
-    parser.add_argument("--resume", type=Path, help="Resume a matching interrupted catalogue")
     arguments = parser.parse_args()
-    if arguments.resume is not None and arguments.suite != "qualification":
-        parser.error("--resume requires --suite qualification")
-    entrypoint = suite_command(arguments.suite, arguments.evidence, arguments.module)
+    entrypoint = suite_command(arguments.suite, arguments.module)
     require_fixture_disk(ROOT)
     context = json.loads(docker(("context", "inspect")))[0]
     endpoint = os.environ.get("DOCKER_HOST", context["Endpoints"]["docker"]["Host"])
@@ -164,17 +140,6 @@ def main() -> None:
                 code = run_maddy(command, root, docker)
             elif arguments.suite in {"runtime", "acme"} and arguments.module is None:
                 code = run_modules(command, (root, arguments.suite), docker)
-            elif arguments.suite == "qualification":
-                code = run_catalogue(
-                    command,
-                    (
-                        root,
-                        arguments.evidence,
-                        entrypoint,
-                        arguments.resume,
-                    ),
-                    docker,
-                )
             else:
                 result = subprocess.run(  # noqa: S603, S607 -- fixed pinned fixture command.
                     ("docker",) + command + entrypoint, check=False

@@ -52,19 +52,17 @@ class RunnerTests(unittest.TestCase):
     def test_partial_maddy_modules_require_existing_names_and_keep_distinct_reports(self):
         from tools.run_linux import suite_command
 
-        arguments = suite_command('maddy', None, 'test_permissions_sessions')
+        arguments = suite_command('maddy', 'test_permissions_sessions')
         self.assertEqual(arguments[:5], ('python', 'tools/run_tests.py', 'maddy',
                                          '--module', 'test_permissions_sessions'))
         self.assertEqual(arguments[5], '--report-directory')
         self.assertTrue(arguments[6].startswith('build/maddy-partial-'))
         self.assertTrue(arguments[6].endswith('/test_permissions_sessions'))
-        with self.assertRaises(ValueError):
-            suite_command('maddy', Path('build/fixture-evidence.json'), 'test_permissions_sessions')
         for suite, module in (('unit', 'test_permissions_sessions'),
                               ('maddy', '../test_permissions_sessions'),
                               ('maddy', 'test_nonexistent')):
             with self.subTest(suite=suite, module=module), self.assertRaises(ValueError):
-                suite_command(suite, None, module)
+                suite_command(suite, module)
 
     def test_restored_web_stops_before_the_original_mail_writer_can_resume(self):
         for error in (None, RuntimeError("synthetic restore failure")):
@@ -234,20 +232,10 @@ class RunnerTests(unittest.TestCase):
         budget = fixture_budget('acme')
         self.assertEqual(budget.companions_mib, 128 + 64 + 64 + 96 + 128)
         self.assertEqual(budget.minimum_available_bytes, 800 * 1024**2)
-        self.assertEqual(suite_command('acme', None), ('python', 'tools/run_tests.py', 'acme'))
+        self.assertEqual(suite_command('acme'), ('python', 'tools/run_tests.py', 'acme'))
 
-    def test_catalogue_runner_requires_an_existing_in_bundle_evidence_path(self):
-        self.assertEqual(suite_command("unit", None), ("python", "tools/run_tests.py", "unit"))
-        with self.assertRaises(ValueError):
-            suite_command("qualification", None)
-        with self.assertRaises(ValueError):
-            suite_command("unit", ROOT / "build/evidence.json")
-        with patch.object(Path, "is_file", return_value=True):
-            with self.assertRaises(ValueError):
-                suite_command("qualification", ROOT / "outside-evidence.json")
-            self.assertEqual(suite_command("qualification", ROOT / "build/candidate/evidence.json"),
-                             ("python", "tools/run_qualification.py",
-                              "/app/build/candidate/evidence.json"))
+    def test_whole_suite_runs_the_shared_test_runner_without_module_arguments(self):
+        self.assertEqual(suite_command("unit"), ("python", "tools/run_tests.py", "unit"))
 
     def run_fixture(self, fixture):
         suite = unittest.defaultTestLoader.loadTestsFromTestCase(fixture)

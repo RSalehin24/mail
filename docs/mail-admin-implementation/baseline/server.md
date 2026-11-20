@@ -1,6 +1,6 @@
 # Server baseline and provenance
 
-Sanitized observations from the recorded SSH sessions are in [observations.json](observations.json). They describe the production host at those times, not this development workstation or current production resource limits. Recheck before maintenance. No dashboard was deployed at the recorded checks; local implementation status is tracked separately in repository-root `verification/status.md`.
+Sanitized observations from the recorded SSH sessions are in [observations.json](observations.json). They describe the production host at those times, not this development workstation or current production resource limits. Recheck before maintenance. No dashboard was deployed at the recorded checks; local implementation status is tracked separately in repository-root `planning/STATUS.md`.
 
 ## Verified Server Baseline — October 21–22, 2026
 

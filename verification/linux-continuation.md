@@ -2,7 +2,7 @@
 
 Updated 26 October 2026 in `/home/rsalehin24/Documents/mail`.
 This workstation runs CachyOS (Arch based), x86_64, with approximately 31 GiB RAM.
-The [Ubuntu handover](ubuntu-handover.md) is a historical Mac transfer record.
+The earlier Mac handover notes were removed (see git history).
 Its candidate identities and results do not qualify this working tree.
 
 ## Latest outcome

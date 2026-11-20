@@ -265,7 +265,7 @@ to the live server requires separate operator approval.
   passed 203 unit, 26 integration and 20 emulated Linux/amd64 Maddy checks, including
   real mail/enrolled dashboard recovery through a local encrypted Restic repository.
   Subsequent restore-safety changes require their own checks; see
-  [current implementation status](status.md) for the final snapshot.
+  [planning/STATUS.md](../planning/STATUS.md) for the current state.
 
 - The earlier frozen source
   `00fbc5e55690303c049a71b7d6a9a515abb3d19eb515bccb2d3682c40a15635e`
