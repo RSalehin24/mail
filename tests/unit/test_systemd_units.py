@@ -26,6 +26,24 @@ def seconds(value):
     return int(match[1]) * SECONDS_PER_UNIT[match[2]]
 
 
+class MaddyRestartUnitTests(unittest.TestCase):
+    """The restart worker is request-file driven only; there is no fallback timer."""
+
+    def test_request_file_starts_a_hardened_oneshot_that_needs_docker(self):
+        path = unit("mail-admin-maddy-restart.path")
+        self.assertEqual(path["Path"]["PathChanged"], f"{HELPER_STATE}/maddy-restart.request.json")
+        self.assertEqual(path["Path"]["Unit"], "mail-admin-maddy-restart.service")
+        self.assertEqual(path["Install"]["WantedBy"], "paths.target")
+        service = unit("mail-admin-maddy-restart.service")
+        self.assertEqual(service["Service"]["Type"], "oneshot")
+        self.assertEqual(service["Unit"]["Requires"], "docker.service")
+        self.assertEqual(service["Service"]["ExecStart"],
+                         "/usr/bin/python3 -m host.maddy_restart")
+        self.assertIn(HELPER_STATE, service["Service"]["ReadWritePaths"].split())
+        self.assertEqual(service["Service"]["ProtectSystem"], "strict")
+        self.assertEqual(service["Service"]["NoNewPrivileges"], "true")
+
+
 class WorkerActivationTests(unittest.TestCase):
     def test_requests_start_the_worker_through_a_path_unit(self):
         for worker, database in WORKERS.items():

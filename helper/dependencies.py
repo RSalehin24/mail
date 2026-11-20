@@ -14,7 +14,7 @@ from helper.recovery import RecoveryControl
 from helper.recovery_records import RecoveryRecords
 from helper.service import HelperDependencies
 from helper.status import host_status
-from helper.submission import SubmissionControl
+from helper.submission import RelayActions, SubmissionControl
 from host.locks import HostLock, LockPolicy
 
 DEPLOYMENT_RECORD = Path("/etc/mail-admin/deployment.json")
@@ -27,6 +27,7 @@ class HostLocations:
     state: Path = Path("/var/lib/mail-admin-helper")
     lock: Path = Path("/run/lock/mail-admin-maddy.lock")
     owner: int = 0
+    relay: RelayActions | None = None  # None: the root helper's Docker verify and restart
     deletion: DeletionPaths = field(default_factory=lambda: DeletionPaths(
         DEPLOYMENT_RECORD, Path("/etc/mail-admin/helper-policy.json"),
         Path("/var/lib/mail-admin-backup/manifest.json"),
@@ -59,5 +60,6 @@ def build_dependencies(
     if (data / "submission-relay.conf").is_file():
         with HostLock(dependencies.lock, dependencies.lock_policy):
             dependencies = replace(dependencies, submission=SubmissionControl(
-                data, Path(deployment["backup_sources"]["dashboard"]) / "admin_data.db"))
+                data, Path(deployment["backup_sources"]["dashboard"]) / "admin_data.db",
+                locations.relay))
     return dependencies
