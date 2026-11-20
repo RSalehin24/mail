@@ -28,7 +28,7 @@ from host.rollout import (
     rollout_operation,
 )
 from shared.errors import ServiceError
-from shared.files import protected_json
+from shared.files import protected_json, state_owner_uid
 from shared.runtime_policy import RUNTIME_POLICY_NAME, RuntimePolicy
 
 
@@ -183,7 +183,7 @@ def baseline_action(action: str) -> int:
     guard.checkpoint("G03" if action == "baseline-backup" else "G02")
     directory = rollout_directory(deployment)
     if action == "maintenance-entry":
-        prepare_maintenance(directory)
+        prepare_maintenance(directory, state_owner_uid(deployment))
     with rollout_operation(deployment):
         state = RolloutState(deployment, (directory.parent, 0))
         if action == "maintenance-entry":
@@ -204,12 +204,12 @@ def baseline_operation(action: str, records: tuple[dict[str, Any], dict[str, Any
         LegacyRenewal(directory / "legacy.json", 30).enter(approval)
 
 
-def prepare_maintenance(directory: Path) -> None:
+def prepare_maintenance(directory: Path, lock_owner: int) -> None:
     for path in (directory.parent, directory, Path("/var/lib/mail-admin-backup/staging")):
         path.mkdir(mode=0o700, parents=True, exist_ok=True)
         require_private_directory(path, 0)
     for name in ("renewal", "maddy", "backup"):
-        provision_lock(Path("/run/lock/mail-admin-" + name + ".lock"))
+        provision_lock(Path("/run/lock/mail-admin-" + name + ".lock"), lock_owner)
     provision_lock(directory.parent / "operation.lock")
     provision_lock(directory / "cutover.lock")
 

@@ -21,9 +21,11 @@ APPLICATION_DATA = Path("/app/data")
 HOST_RECORDS = Path("/run/mail-admin-host")
 DEFAULT_CLI_VERSION = "0.9.5"
 
+# State and the mailbox lock are the host paths the root workers also use, bind-mounted
+# into the container and owned by the dashboard's user (the deployment's state_owner_uid).
 LOCAL_LOCATIONS = HostLocations(
-    state=APPLICATION_DATA / "host",
-    lock=APPLICATION_DATA / "host" / "mail-admin-maddy.lock",
+    state=Path("/var/lib/mail-admin-helper"),
+    lock=Path("/run/lock/mail-admin-maddy.lock"),
     owner=os.geteuid(),
     deletion=DeletionPaths(
         HOST_RECORDS / "deployment.json",

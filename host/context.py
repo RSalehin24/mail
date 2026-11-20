@@ -21,7 +21,7 @@ from host.coordination import Coordination, MaintenanceLocks
 from host.docker import Docker, DockerConsumer, DockerSnapshots
 from host.locks import LockPolicy
 from host.renewal import Certbot, Renewal
-from shared.files import protected_json
+from shared.files import protected_json, state_owner_uid
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,7 @@ class HostContext:
     @classmethod
     def load(cls) -> HostContext:
         deployment = protected_json(Path("/etc/mail-admin/deployment.json"))
-        inputs = deployment["inputs"]
+        inputs, owner = deployment["inputs"], state_owner_uid(deployment)
         generations = Generations(
             GenerationPaths(
                 Path("/opt/maddy/tls/generations"),
@@ -46,10 +46,10 @@ class HostContext:
         locks = MaintenanceLocks(
             Path("/run/lock/mail-admin-renewal.lock"),
             Path("/run/lock/mail-admin-maddy.lock"),
-            LockPolicy(inputs["lock_wait_seconds"]),
+            LockPolicy(inputs["lock_wait_seconds"], owner),
         )
         coordination = Coordination(
-            locks, (Journal(Path("/var/lib/mail-admin-helper/journal.db")), generations)
+            locks, (Journal(Path("/var/lib/mail-admin-helper/journal.db"), owner), generations)
         )
         alerts = Alerts(
             Path("/var/lib/mail-admin-alerts/state.json"),

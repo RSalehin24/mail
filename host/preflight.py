@@ -129,7 +129,11 @@ def validate_image(deployment: dict[str, Any], docker: Docker) -> None:
 def provision_lock(path: Path, owner: int = 0) -> None:
     if not path.exists():
         descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-        os.close(descriptor)
+        try:
+            if owner != os.geteuid():
+                os.fchown(descriptor, owner, -1)
+        finally:
+            os.close(descriptor)
     metadata = path.lstat()
     if (
         not stat.S_ISREG(metadata.st_mode)

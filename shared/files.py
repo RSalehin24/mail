@@ -11,6 +11,14 @@ from typing import Any
 from shared.errors import ServiceError
 
 
+def state_owner_uid(deployment: dict[str, Any]) -> int:
+    """Owner of the files shared with the dashboard (locks, journal); root unless configured."""
+    owner = deployment.get("state_owner_uid", 0)
+    if type(owner) is not int or owner < 0:
+        raise ServiceError("invalid_state_owner", 503)
+    return owner
+
+
 def protected_bytes(path: Path, owner: int = 0) -> bytes:
     descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
     try:

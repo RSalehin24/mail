@@ -18,6 +18,7 @@ from host.legacy import LegacyRenewal
 from host.locks import HostLock, LockPolicy
 from host.rollout import rollout_directory
 from shared.errors import ServiceError
+from shared.files import state_owner_uid
 
 
 class ExistingMaddy(DockerMaddy):
@@ -134,17 +135,18 @@ def baseline_backup(deployment: dict[str, Any]) -> BackupService:
     if not required <= set(sources):
         raise ServiceError("baseline_sources_incomplete", 503)
     docker = Docker(timeout=deployment["inputs"]["operation_timeout_seconds"])
+    owner = state_owner_uid(deployment)
     locks = MaintenanceLocks(
         Path("/run/lock/mail-admin-renewal.lock"),
         Path("/run/lock/mail-admin-maddy.lock"),
-        LockPolicy(deployment["inputs"]["lock_wait_seconds"]),
+        LockPolicy(deployment["inputs"]["lock_wait_seconds"], owner),
     )
     journal_path = Path("/var/lib/mail-admin-helper/journal.db")
     scope = BaselineScope(
         locks,
         (
             LegacyRenewal(rollout_directory(deployment) / "legacy.json", 30),
-            Journal(journal_path) if journal_path.exists() else None,
+            Journal(journal_path, owner) if journal_path.exists() else None,
         ),
     )
     paths = BackupPaths(
