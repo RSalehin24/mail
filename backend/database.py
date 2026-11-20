@@ -65,7 +65,7 @@ class Database:
                 self._writes.release()
 
     @classmethod
-    def provision(cls, path: Path, identity: str) -> "Database":
+    def provision(cls, path: Path, identity: str) -> Database:
         descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         os.close(descriptor)
         try:

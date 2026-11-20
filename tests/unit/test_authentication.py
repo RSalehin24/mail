@@ -129,7 +129,7 @@ class AuthenticationTests(unittest.TestCase):
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM sessions").fetchone()[0], 1)
 
     def test_exact_totp_digits_step_window_and_monotonic_consumption(self):
-        secret, now = "JBSWY3DPEHPK3PXP", 1800000000
+        secret, now = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP", 1800000000
         current = now // 30
         for code in ("12345", "1234567", "１２３４５６", "+12345", "123 45"):
             self.assertIsNone(matching_step(secret, code, now))

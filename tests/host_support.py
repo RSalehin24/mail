@@ -71,7 +71,7 @@ class GuestHelper:
         self.verify_consumer()
 
     @classmethod
-    def load(cls) -> "GuestHelper":
+    def load(cls) -> GuestHelper:
         return cls(protected_json(CONTEXT))
 
     def command(self, arguments: tuple[str, ...]) -> str:

@@ -38,7 +38,7 @@ class R2Options:
     retention_seconds: int
 
     @classmethod
-    def load(cls, configuration: dict[str, Any]) -> "R2Options":
+    def load(cls, configuration: dict[str, Any]) -> R2Options:
         try:
             destination = urlsplit(configuration["inputs"]["backup_destination"])
             options = configuration["backup_r2"]

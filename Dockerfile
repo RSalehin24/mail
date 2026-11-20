@@ -5,7 +5,7 @@ RUN npm ci --ignore-scripts
 COPY frontend/ ./
 RUN npm run build
 
-FROM python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199 AS dependencies
+FROM python:3.15.2-slim-bookworm@sha256:96599df822d0e1c6bb700014a05c7f3c8cabc6e0f7ff3c4f9f69cee033b4b5d9 AS dependencies
 WORKDIR /build
 COPY requirements.lock ./
 RUN --mount=type=bind,source=build/wheels,target=/wheels,ro \
@@ -16,7 +16,7 @@ COPY requirements-dev.lock ./
 RUN --mount=type=bind,source=build/wheels,target=/wheels,ro \
     pip install --no-index --find-links=/wheels --require-hashes --prefix=/qualification -r requirements-dev.lock
 
-FROM python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199 AS runtime
+FROM python:3.15.2-slim-bookworm@sha256:96599df822d0e1c6bb700014a05c7f3c8cabc6e0f7ff3c4f9f69cee033b4b5d9 AS runtime
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 BIND_HOST=0.0.0.0
 COPY --from=dependencies /install /usr/local
@@ -24,7 +24,7 @@ COPY --from=frontend /build/dist /app/static
 COPY backend /app/backend
 COPY shared /app/shared
 RUN python -m compileall --invalidation-mode checked-hash -q \
-    /app/backend /app/shared /usr/local/lib/python3.11
+    /app/backend /app/shared /usr/local/lib/python3.15
 USER 10001:10001
 EXPOSE 8443
 CMD ["python", "-m", "backend"]

@@ -25,7 +25,7 @@ class Journal:
             connection.execute("SELECT id FROM operations LIMIT 1")
 
     @classmethod
-    def provision(cls, path: Path) -> "Journal":
+    def provision(cls, path: Path) -> Journal:
         descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         os.close(descriptor)
         with sqlite3.connect(path) as connection:

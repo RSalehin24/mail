@@ -33,7 +33,7 @@ class HostContext:
     alerts: Alerts
 
     @classmethod
-    def load(cls) -> "HostContext":
+    def load(cls) -> HostContext:
         deployment = protected_json(Path("/etc/mail-admin/deployment.json"))
         inputs = deployment["inputs"]
         generations = Generations(

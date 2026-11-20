@@ -16,7 +16,7 @@ class RecoveryPolicy:
     default_retention: str
 
     @classmethod
-    def parse(cls, value: dict[str, Any]) -> "RecoveryPolicy":
+    def parse(cls, value: dict[str, Any]) -> RecoveryPolicy:
         if (
             type(value.get("schema_version")) is not int
             or value.get("schema_version") != 1

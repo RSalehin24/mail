@@ -6,7 +6,7 @@ fixture-space:
 restic:
 	$(PYTHON) tools/fetch_restic.py linux_amd64
 wheels:
-	$(PYTHON) -m pip download --require-hashes --only-binary=:all: --platform manylinux_2_34_x86_64 --platform manylinux_2_28_x86_64 --platform manylinux_2_17_x86_64 --platform linux_x86_64 --python-version 3.11 --implementation cp --abi cp311 -r requirements-dev.lock --dest build/wheels
+	$(PYTHON) -m pip download --require-hashes --only-binary=:all: --platform manylinux_2_34_x86_64 --platform manylinux_2_28_x86_64 --platform manylinux_2_17_x86_64 --platform linux_x86_64 --python-version 3.15 --implementation cp --abi cp315 -r requirements-dev.lock --dest build/wheels
 build: fixture-space wheels
 	docker build --platform linux/amd64 --target runtime -t mail-admin:candidate .
 lint:

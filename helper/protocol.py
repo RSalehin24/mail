@@ -17,7 +17,7 @@ class HelperRequest:
     recovery: dict[str, Any] | None = None
 
     @classmethod
-    def parse(cls, payload: dict[str, Any]) -> "HelperRequest":
+    def parse(cls, payload: dict[str, Any]) -> HelperRequest:
         operation = payload.get("operation")
         if operation == "submission_reconcile":
             if (type(payload.get("protocol")) is not int

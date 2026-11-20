@@ -44,7 +44,7 @@ class SecretKeys:
         ).hexdigest()
 
     @classmethod
-    def load(cls, directory: Path, marker: Path) -> "SecretKeys":
+    def load(cls, directory: Path, marker: Path) -> SecretKeys:
         record = protected_json(marker)
         instance = cls(
             protected_bytes(directory / "encryption.key"),

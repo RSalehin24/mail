@@ -18,7 +18,7 @@ Paths: `frontend/` (React/MUI), `backend/` (API/domain/data), `shared/` (validat
 `helper/` (private Unix service), `host/` (operator lifecycle), `tests/` (application
 assertions), `tools/` (build and evidence adapters).
 
-Use Python 3.11 and Node 24 LTS. Python 3.12 on macOS is a development check only.
+Use Python 3.15 and Node 24 LTS.
 For the new Linux workstation, read the [setup checkpoint](verification/linux-continuation.md).
 Image builds require Docker Engine, the Buildx plugin (BuildKit), and Docker
 Compose. Install all three before `make build`; the legacy builder cannot execute
@@ -26,7 +26,7 @@ the Dockerfile's wheel-cache bind mounts.
 Install locked Python inputs into `.venv` and run `npm ci` in `frontend/`:
 
 ```sh
-python3.11 -m venv .venv
+python3.15 -m venv .venv
 .venv/bin/python -m pip install --require-hashes -r requirements-dev.lock
 npm --prefix frontend ci --ignore-scripts
 ```
@@ -55,7 +55,7 @@ make plan
 
 `make build` builds the pinned Linux/amd64 multi-stage image locally.
 `make build` downloads hash-locked Linux/amd64 wheels and builds with pinned Node
-24 and Python 3.11 stages. Network downloads happen outside the mail server.
+24 and Python 3.15 stages. Network downloads happen outside the mail server.
 The separate qualification image contains development tools and a Docker client;
 those tools are absent from the runtime image.
 Python bytecode is generated during the image build with source-hash validation;

@@ -1,5 +1,5 @@
 ARG GUEST_PLATFORM=linux/amd64
-ARG MOCK_BASE=python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199
+ARG MOCK_BASE=python:3.15.2-slim-bookworm@sha256:96599df822d0e1c6bb700014a05c7f3c8cabc6e0f7ff3c4f9f69cee033b4b5d9
 FROM --platform=$GUEST_PLATFORM docker:29.4.0-dind@sha256:a6dd5322747a95cd8e3207bd8d415a8fd20ec34e9c00f06dc019cbd912013489 AS engine
 
 FROM $MOCK_BASE

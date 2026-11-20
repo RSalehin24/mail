@@ -37,19 +37,19 @@ class Services:
     dns: Callable[[], dict[str, Any]] = observe_mx
 
     @classmethod
-    def production(cls) -> "Services":
+    def production(cls) -> Services:
         RuntimePolicy().require_running()
         require_runtime_sources()
         return cls._load()
 
     @classmethod
-    def operator(cls) -> "Services":
+    def operator(cls) -> Services:
         if os.geteuid() != 0:
             raise ServiceError("root_required", 403)
         return cls._load()
 
     @classmethod
-    def _load(cls) -> "Services":
+    def _load(cls) -> Services:
         settings = Settings.from_environment()
         marker = Path("/run/mail-admin-installation.json")
         installation = protected_json(marker)

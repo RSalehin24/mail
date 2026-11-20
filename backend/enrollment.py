@@ -17,7 +17,7 @@ from shared.validation import ADMIN_EMAIL, master_password
 
 
 def qr_material(secret: str) -> dict[str, str]:
-    uri = pyotp.TOTP(secret).provisioning_uri(ADMIN_EMAIL, issuer_name="Mail Admin")
+    uri = pyotp.TOTP(secret).provisioning_uri(name=ADMIN_EMAIL, issuer_name="Mail Admin")
     image = qrcode.make(uri, image_factory=qrcode.image.svg.SvgPathImage)
     encoded = base64.b64encode(image.to_string()).decode()
     return {"secret": secret, "uri": uri, "qr": "data:image/svg+xml;base64," + encoded}

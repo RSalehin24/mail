@@ -22,7 +22,7 @@ class HostLock:
         self.path, self.policy = path, policy
         self.descriptor: int | None = None
 
-    def __enter__(self) -> "HostLock":
+    def __enter__(self) -> HostLock:
         descriptor = os.open(self.path, os.O_RDWR | os.O_NOFOLLOW)
         self.descriptor = descriptor
         metadata = os.fstat(descriptor)

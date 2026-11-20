@@ -8,12 +8,15 @@ Updated 2026-11-20. Resume here; do not re-derive earlier decisions ([DECISIONS]
 
 ## Next action
 
-1. Phase 0 is done. Backup check done (see below). Next: dependency and Python update plan, then Phase 1 (see PLAN).
+1. Phase 0 is done. Backup check done (see below). Update done (see below). Next: owner decides on deploying it (T2/T3, needs restore point and approval), then Phase 1 (see PLAN).
 2. Confirm the 2026-11-20 dashboard backup (started 9:46 PM Dhaka) finished, and read why the 9:13 PM boot-time run failed.
 3. Delete `~/.cf_token` and revoke the temporary Cloudflare token (owner action).
 
 ## Phase 0 baseline (2026-11-20, Python 3.14, D-007 to D-015)
 All suites pass locally: lint, typecheck, reads, unit (537), integration (94), build, browser, Maddy (31 modules), runtime (8), ACME (7). Fixes made to stale tests/fixtures, assertions unchanged: SMTP keyword case (D-009), inventory cache wait (D-014). The Maddy fixture image is a local rebuild with a different executable hash than the approved one, pinned by owner decision (D-013); weaker evidence than the original. Not run: `make plan`, qualification suite, any production check. Python 3.14 was used instead of 3.11.
+
+## Update to Python 3.15 and latest libraries (2026-11-20, D-016, D-017)
+Repo and image only, not deployed. Python 3.15.2 base image (digest-pinned), 18 Python and 3 npm packages updated within their majors; locks regenerated with the documented commands. Needed two fixes: PyOTP 2.12.1 keyword-only `name` (real runtime break, caught by mypy) and a 160-bit test TOTP secret; ruff dropped 16 unneeded annotation quotes. Passing: lint, typecheck, reads, unit and integration (local `.venv` is Python 3.14), `make build`, `make browser`, `make linux-check` (Maddy, runtime, ACME, unit and integration inside the 3.15 image). Not done: deploy; Debian bookworm base images and the Node, Docker CLI and Maddy pins are unchanged.
 
 ## Backup check (2026-11-20, read-only)
 - The 9:46 PM Dhaka backup (15:47 UTC) succeeded: verified, all 9 mailboxes, snapshot `0e9c0c45`, recovered alert sent. `restore_passed` is false: no restore test has run.

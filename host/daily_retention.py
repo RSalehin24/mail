@@ -33,7 +33,7 @@ def daily_keep(
 
 
 class RetentionLedger:
-    def __init__(self, repository: "ResticRepository") -> None:
+    def __init__(self, repository: ResticRepository) -> None:
         self.repository = repository
         directory = repository.process.paths.state / "retention"
         directory.mkdir(mode=0o700, exist_ok=True)

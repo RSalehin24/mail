@@ -21,7 +21,7 @@ class Settings:
     permanent_deletion_enabled: bool = False
 
     @classmethod
-    def from_environment(cls) -> "Settings":
+    def from_environment(cls) -> Settings:
         values = [
             int(os.environ[key])
             for key in ("HASH_MEMORY_KIB", "HASH_PARALLELISM", "HTTP_CONCURRENCY")

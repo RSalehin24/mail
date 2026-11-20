@@ -16,7 +16,7 @@ class ContainerPolicy:
     cpus: float
 
     @classmethod
-    def load(cls, configuration: dict[str, Any]) -> "ContainerPolicy":
+    def load(cls, configuration: dict[str, Any]) -> ContainerPolicy:
         values = configuration.get("transient_resources")
         if not isinstance(values, dict):
             raise ServiceError("measured_transient_resources_required", 503)

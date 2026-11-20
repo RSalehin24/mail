@@ -35,7 +35,7 @@ class ArtifactArchive:
     def close(self) -> None:
         self.archive.close()
 
-    def __enter__(self) -> "ArtifactArchive":
+    def __enter__(self) -> ArtifactArchive:
         return self
 
     def __exit__(self, *arguments: object) -> None:
