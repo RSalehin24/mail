@@ -1,0 +1,25 @@
+# VM cutover plan for Stage 2 (step 7; T3; NOT approved, nothing here has been run)
+
+Goal: run Maddy and the dashboard as the same unprivileged user (uid/gid 10001, the existing `mail-admin` user), with the dashboard doing the mailbox work itself (`LOCAL_HOST=true`) and no root helper socket. Facts read from the VM on 2026-11-20 (read-only): `mail-admin` is uid/gid 10001; Maddy runs as root from `/opt/maddy/docker-compose.yml` (a separate compose project `maddy`); the dashboard runs from `/opt/mail-admin/docker-compose.yml` (project `mail-admin`); `/opt/maddy/data` is root:root 0700; `/var/lib/mail-admin-helper` is root:root 0700; `/run/lock/mail-admin-maddy.lock` is root 0600; `/etc/mail-admin/deployment.json` and `helper-policy.json` are root:root 0600; `/opt/maddy/tls/*.pem` are root:10001 0640; VM memory 470 of 952 MB used; no swap.
+
+## Approvals needed before any step (ask with AskUserQuestion)
+1. The cutover itself and a maintenance window (mail is down for a few minutes; sending servers retry for days).
+2. Building the new image on the workstation and loading it on the VM (`docker save | ssh ... docker load`; inbound to the VM, so no egress cost).
+3. A fresh backup to R2 as the restore point (a live backup run). No GCP snapshots (cost goal $0).
+
+## Order (each command is shown to the owner first; ask again for anything not listed)
+0. Preflight (read-only): `docker ps`, free disk and memory, backup age (`manifest.json`), `systemctl --failed`, image digests, current compose files, `id mail-admin`.
+1. Restore point: copy `/opt/maddy/docker-compose.yml`, `/opt/mail-admin/docker-compose.yml`, `/etc/mail-admin/`, `/etc/systemd/system/mail-admin-*`, `/opt/maddy/config` to a root-only dated directory under `/root/`; run one fresh backup (`systemctl start mail-admin-backup.service`) and confirm `manifest.json` shows a new snapshot and `verified: true`; keep the old image tags (`docker image ls`).
+2. Load the new dashboard image; do not start it.
+3. Copy the new single compose file next to the old ones; `docker compose config` with the real variables; compare mounts with this plan.
+4. Maintenance: stop the dashboard, then Maddy (`docker compose stop`); stop the helper, workers and timers (`mail-admin-*.timer`, `.path`, `mail-admin-helper.service`).
+5. Ownership: `chown -R 10001:10001 /opt/maddy/data /var/lib/mail-admin-helper`; the three lock files in `/run/lock` and `mail-admin-maddy.lock` to 10001 (`mail-admin-paths.service` recreates them at boot with `state_owner_uid`); `chgrp 10001` and mode 0640 on `/etc/mail-admin/deployment.json`, `helper-policy.json` and a copy of `backup/manifest.json` placed under `/run/mail-admin-host` or bind-mounted from its own path (root stays the owner: the deletion guard requires it); add `"state_owner_uid": 10001` to `deployment.json` (top level, not under `inputs`) and recompute any hash the deployment record carries (check `host/rollout.py` first).
+6. Start Maddy (as 10001, tmpfs `/run/maddy` owned by 10001), check it logs `server started` and listens on 25, 587 and 993 as a non-root user with all capabilities dropped (to verify: `net.ipv4.ip_unprivileged_port_start` inside the container).
+7. Start the dashboard with `LOCAL_HOST=true`, then enable the root agent units (`mail-admin-maddy-restart.path`, backup-control and recovery path units) and the timers; leave `mail-admin-helper.service` disabled and masked.
+8. Verify: IMAP login for one existing mailbox; send and receive a test message (ask first: live mail test); dashboard login with TOTP; create and delete a temporary mailbox through the UI; Server page shows live data; Backups page lists snapshots; `systemctl --failed` empty; next 03:00 Dhaka backup succeeds.
+
+## Rollback (stay within 15 minutes; decide at step 8)
+Stop both containers; `chown -R 0:0` on `/opt/maddy/data` and `/var/lib/mail-admin-helper`; restore the saved compose files, `/etc/mail-admin/` and unit files from the restore directory; remove `state_owner_uid`; `systemctl daemon-reload`; start the old Maddy and old dashboard images; re-enable `mail-admin-helper.service`; run the same verification. If mail data looks damaged, restore from the fresh backup with the existing restore tooling (ask first).
+
+## Not yet verified
+Whether the production Maddy digest behaves like the fixture build under a non-root user with `cap_drop: ALL`; ownership of the TLS generation directory seen by uid 10001; whether any systemd unit or tool assumes `/run/mail-admin-helper`; memory of the CLI inside the dashboard's 128 MiB limit under load; the deployment record's hash and approval fields.
