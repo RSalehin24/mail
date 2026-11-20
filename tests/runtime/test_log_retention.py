@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from tests.runtime_compose_support import RuntimeCompose
-from tests.runtime_support import RuntimeFixture
+from tests.runtime_local_support import LocalHostRuntime, UnprivilegedMaddyFixture
 
 LOG_READ_TIMEOUT_SECONDS = 30
 
@@ -40,7 +40,10 @@ def observed_output(identifier):
 
 class ContainerLogRetentionTests(unittest.TestCase):
     def test_shipped_local_driver_rotates_old_output_and_retains_current_logs(self):
-        fixture = RuntimeFixture()
+        maddy = UnprivilegedMaddyFixture()
+        self.addCleanup(maddy.close)
+        maddy.start()
+        fixture = LocalHostRuntime(maddy)
         self.addCleanup(fixture.close)
         compose = RuntimeCompose(fixture)
         self.addCleanup(compose.close)

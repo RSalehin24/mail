@@ -4,9 +4,12 @@ Self-hosted mail for `rsalehin24.me`: the Maddy mail server and the Mail Admin
 dashboard on one small VM. Design contract: [docs/mail-admin-implementation](docs/mail-admin-implementation/README.md).
 Plans and decisions: [planning/](planning/STATUS.md) (start with `STATUS.md`).
 
-The HTTPS web application runs without Docker access or a Maddy data mount.
-A root Unix-socket helper owns mailbox changes; root host tools own TLS, backups
-and recovery. Production changes need an owner-approved plan and a restore point.
+The HTTPS web application never has Docker access. By default a root Unix-socket
+helper owns mailbox changes; with `LOCAL_HOST=true` (the shipped `docker-compose.yml`,
+one project for `maddy` and `mail-admin`, both as the same non-root user) the
+dashboard runs the same helper code in-process against Maddy's data directory.
+Root host tools own TLS, backups and recovery. Production changes need an
+owner-approved plan and a restore point.
 
 Mail clients use `mail.rsalehin24.me` for IMAP 993/TLS and SMTP 587/STARTTLS,
 with the full mailbox address and mailbox password for both. Enable saving sent
@@ -50,7 +53,7 @@ mkdir -p build
 | `make build` | the runtime image (pinned Node 24 and Python 3.15 stages, hash-locked wheels) |
 | `make browser` | headless Chrome against a synthetic fixture (set `MAIL_ADMIN_CHROME` for another Chrome) |
 | `make maddy-integration` | real Maddy 0.9.5 fixture ([patched image](tools/maddy-fixture/README.md)), synthetic mail |
-| `make runtime-integration` | the non-root HTTPS image: socket, TLS, enrollment, restarts |
+| `make runtime-integration` | the non-root HTTPS image: socket and `LOCAL_HOST` modes, TLS, enrollment, restarts |
 | `make acme-integration` | private ACME with pinned Certbot and Pebble images; pull the references in `tools/fixture_images.py` first |
 | `make linux-check` | the three Docker suites plus unit and integration inside Linux containers |
 | `make plan` | validates the design-contract docs |

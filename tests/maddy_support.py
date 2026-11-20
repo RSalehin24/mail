@@ -77,6 +77,9 @@ class RealMaddyFixture:
     def image_reference(self):
         return fixture_reference()
 
+    def runtime_tmpfs(self):
+        return f"/run/maddy:size={MADDY_RUNTIME_TMPFS_BYTES},mode=0700"
+
     def __init__(self, configuration=CONFIGURATION):
         self.docker = shutil.which("docker")
         if not self.docker:
@@ -159,7 +162,7 @@ class RealMaddyFixture:
             "--pids-limit",
             "128",
             "--tmpfs",
-            f"/run/maddy:size={MADDY_RUNTIME_TMPFS_BYTES},mode=0700",
+            self.runtime_tmpfs(),
             "-p",
             "127.0.0.1::993",
             "-p",

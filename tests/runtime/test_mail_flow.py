@@ -11,11 +11,20 @@ from tests.runtime_support import RuntimeFixture
 
 
 class MailFlowFixture(unittest.TestCase):
+    def create_maddy(self):
+        return RealMaddyFixture()
+
+    def create_web(self):
+        return RuntimeFixture(self.maddy.helper)
+
+    def journal(self):
+        return self.maddy.helper.journal
+
     def setUp(self):
-        self.maddy = RealMaddyFixture()
+        self.maddy = self.create_maddy()
         self.addCleanup(self.maddy.close)
         self.maddy.start()
-        self.web = RuntimeFixture(self.maddy.helper)
+        self.web = self.create_web()
         self.addCleanup(self.web.close)
         self.web.start()
         self.authentication = RuntimeAuthentication(self, self.web)
@@ -33,7 +42,7 @@ class MailFlowFixture(unittest.TestCase):
         deadline = time.monotonic() + 30
         record = None
         while time.monotonic() < deadline:
-            record = self.maddy.helper.journal.lookup(payload["request_id"])
+            record = self.journal().lookup(payload["request_id"])
             if record and record["state"] != "pending":
                 break
             time.sleep(0.25)
