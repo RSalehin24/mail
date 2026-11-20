@@ -24,6 +24,9 @@ Starts in the last hour: recovery 932 (timer: 2 s after each run), backup-contro
 ## Simplification (D-019)
 Owner chose all three stages and keeps all four features. Plan: [SIMPLIFY](SIMPLIFY.md). Stage 1 (repo-only removal of qualification/evidence tooling and historical docs) awaits owner approval of the deletion list.
 
+## Stage 2 spike done (see SIMPLIFY.md)
+The app can run the Maddy account commands itself if Maddy runs as 10001 and owns/shares the data directory. Needed on the VM later (T3, approval + restore point): Maddy container as 10001:10001, chown of `/opt/maddy/data`, TLS files readable, `/run/maddy` tmpfs owned by 10001. Next in the repo: let the backend run the helper logic in-process with a local-subprocess Maddy. Spike test kept outside the repo (scratchpad `test_spike_direct_cli.py`).
+
 ## Stage 1 progress (repo only, D-020/D-021)
 Removed about 9,300 lines: qualification/evidence tools, mock-host/VM tooling, the `qualification` suite of `run_linux.py`, 25 test and support files that only exercised them, five historical `verification/` files; README rewritten. Passing: lint, typecheck, reads, unit (424), integration (94), `make plan`, `make browser`, `make linux-check` runtime/ACME/Maddy except one intermittent failure: `tests/runtime/test_api_crashes.py::test_sigkill_https_during_authorized_fixture_delete_never_repeats_removal` failed once (state `reconciliation_required`, expected `complete`) in a full run; it then passed 3 of 3 alone and in a full runtime rerun. Cause unconfirmed; the test kills a process mid-delete, so timing under load is suspected. Still to do in Stage 1: nothing blocking; `docs/mail-admin-implementation/` and the run_remote runner stay until Stage 2 (host code loads the contract files at runtime).
 
