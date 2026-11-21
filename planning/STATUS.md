@@ -21,7 +21,7 @@ Updated 2026-11-21 (final, after the owner's dashboard and mail check). Resume h
 2. Billing: look at Billing, then Reports, in a few days for any non-zero line; the $0.01 alert `zero-cost-guard` is set.
 3. Maddy's first real certificate renewal is about two months out.
 4. Optional live checks that need the owner's TOTP or approval: create, delete and restore a temporary mailbox (deleted-mailbox recovery) (the relay re-save was dropped by the owner, D-055).
-5. Left on purpose: kernel 7.0.0-1016 as a fallback; old backup staging folders under the backup app's own retention; `backend/operator.py` (run inside the dashboard image by `host/image_tools.py` for offline recovery); `/root/cutover-20261121/{refactor,rollback-dns-update.sh,stage2.env}`.
+5. Left on purpose: the two backup staging folders the backup app tracks (its own retention); `backend/operator.py` (run inside the dashboard image by `host/image_tools.py` for offline recovery); `/root/cutover-20261121/{stage2.env,rollback-dns-update.sh,rollback-dashboard.sh}` (stage2.env is needed by every compose deploy). The 2026-11-21 OS upgrade is applied; kernel 7.0.0-1018 is installed and becomes active after a reboot (D-062).
 
 ## Known limits
 - Permanent deletion stays blocked by design (production never sets `restore_passed`).
