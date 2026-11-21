@@ -35,3 +35,14 @@ External IP on the STANDARD tier, one 30 GB pd-standard disk, no static IP, snap
 
 ## Backup pause marker
 `/var/lib/mail-admin-helper/consumers.json` records which consumers a backup or offline recovery stopped on purpose; a crash leaves it in `maintenance`, which blocks the next backup until the backup-control reconcile job restarts the consumers. Reconcile from the dashboard Backups page, or file a `reconcile` job for the stuck backup.
+
+## Rebuild a blank VM from a snapshot (rehearsed 2026-11-21 in a sandbox on the live VM)
+The snapshot holds `maddy` (data, queue and the certificate store `acme/`), `maddy_configuration`, `maddy_compose`, `dashboard` (`admin_data.db`), `helper` (journal, queues, records, recovery key), `operator` (`/etc/mail-admin` with secrets), `alerts`, `host_tools` (the root library), `units`, `tmpfiles`, `docker_ordering` and `launcher`. It does not hold Docker, the images or DNS.
+1. New e2-micro in the free-tier region with a STANDARD-tier ephemeral IP; install Docker; create the `mail-admin` user with uid and gid 10001. The DNS update service fixes the A record at first boot once its files are back (step 3).
+2. Get the restic repository settings and keys from `operator` of any copy you hold (R2 credentials, restic password), restore the latest snapshot with `ResticRepository.restore` into a scratch folder, then copy each role back with `cp -a` (owners and modes are recorded): `maddy` to `/opt/maddy/data`, `maddy_configuration` to `/opt/maddy/config/maddy.conf`, `dashboard` to `/opt/mail-admin/data`, `helper` to `/var/lib/mail-admin-helper`, `operator` to `/etc/mail-admin`, `host_tools` to `/usr/local/lib/mail-admin`, `launcher` to `/usr/local/libexec/mail-admin-maddy`, `alerts` to `/var/lib/mail-admin-alerts`, `maddy_compose` to `/opt/mail-admin/docker-compose.yml`, `units` and `tmpfiles` to systemd and `/etc/tmpfiles.d`.
+3. Images: pull the pinned Maddy image by digest; build the dashboard image from the repository (`make build`) and load it; then `docker compose up -d` as in Deploy step 3 and enable the units and timers; run `systemd-tmpfiles --create`; the boot service updates `mail.rsalehin24.me`.
+4. Check: ports 25, 587, 993 and 443 present the restored certificate (issued by Maddy; renewal continues from `acme/`), the dashboard answers, 9 mailboxes, then run a backup.
+Rehearsal result: a second Maddy and dashboard started only from the snapshot (offline, owners restored) served the same certificate fingerprint as production, the dashboard answered 200, and 9 mailboxes and 153 messages matched.
+
+## Forcing a new external IP (test of the DNS update)
+Stop the VM, `gcloud compute instances delete-access-config` then `add-access-config --network-tier=STANDARD` (never an address reservation), start it, and check the Cloudflare record and the ports within a minute.
