@@ -58,3 +58,16 @@ class WorkerActivationTests(unittest.TestCase):
             with self.subTest(worker=worker):
                 interval = seconds(unit(worker + ".timer")["Timer"]["OnUnitInactiveSec"])
                 self.assertGreaterEqual(interval, MINIMUM_FALLBACK_SECONDS)
+
+
+class DnsUpdateUnitTests(unittest.TestCase):
+    """The address fix runs once per boot, after the network is up, and only when configured."""
+
+    def test_boot_oneshot_waits_for_the_network_and_the_owner_installed_settings(self):
+        service = unit("mail-admin-dns-update.service")
+        self.assertEqual(service["Service"]["Type"], "oneshot")
+        self.assertEqual(service["Service"]["ExecStart"], "/usr/bin/python3 -m host.dns_update")
+        self.assertEqual(service["Install"]["WantedBy"], "multi-user.target")
+        self.assertEqual(service["Unit"]["After"], "network-online.target")
+        self.assertEqual(service["Unit"]["ConditionPathExists"], "/etc/mail-admin/dns-update.json")
+        self.assertFalse((UNITS / "mail-admin-dns-update.timer").exists())

@@ -1,0 +1,23 @@
+[Unit]
+Description=Point the mail host's DNS record at the VM's current external IP
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/mail-admin/dns-update.json
+
+[Service]
+Type=oneshot
+WorkingDirectory=/usr/local/lib/mail-admin
+ExecStart=/usr/bin/python3 -m host.dns_update
+MemoryMax=64M
+CPUQuota=50%
+TasksMax=16
+TimeoutStartSec=120
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+LogNamespace=mail-admin
+
+[Install]
+WantedBy=multi-user.target
