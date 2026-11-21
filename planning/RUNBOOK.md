@@ -10,7 +10,7 @@ Live host: GCP VM `rsalehin24-mail` (us-east1-c), SSH `deployer@mail.rsalehin24.
 
 ## Restore
 - Latest snapshot check without touching mail: `ResticRepository(ResticProcess(HostContext.load().deployment), time.time).verify({"reference", "content_sha256"})` from the manifest, as root in `/usr/local/lib/mail-admin` (about 25 s; restores to a scratch folder and deletes it).
-- Mailbox recovery and additive restore: dashboard Backups and Recovery pages. Full-server restore from a snapshot is not yet rehearsed.
+- Mailbox recovery and additive restore: dashboard Backups and Recovery pages. Full-server rehearsal (done 2026-11-21): `ResticRepository.restore(reference, staging/rehearsal-restore)` as root, chown the `maddy/` folder to 10001, copy `maddy_configuration` to `maddy/maddy.conf`, run the pinned Maddy image offline (`--network none`, uid 10001, no capabilities, entrypoint `/usr/local/libexec/mail-admin-maddy`) with `creds list` and `imap-acct list`, compare message counts in `imapsql.db` with the live one, then delete the folder. The snapshot holds Maddy data, config, compose, certificates, dashboard database, helper state and operator files (about 200 MB).
 - Whole stack rollback to the pre-Stage-2 setup: `/root/cutover-20261121/stage3/rollback3.sh` (as root).
 
 ## Rotate secrets
