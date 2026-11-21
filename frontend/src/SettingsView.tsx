@@ -38,7 +38,7 @@ function OutgoingSettings({ authorize, notify }: Pick<Props, 'authorize' | 'noti
   const [apiKey, setApiKey] = useState('');
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
-  const [quota, setQuota] = useState('Add a Brevo API key to view remaining credits. SMTP sending does not require it.');
+  const [quota, setQuota] = useState('');
   async function load() {
     try { const value = await api<RelaySettings>('/settings/relay'); setRelay(value); setUsername(value.username); }
     catch (failure) { setError((failure as Error).message); }
@@ -54,8 +54,8 @@ function OutgoingSettings({ authorize, notify }: Pick<Props, 'authorize' | 'noti
       <TextField label="SMTP host" value="smtp-relay.brevo.com" disabled/>
       <TextField label="SMTP security" value="587 · STARTTLS" disabled/>
       <TextField label="Brevo SMTP login" value={username} onChange={event => { setUsername(event.target.value); setDirty(true); }}/>
-      <TextField label="Brevo SMTP key" type="password" autoComplete="new-password" value={credential} onChange={event => { setCredential(event.target.value); setDirty(true); }} helperText={relay?.configured ? 'Configured and masked. Leave blank to preserve it.' : 'Required for first save.'}/>
-      <TextField label="Optional Brevo API key" type="password" autoComplete="new-password" value={apiKey} onChange={event => { setApiKey(event.target.value); setDirty(true); }} helperText="Encrypted separately and kept on the server."/>
+      <TextField label="Brevo SMTP key" type="password" autoComplete="new-password" value={credential} onChange={event => { setCredential(event.target.value); setDirty(true); }}/>
+      <TextField label="Optional Brevo API key" type="password" autoComplete="new-password" value={apiKey} onChange={event => { setApiKey(event.target.value); setDirty(true); }} />
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}>
         <Button disabled={dirty || !relay?.configured} onClick={async () => {
           try { const result = await api<{ state: string; plans: { plan: string; credits: number; credits_type: string }[] }>('/settings/relay/quota');

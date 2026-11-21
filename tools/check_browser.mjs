@@ -218,7 +218,7 @@ async function mailboxFlows(connection, fixture) {
   await connection.until(`document.body.textContent.includes('Updated mailbox')`);
   assert.equal(await connection.read(`getComputedStyle(document.querySelector('thead th:nth-child(3)')).textAlign`), 'left');
   assert.equal(await connection.read(`document.querySelector('.stat-row') === null`), true);
-  assert.deepEqual(await connection.read(`[...document.querySelectorAll('.desktop-table th')].map(cell => cell.textContent.trim()).filter(Boolean)`), ['Mailbox', 'Creation Date', 'Inbox', 'Sending', 'Actions']);
+  assert.deepEqual(await connection.read(`[...document.querySelectorAll('.desktop-table th')].map(cell => cell.textContent.trim()).filter(Boolean)`), ['Name', 'Mailbox', 'Creation Date', 'Inbox', 'Sending', 'Actions']);
   assert.equal(await connection.read(`Boolean(document.querySelector('.MuiPagination-root [aria-label="Go to first page"]')) && Boolean(document.querySelector('[aria-label="Go to last page"]'))`), true);
 
   assert.match(await connection.read(`document.querySelector('.desktop-table tbody time').textContent`), /^[A-Z][a-z]{2} \d{1,2}, \d{4}$/);
@@ -411,7 +411,7 @@ async function forwardingAndEmailSettings(connection) {
   await connection.until(`[...document.querySelectorAll('button')].some(button => button.textContent === 'I received this test')`);
   await connection.read(`[...document.querySelectorAll('button')].find(button => button.textContent === 'I received this test').click()`);
   await connection.click({tag:'button',name:'Security'});
-  await connection.until(`document.body.textContent.includes('Administrator email delivery is verified for the current provider settings.')`);
+  await connection.until(`document.body.textContent.includes('Email delivery verified')`);
   await connection.click({tag:'input',name:'Allow email verification codes'});
   await connection.until(`[...document.querySelectorAll('input')].find(input => input.type==='checkbox')?.checked === true`);
   await connection.call('Page.reload');

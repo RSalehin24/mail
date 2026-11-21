@@ -69,7 +69,7 @@ export function Dashboard({ authorize, notify }: { authorize: Authorize; notify:
     <StatGrid>
       <StatCard label="Mailboxes" value={mailboxes.length}/>
       <StatCard label="Inbox ready" value={mailboxes.filter(mailbox => mailbox.status === 'ready').length} tone={mailboxes.every(mailbox => mailbox.status === 'ready') ? 'success' : 'warning'}/>
-      <StatCard label="Sending verified" value={mailboxes.filter(mailbox => mailbox.outbound_readiness === 'confirmed').length} detail="Outgoing mail tested"/>
+      <StatCard label="Sending verified" value={mailboxes.filter(mailbox => mailbox.outbound_readiness === 'confirmed').length}/>
       <StatCard label="Awaiting receipt" value={pending.length} tone={pending.length ? 'warning' : 'neutral'}/>
     </StatGrid>
     {error && <Alert severity="warning" sx={{ mb: 2 }}>{error} Previously loaded accounts may be out of date.</Alert>}
@@ -95,12 +95,14 @@ export function Dashboard({ authorize, notify }: { authorize: Authorize; notify:
         <TableCell padding="checkbox" align="center"><Checkbox checked={rows.length > 0 && rows.every(mailbox => selected.includes(mailbox.email))}
           indeterminate={rows.some(mailbox => selected.includes(mailbox.email)) && !rows.every(mailbox => selected.includes(mailbox.email))}
           slotProps={{ input: { 'aria-label': 'Select visible mailboxes' } }} onChange={(_, checked) => selectVisible(checked)}/></TableCell>
+        <TableCell>Name</TableCell>
         <TableCell>Mailbox</TableCell>
         <TableCell sortDirection={reverse ? 'asc' : 'desc'}><Button color="inherit" className="column-sort" size="small" aria-label={reverse ? 'Creation Date, oldest first. Sort newest first' : 'Creation Date, newest first. Sort oldest first'} endIcon={<ArrowDownwardRounded sx={{ fontSize: '14px !important', transform: reverse ? 'rotate(180deg)' : undefined }}/>} onClick={() => { setReverse(!reverse); setPage(0); }}>Creation Date</Button></TableCell>
         <TableCell>Inbox</TableCell><TableCell>Sending</TableCell><TableCell align="center" sx={{ width: 88 }}>Actions</TableCell>
       </TableRow></TableHead><TableBody>{rows.map(mailbox => <TableRow hover selected={selected.includes(mailbox.email)} key={mailbox.email}>
         <TableCell padding="checkbox" align="center"><Checkbox checked={selected.includes(mailbox.email)} onChange={() => toggle(mailbox.email)} slotProps={{ input: { 'aria-label': `Select ${mailbox.email}` } }}/></TableCell>
-        <TableCell><Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}><Avatar className="mailbox-avatar">{mailbox.email[0].toUpperCase()}</Avatar><Box sx={{ minWidth: 0 }}><Typography component="a" href={mailboxPath(mailbox.email)} onClick={event => { event.preventDefault(); navigate(mailboxPath(mailbox.email)); }} variant="body2" sx={{ color: 'primary.main', fontWeight: 600, overflowWrap: 'anywhere' }}>{mailbox.email}</Typography>{mailbox.display_name && <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{mailbox.display_name}</Typography>}{mailbox.notes && <Typography variant="caption" color="text.secondary">{mailbox.notes}</Typography>}</Box></Stack></TableCell>
+        <TableCell><Typography variant="body2" color={mailbox.display_name ? 'text.primary' : 'text.secondary'}>{mailbox.display_name || '—'}</Typography></TableCell>
+        <TableCell><Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}><Avatar className="mailbox-avatar">{mailbox.email[0].toUpperCase()}</Avatar><Box sx={{ minWidth: 0 }}><Typography component="a" href={mailboxPath(mailbox.email)} onClick={event => { event.preventDefault(); navigate(mailboxPath(mailbox.email)); }} variant="body2" sx={{ color: 'primary.main', fontWeight: 600, overflowWrap: 'anywhere' }}>{mailbox.email}</Typography>{mailbox.notes && <Typography variant="caption" color="text.secondary">{mailbox.notes}</Typography>}</Box></Stack></TableCell>
 
         <TableCell sx={{ whiteSpace: 'nowrap' }}><Typography variant="body2" component="time" dateTime={mailbox.created ? new Date(mailbox.created * 1000).toISOString() : undefined}>{creationDate(mailbox)}</Typography></TableCell>
         <TableCell><StatusDot tone={mailbox.status === 'ready' ? 'success' : 'warning'} label={mailbox.status === 'ready' ? 'Ready' : 'Needs review'}/></TableCell>

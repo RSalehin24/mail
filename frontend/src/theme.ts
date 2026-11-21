@@ -4,6 +4,9 @@ import { createTheme } from '@mui/material';
 // no shadows. Components read colours from CSS variables so a mode change never re-renders.
 const FONT = 'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 const hairline = 'var(--mui-palette-divider)';
+// Controls need a stronger edge than layout dividers, in both colour schemes.
+const controlLine = 'color-mix(in srgb, var(--mui-palette-text-primary) 32%, transparent)';
+const controlLineHover = 'color-mix(in srgb, var(--mui-palette-text-primary) 60%, transparent)';
 
 export const theme = createTheme({
   cssVariables: { colorSchemeSelector: 'data' },
@@ -38,15 +41,17 @@ export const theme = createTheme({
     MuiButton: {
       defaultProps: { disableElevation: true },
       styleOverrides: { root: { minHeight: 36, borderRadius: 8, '@media(max-width:599px)': { minHeight: 48 } },
-        outlined: { borderColor: hairline, color: 'inherit', '&:hover': { borderColor: hairline, backgroundColor: 'var(--mui-palette-action-hover)' } } },
+        outlined: { borderColor: controlLine, color: 'var(--mui-palette-text-primary)', '&:hover': { borderColor: controlLineHover, backgroundColor: 'var(--mui-palette-action-hover)' } } },
     },
     MuiIconButton: { styleOverrides: { root: { '@media(max-width:599px)': { minWidth: 48, minHeight: 48 } } } },
     MuiPaper: { defaultProps: { elevation: 0 }, styleOverrides: { root: { backgroundImage: 'none' }, outlined: { borderColor: hairline } } },
     MuiDialog: { styleOverrides: { paper: { borderRadius: 14, border: `1px solid ${hairline}` } } },
     MuiDialogTitle: { styleOverrides: { root: { fontWeight: 600, fontSize: '1.1rem' } } },
     MuiTextField: { defaultProps: { size: 'small' } },
-    MuiOutlinedInput: { styleOverrides: { root: { borderRadius: 8 }, notchedOutline: { borderColor: hairline } } },
-    MuiChip: { styleOverrides: { root: { borderRadius: 6, fontWeight: 550 } } },
+    MuiOutlinedInput: { styleOverrides: { root: { borderRadius: 8, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: controlLineHover } }, notchedOutline: { borderColor: controlLine } } },
+    MuiInputLabel: { styleOverrides: { root: { color: 'var(--mui-palette-text-secondary)' } } },
+    MuiSwitch: { styleOverrides: { track: { backgroundColor: controlLine, opacity: 1 } } },
+    MuiChip: { styleOverrides: { root: { borderRadius: 6, fontWeight: 550 }, outlined: { borderColor: controlLine } } },
     MuiTab: { styleOverrides: { root: { minHeight: 44, fontWeight: 550 } } },
     MuiTableCell: { styleOverrides: { root: { borderColor: hairline }, head: { fontWeight: 600, color: 'var(--mui-palette-text-secondary)' } } },
     MuiAlert: { styleOverrides: { root: { borderRadius: 10 } } },

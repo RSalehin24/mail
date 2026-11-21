@@ -6,7 +6,7 @@ body { margin: 0; }
 .auth-icon { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 16px; background: color-mix(in srgb, var(--mui-palette-primary-main) 10%, transparent); color: var(--mui-palette-primary-main); margin-bottom: 22px; }
 .auth-footer { display: block; text-align: center; margin-top: 20px !important; }
 .code-input { display: flex; gap: 8px; justify-content: center; }
-.code-input input { flex: 1; min-width: 0; max-width: 52px; height: 58px; border: 1px solid var(--mui-palette-divider); border-radius: 8px; background: transparent; font: inherit; font-size: 24px; color: inherit; text-align: center; }
+.code-input input { flex: 1; min-width: 0; max-width: 52px; height: 58px; border: 1px solid color-mix(in srgb, var(--mui-palette-text-primary) 32%, transparent); border-radius: 8px; background: transparent; font: inherit; font-size: 24px; color: inherit; text-align: center; }
 .code-input input:focus { outline: 2px solid var(--mui-palette-primary-main); outline-offset: 2px; }
 .qr { width: 190px; height: 190px; padding: 8px; background: white; border-radius: 8px; }
 .secret-text { overflow-wrap: anywhere; padding: 10px 14px; background: #8b9c9312; border-radius: 8px; }

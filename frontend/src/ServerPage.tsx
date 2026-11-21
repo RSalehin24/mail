@@ -16,9 +16,9 @@ function Observation({ title, value, at, now, maxAge, children }: {
   const stale = !unavailable && maxAge !== undefined && age! > maxAge;
   const ageLabel = age === undefined ? '' : age < 5 ? 'Just now' : age < 60 ? `${Math.floor(age)}s ago` : age < 3600 ? `${Math.floor(age / 60)}m ago` : age < 86400 ? `${Math.floor(age / 3600)}h ago` : `${Math.floor(age / 86400)}d ago`;
   return <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-    <Stack direction="row" spacing={1} sx={{ alignItems: 'start', justifyContent: 'space-between', mb: 1 }}><Typography variant="body2" color="text.secondary">{title}</Typography><Chip size="small" variant="outlined" color={stale ? 'warning' : 'default'} label={unavailable ? 'Unavailable' : stale ? 'Stale' : maxAge === undefined ? 'Recorded' : 'Fresh'}/></Stack>
+    <Stack direction="row" spacing={1} sx={{ alignItems: 'start', justifyContent: 'space-between', mb: 1 }}><Typography variant="body2" color="text.secondary">{title}</Typography>{(unavailable || stale) && <Chip size="small" variant="outlined" color="warning" label={unavailable ? 'Unavailable' : 'Stale'}/>}</Stack>
     <Typography variant="body1" sx={{ fontWeight: 650 }}>{value}</Typography>
-    {at && !unavailable ? <Stack spacing={.25} sx={{ mt: 1 }}><Typography variant="caption" color={stale ? 'warning.main' : 'text.secondary'}>Checked {ageLabel}</Typography><Typography component="time" dateTime={new Date(at * 1000).toISOString()} variant="caption" color="text.secondary">{formatDateTime(at)}</Typography></Stack> : <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>No observation recorded</Typography>}
+    {at && !unavailable ? <Stack spacing={.25} sx={{ mt: 1 }}><Typography variant="caption" color={stale ? 'warning.main' : 'text.secondary'}>Checked {ageLabel}</Typography></Stack> : null}
     {children}
   </Box>;
 }

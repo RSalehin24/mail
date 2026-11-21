@@ -31,9 +31,9 @@ export function SecuritySettings({ authorize, onRevoked, onDeliverySettings }: {
     });
   }
   const cards = [
-    { id: 'password' as const, title: 'Master password', icon: <LockOutlined/>, description: 'Manage the password you use to sign in to Mail Admin.', action: 'Change password', note: 'Signs out all sessions after the change.' },
-    { id: 'authenticator' as const, title: 'Authenticator app', icon: <ShieldOutlined/>, description: 'Move two-step verification to a new phone or authenticator app.', action: 'Replace authenticator', note: 'Your current authenticator works until you confirm the new one.' },
-    { id: 'recovery' as const, title: 'Recovery codes', icon: <KeyOutlined/>, description: 'Create backup codes for signing in when your authenticator is unavailable.', action: 'Replace recovery codes', note: 'Replaces all five codes and signs out all sessions.' },
+    { id: 'password' as const, title: 'Master password', icon: <LockOutlined/>, description: 'Manage the password you use to sign in to Mail Admin.', action: 'Change password' },
+    { id: 'authenticator' as const, title: 'Authenticator app', icon: <ShieldOutlined/>, description: 'Move two-step verification to a new phone or authenticator app.', action: 'Replace authenticator' },
+    { id: 'recovery' as const, title: 'Recovery codes', icon: <KeyOutlined/>, description: 'Create backup codes for signing in when your authenticator is unavailable.', action: 'Replace recovery codes' },
   ];
   return <Box component="section" aria-labelledby="security-heading">
     <Typography variant="h5" component="h2" id="security-heading" sx={{ mb: .75, fontWeight: 700 }}>Security</Typography>
@@ -41,7 +41,6 @@ export function SecuritySettings({ authorize, onRevoked, onDeliverySettings }: {
       {cards.map(card => <Paper variant="outlined" component="section" key={card.id} sx={{ p: 3, borderRadius: '16px', display: 'flex', flexDirection: 'column', alignItems: 'start' }}>
         <Avatar variant="rounded" sx={{ bgcolor: 'action.hover', color: 'primary.main', mb: 2 }}>{card.icon}</Avatar>
         <Typography component="h3" variant="h6" sx={{ mb: 1 }}>{card.title}</Typography>
-        <Typography color="text.secondary" variant="caption" sx={{ mb: 2.5 }}>{card.note}</Typography>
         <Button variant="outlined" sx={{ mt: 'auto' }} onClick={() => { setError(''); setDialog(card.id); }}>{card.action}</Button>
       </Paper>)}
     </Box>
@@ -50,7 +49,7 @@ export function SecuritySettings({ authorize, onRevoked, onDeliverySettings }: {
       {emailError && <Alert severity="error">{emailError}</Alert>}
       {!emailAuth && !emailError && <LoadingState label="Loading email authentication settings…"/>}
       {emailAuth && <>
-        <Alert severity={emailAuth.delivery_verified ? 'success' : 'info'}>{emailAuth.delivery_verified ? 'Administrator email delivery is verified for the current provider settings.' : 'Send an administrator delivery test and confirm its receipt before enabling email codes.'}</Alert>
+        <Alert severity={emailAuth.delivery_verified ? 'success' : 'info'}>{emailAuth.delivery_verified ? 'Email delivery verified' : 'Send an administrator delivery test and confirm its receipt before enabling email codes.'}</Alert>
         <FormControlLabel label="Allow email verification codes" control={<Switch checked={emailAuth.enabled} disabled={busy || (!emailAuth.enabled && !emailAuth.delivery_verified)} onChange={(_, checked) => authorize(async () => {
           setBusy(true); setEmailError('');
           try { setEmailAuth(await api<NonNullable<typeof emailAuth>>('/security/email-authentication', { enabled: checked }, 'PUT')); }
