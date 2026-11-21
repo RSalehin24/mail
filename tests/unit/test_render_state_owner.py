@@ -5,7 +5,7 @@ from host.render import rendered_files
 
 UNITS = Path(__file__).resolve().parents[2] / "host" / "systemd"
 DASHBOARD_UID = 10001
-SHARED_LOCKS = ("renewal", "maddy", "backup")
+SHARED_LOCKS = ("maddy", "backup")
 
 
 def render(**extra):

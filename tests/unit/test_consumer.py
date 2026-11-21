@@ -1,9 +1,8 @@
 import unittest
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from host.docker import Docker, DockerConsumer, DockerSnapshots
+from host.docker import Docker, DockerSnapshots
 from shared.errors import ServiceError
 
 
@@ -16,7 +15,7 @@ class DockerFixture:
         self.container = {
             "Image": "fixture-image",
             "State": {"Running": True},
-            "Mounts": [{"Destination": "/tls", "Source": "/generations/current"}],
+            "Mounts": [],
         }
 
     def inspect(self, name):
@@ -24,55 +23,19 @@ class DockerFixture:
             raise ServiceError("docker_operation_failed", 503)
         return self.container
 
-    def run(self, arguments, environment):
-        self.calls.append((arguments, environment))
-        self.container["Mounts"][0]["Source"] = environment["TLS_DIRECTORY"]
 
 
 class ConsumerTests(unittest.TestCase):
     def setUp(self):
         self.docker = DockerFixture()
-        self.record = {
-            "container": "mail-admin",
-            "image_id": "fixture-image",
-            "tls_target": "/tls",
-            "tls_port": 443,
-            "tls_variable": "TLS_DIRECTORY",
-            "environment": {},
-            "compose_file": "/fixture/compose.yml",
-            "service": "mail-admin",
-        }
-        self.consumer = DockerConsumer(self.record, self.docker)
-
-    def test_valid_current_generation_does_not_recreate_consumer(self):
-        with patch("host.docker.served_fingerprint", return_value="verified"):
-            self.consumer.activate(Path("/generations/current"), {"served_sha256": "verified"})
-        self.assertEqual(self.docker.calls, [])
-
-    def test_missing_deployed_consumer_remains_pending(self):
-        self.docker.missing = True
-        with self.assertRaises(ServiceError):
-            self.consumer.activate(Path("/generations/current"), {"served_sha256": "verified"})
-        self.assertEqual(self.docker.calls, [])
-
-    def test_new_generation_waits_for_served_certificate_after_recreation(self):
-        with (
-            patch("host.docker.served_fingerprint", side_effect=[OSError("starting"), "verified"]),
-            patch("host.docker.time.sleep"),
-            patch("host.docker.time.monotonic", side_effect=[0, 0.01, 0.02]),
-        ):
-            self.consumer.activate(Path("/generations/new"), {"served_sha256": "verified"})
-        self.assertEqual(len(self.docker.calls), 1)
-        self.assertIn("--pull", self.docker.calls[0][0])
-        self.assertIn("never", self.docker.calls[0][0])
 
     def test_interrupted_pause_cannot_hide_a_running_writer_from_backup(self):
-        generations = SimpleNamespace(
+        intents = SimpleNamespace(
             read=lambda: {
                 "consumers": {"maddy": {"intent": "maintenance", "reason": "backup_capture"}}
             }
         )
-        snapshots = DockerSnapshots((self.docker, MagicMock(), generations))
+        snapshots = DockerSnapshots((self.docker, MagicMock(), intents))
         with self.assertRaisesRegex(ServiceError, "maintenance_consumer_unexpectedly_running"):
             snapshots.running()
         self.assertEqual(self.docker.calls, [])
@@ -80,11 +43,11 @@ class ConsumerTests(unittest.TestCase):
     def test_resume_expects_the_certificate_served_just_before_the_pause_not_the_recorded_one(self):
         # Maddy renews its own certificate, so the fingerprint stored at issue time goes stale.
         consumers = {"maddy": {"intent": "expected_running", "served_sha256": "stale"}}
-        generations = MagicMock()
-        generations.read.return_value = {"consumers": consumers}
+        intents = MagicMock()
+        intents.read.return_value = {"consumers": consumers}
         docker = MagicMock()
         docker.inspect.return_value = {"State": {"Running": False}}
-        snapshots = DockerSnapshots((docker, MagicMock(), generations))
+        snapshots = DockerSnapshots((docker, MagicMock(), intents))
         with patch("host.docker.served_fingerprint", return_value="fresh") as served:
             with patch.object(snapshots, "_verify_resumed") as verify:
                 docker.inspect.side_effect = [
@@ -96,13 +59,13 @@ class ConsumerTests(unittest.TestCase):
         verify.assert_called_once_with("maddy", "fresh")
 
     def test_offline_recovery_blocks_backup_even_when_the_web_container_is_stopped(self):
-        generations = SimpleNamespace(
+        intents = SimpleNamespace(
             read=lambda: {
                 "consumers": {"mail-admin": {"intent": "maintenance", "reason": "offline_recovery"}}
             }
         )
         maddy = MagicMock()
-        snapshots = DockerSnapshots((self.docker, maddy, generations))
+        snapshots = DockerSnapshots((self.docker, maddy, intents))
         with self.assertRaisesRegex(ServiceError, "offline_recovery_in_progress"):
             snapshots.inventories()
         maddy.validate.assert_not_called()

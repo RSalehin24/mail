@@ -91,13 +91,12 @@ class HostStatusTests(unittest.TestCase):
         recent = {'observed_at': time.time(), 'outcome': 'active'}
         paths = HostStatusPaths(
             maddy_data=root, deployment=root / 'deployment.json',
-            certificate_state=root / 'certificates.json',
             served_certificates=root / 'served.json', monitoring=root / 'monitor.json',
             external_monitoring=root / 'external.json', backup_manifest=root / 'manifest.json',
         )
         inputs = {'disk_free_minimum_bytes': 1, 'inode_free_minimum': 2,
                   'recovery_point_seconds': 3}
-        for name, record in (('deployment', {'inputs': inputs}), ('certificates', recent),
+        for name, record in (('deployment', {'inputs': inputs}), ('served', recent),
                              ('monitor', recent), ('manifest', recent)):
             (root / (name + '.json')).write_text(json.dumps(record))
             (root / (name + '.json')).chmod(0o600)

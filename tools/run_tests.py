@@ -83,11 +83,11 @@ def append_progress(path: Path, record: dict[str, Any]) -> None:
 def validate_module(suite: str, module: str | None) -> Path:
     directory = ROOT / "tests" / suite
     if module is not None and (
-        suite not in {"maddy", "runtime", "acme"}
+        suite not in {"maddy", "runtime"}
         or re.fullmatch(r"test_[a-z0-9_]+", module) is None
         or not (directory / (module + ".py")).is_file()
     ):
-        raise ValueError("An existing Maddy, runtime or ACME test module is required")
+        raise ValueError("An existing Maddy or runtime test module is required")
     return directory
 
 
@@ -194,7 +194,7 @@ def export_report_owner(directory: Path, files: tuple[Path, ...]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("suite", choices=("unit", "integration", "maddy", "runtime", "acme"))
+    parser.add_argument("suite", choices=("unit", "integration", "maddy", "runtime"))
     parser.add_argument("--module")
     parser.add_argument("--report-directory", type=Path)
     arguments = parser.parse_args()

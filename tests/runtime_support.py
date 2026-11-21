@@ -30,7 +30,6 @@ OBSERVATION_DIRECTORIES = {
     "etc": "/run/mail-admin-host/etc",
     "backup": "/var/lib/mail-admin-backup",
     "alerts": "/var/lib/mail-admin-alerts",
-    "certificates": "/var/lib/mail-admin-certificates",
 }
 RECORD_DIRECTORIES = {"deployment.json": "etc", "helper-policy.json": "etc",
                       "manifest.json": "backup"}

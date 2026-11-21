@@ -25,7 +25,7 @@ print(json.dumps({'source_sha256':source_digest(), 'suite':suite,
 
 
 def module_inventory(image: str, docker, suite: str = "maddy") -> dict:
-    if suite not in {"maddy", "runtime", "acme"}:
+    if suite not in {"maddy", "runtime"}:
         raise ValueError("Unsupported isolated module suite")
     response = docker(
         (

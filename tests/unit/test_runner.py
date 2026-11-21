@@ -228,12 +228,6 @@ class RunnerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             fixture_budget("unknown")
 
-    def test_private_acme_budget_covers_client_authority_and_dns_with_the_host_reserve(self):
-        budget = fixture_budget('acme')
-        self.assertEqual(budget.companions_mib, 128 + 64 + 64 + 96 + 128)
-        self.assertEqual(budget.minimum_available_bytes, 800 * 1024**2)
-        self.assertEqual(suite_command('acme'), ('python', 'tools/run_tests.py', 'acme'))
-
     def test_whole_suite_runs_the_shared_test_runner_without_module_arguments(self):
         self.assertEqual(suite_command("unit"), ("python", "tools/run_tests.py", "unit"))
 

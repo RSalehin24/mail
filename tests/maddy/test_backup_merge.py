@@ -101,7 +101,7 @@ class BackupMergeTests(unittest.TestCase):
                 "backup_sources": {"dashboard": str(dashboard)},
             },
             coordination=writers,
-            generations=SimpleNamespace(),
+            intents=SimpleNamespace(),
         )
         new_password = "new missing mailbox password 2026"
         jobid = str(uuid.uuid4())
@@ -181,7 +181,7 @@ class BackupMergeTests(unittest.TestCase):
                 ).fetchone()
             )
         control.update(control_id, "reconciliation_required", "resuming_mail", 1009)
-        worker.context.generations = SimpleNamespace(
+        worker.context.intents = SimpleNamespace(
             read=lambda: {"consumers": {}}, write=lambda state: None
         )
         writers.locks = SimpleNamespace(policy=fixture.helper.dependencies.lock_policy)

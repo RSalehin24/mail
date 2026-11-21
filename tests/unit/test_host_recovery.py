@@ -1,10 +1,9 @@
 import os
 import unittest
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-from host.certificates import CertificatePolicy, GenerationPaths, Generations, PairValidator
-from host.image_tools import ImageTools
+from host.consumers import ConsumerIntents
 from host.locks import LockPolicy
 from host.recovery import Recovery
 from shared.errors import ServiceError
@@ -68,28 +67,15 @@ class HostRecoveryTests(unittest.TestCase):
         atomic_json(marker, {"installation_id": "synthetic-recovery"})
         atomic_json(policy, {"installation_id": "synthetic-recovery", "intent": "expected_running"})
         self.policy = RuntimePolicy(marker, policy, os.getuid())
-        state = self.fixture.root / "generations.json"
-        atomic_json(
-            state,
-            {
-                "coordination_migrated": True,
-                "consumers": {"mail-admin": {"intent": "expected_running"}},
-            },
-        )
-        self.generations = Generations(
-            GenerationPaths(self.fixture.root, state),
-            (
-                CertificatePolicy(os.getgid(), os.getuid()),
-                PairValidator(),
-                lambda: self.fixture.now,
-            ),
+        self.intents = ConsumerIntents(
+            self.fixture.root / "consumers.json", os.getuid(), lambda: self.fixture.now
         )
         self.scope = SnapshotFixture()
         self.scope.locks = SimpleNamespace(policy=LockPolicy(0.03, os.getuid()))
         self.consumer = RecoveryFixture(self.policy, self.scope)
         self.outcome = self.fixture.root / "outcome.json"
         self.outcome.with_suffix(".lock").touch(mode=0o600)
-        self.operation = Recovery(self.scope, (self.generations, self.consumer, self.outcome))
+        self.operation = Recovery(self.scope, (self.intents, self.consumer, self.outcome))
 
     def record(self):
         return protected_json(self.outcome, os.getuid())
@@ -104,11 +90,11 @@ class HostRecoveryTests(unittest.TestCase):
         self.assertTrue(self.record()["consumer_stopped"])
         self.assertEqual(self.policy.read()["intent"], "maintenance")
         self.assertEqual(
-            self.generations.read()["consumers"]["mail-admin"]["intent"], "maintenance"
+            self.intents.read()["consumers"]["mail-admin"]["intent"], "maintenance"
         )
 
     def test_interruption_before_docker_stop_still_blocks_web_startup(self):
-        with patch.object(self.generations, "maintenance", side_effect=OSError("synthetic death")):
+        with patch.object(self.intents, "maintenance", side_effect=OSError("synthetic death")):
             with self.assertRaises(OSError):
                 self.operation.run()
         with self.assertRaisesRegex(ServiceError, "operator_maintenance"):
@@ -187,93 +173,3 @@ class HostRecoveryTests(unittest.TestCase):
 
         self.operation.resume(activate)
         self.assertEqual(self.record()["state"], "resumed")
-
-    def test_rollback_to_legacy_pairing_blocks_recovery_activation_and_new_recovery(self):
-        self.operation.run()
-        state = self.generations.read()
-        state["coordination_migrated"] = False
-        self.generations.write(state)
-        with self.assertRaisesRegex(ServiceError, "matched_renewal_cutover_required"):
-            self.operation.resume(lambda: self.fail("Legacy pairing cannot activate generations"))
-        with self.assertRaisesRegex(ServiceError, "matched_renewal_cutover_required"):
-            self.operation.run()
-        self.assertEqual(self.policy.read()["intent"], "maintenance")
-
-
-class RecoveryImageTests(unittest.TestCase):
-    def setUp(self):
-        self.name = "mail-admin-recovery-a599616f-cefc-4277-a2c3-931d2032ebfa"
-        self.identifier = "c" * 64
-        self.docker = MagicMock(executable="/usr/bin/docker")
-        self.deployment = {
-            "dashboard_image_id": "sha256:" + "a" * 64,
-            "inputs": {"service_uid": 10001, "service_gid": 10001},
-            "consumers": {"mail-admin": {"environment": {}}},
-            "transient_resources": {
-                "memory_limit_bytes": 128 * 1024 * 1024,
-                "tmpfs_limit_bytes": 8 * 1024 * 1024,
-                "cpu_limit": 0.5,
-            },
-        }
-        self.observed = {
-            "Id": self.identifier,
-            "Name": "/" + self.name,
-            "Image": self.deployment["dashboard_image_id"],
-            "Config": {"Labels": {"mail-admin.recovery-run": self.name}},
-            "State": {"Running": False, "Status": "exited", "ExitCode": 0},
-        }
-        self.docker.inspect.return_value = self.observed
-        self.docker.run.return_value = self.identifier
-        self.tools = ImageTools(self.docker, self.deployment)
-
-    def test_resume_needs_matching_container_exit_and_a_current_database_probe(self):
-        self.tools.verify_recovery(self.name)
-        self.assertIn("probe", self.docker.run.call_args.args[0])
-        for state in (
-            {"Running": True, "Status": "running", "ExitCode": 0},
-            {"Running": False, "Status": "exited", "ExitCode": 9},
-            {"Running": False, "Status": "created", "ExitCode": 0},
-        ):
-            self.observed["State"] = state
-            self.docker.run.reset_mock()
-            with self.assertRaisesRegex(ServiceError, "recovery_completion_unknown"):
-                self.tools.verify_recovery(self.name)
-            self.assertEqual(self.docker.run.call_count, 1)
-
-    def test_changed_image_or_foreign_container_label_cannot_authorize_resume(self):
-        self.observed["Image"] = "sha256:" + "b" * 64
-        with self.assertRaisesRegex(ServiceError, "recovery_completion_unknown"):
-            self.tools.verify_recovery(self.name)
-        self.observed["Config"]["Labels"] = {}
-        with self.assertRaisesRegex(ServiceError, "untrusted_operation_container"):
-            self.tools.verify_recovery(self.name)
-
-    def test_private_interactive_container_is_named_retained_and_attached_without_capturing_secrets(
-        self,
-    ):
-        self.docker.run.side_effect = ["", self.identifier, self.identifier, ""]
-        with (
-            patch("host.image_tools.sys.stdin.isatty", return_value=True),
-            patch("host.image_tools.sys.stdout.isatty", return_value=True),
-            patch(
-                "host.image_tools.subprocess.run", return_value=SimpleNamespace(returncode=0)
-            ) as attached,
-        ):
-            self.tools.offline_utility(self.name)
-        created = self.docker.run.call_args_list[1].args[0]
-        self.assertEqual(created[:4], ("create", "-it", "--name", self.name))
-        self.assertNotIn("--rm", created)
-        self.assertIn("none", created)
-        self.assertIn("FOWNER", created)
-        self.assertEqual(created[created.index("--log-driver") + 1], "none")
-        self.assertNotIn("--log-opt", created)
-        attached.assert_called_once_with(
-            ("/usr/bin/docker", "start", "--attach", "--interactive", self.name),
-            check=False,
-        )
-
-    def test_nonterminal_recovery_performs_no_docker_action(self):
-        with patch("host.image_tools.sys.stdin.isatty", return_value=False):
-            with self.assertRaisesRegex(ServiceError, "private_terminal_required"):
-                self.tools.offline_utility(self.name)
-        self.docker.run.assert_not_called()

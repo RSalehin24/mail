@@ -62,7 +62,7 @@ class RecoveryHttpsTests(unittest.TestCase):
                         'maddy_message_paths': ['messages'],
                         'backup_sources': {'dashboard': str(web.directories['data'])}},
             docker=SimpleNamespace(inspect=lambda name: {}),
-            generations=SimpleNamespace(read=lambda: {'consumers': {'maddy': {}}}),
+            intents=SimpleNamespace(read=lambda: {'consumers': {'maddy': {}}}),
             coordination=writers,
         )
         worker = MailboxRecovery(context, root)

@@ -12,7 +12,7 @@ from tools.run_linux import main
 
 class FixtureStorageTests(unittest.TestCase):
     def test_low_mac_disk_stops_before_any_docker_operation_or_fixture_creation(self):
-        with (patch.object(sys, 'argv', ['run_linux.py', '--suite', 'acme']),
+        with (patch.object(sys, 'argv', ['run_linux.py', '--suite', 'runtime']),
               patch('shutil.disk_usage', return_value=SimpleNamespace(free=116 * 1024**2)),
               patch('tools.run_linux.docker') as docker):
             with self.assertRaisesRegex(RuntimeError, 'free disk space'):
@@ -40,7 +40,7 @@ class FixtureStorageTests(unittest.TestCase):
                 return json.dumps([{'Id': arguments[2]}])
             self.fail('Fixture mutation occurred before source and runtime verification')
 
-        with (patch.object(sys, 'argv', ['run_linux.py', '--suite', 'acme']),
+        with (patch.object(sys, 'argv', ['run_linux.py', '--suite', 'runtime']),
               patch('tools.run_linux.require_fixture_disk'),
               patch('tools.run_linux.docker', side_effect=docker),
               patch('tools.run_remote.verify_images', side_effect=RuntimeError('image differs'))):

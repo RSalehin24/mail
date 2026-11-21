@@ -51,7 +51,6 @@ class RootWrittenFilesTests(unittest.TestCase):
             ("alerts", "monitor-observation.json", self.observation()),
             ("alerts", "external-monitoring.json", self.observation(provider="external")),
             ("alerts", "served-certificates.json", self.observation(consumers=CONSUMERS)),
-            ("certificates", "state.json", self.observation(desired_generation="a" * 64)),
         ):
             self.root_write(directories[directory] / name, record)
         self.root_write(self.web.records["manifest.json"], self.observation(

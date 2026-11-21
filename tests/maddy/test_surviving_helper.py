@@ -8,11 +8,9 @@ from unittest.mock import patch
 
 from helper.process import _collect
 from helper.protocol import HelperRequest
-from host.certificates import CertificatePolicy, GenerationPaths, Generations, PairValidator
 from host.coordination import Coordination, MaintenanceLocks
 from host.locks import LockPolicy
 from shared.errors import ServiceError
-from shared.files import atomic_json
 from tests.helper_support import MAILBOX_PASSWORD
 from tests.maddy_support import RealMaddyFixture
 from tests.process_fault_support import kill_at_observed_boundary
@@ -63,16 +61,9 @@ class SurvivingHelperTests(unittest.TestCase):
         self.fixture = RealMaddyFixture()
         self.addCleanup(self.fixture.close)
         self.fixture.start()
-        root = self.fixture.root
-        state, renewal = root / 'generations.json', root / 'renewal.lock'
-        atomic_json(state, {'consumers': {}})
-        renewal.touch(mode=0o600)
-        generations = Generations(GenerationPaths(root, state), (
-            CertificatePolicy(os.getgid(), os.getuid()), PairValidator(), time.time,
-        ))
         self.coordination = Coordination(MaintenanceLocks(
-            renewal, self.fixture.helper.dependencies.lock, LockPolicy(1, os.getuid()),
-        ), (self.fixture.helper.journal, generations))
+            self.fixture.helper.dependencies.lock, LockPolicy(1, os.getuid()),
+        ), self.fixture.helper.journal)
 
     def assert_backup_excluded(self):
         with self.assertRaisesRegex(ServiceError, 'helper_reconciliation_required'):

@@ -170,14 +170,12 @@ class RemoteObservationTests(unittest.TestCase):
             path.write_text(json.dumps({
                 'maddy_modules': ['test_first', 'test_second'],
                 'runtime_modules': ['test_first', 'test_second', 'test_third'],
-                'acme_modules': ['test_first'],
             }))
             self.assertEqual(MODULE_TIMEOUT_SECONDS, 900)
             self.assertEqual(native._timeout('maddy'), 2 * 900 + 60)
             self.assertEqual(native._timeout('runtime'), 3 * 900 + 60)
-            self.assertEqual(native._timeout('acme'), 900 + 60)
             for modules in ([], ['test_first', 'test_first'], [['invalid']], ['../outside']):
-                for suite in ('maddy', 'runtime', 'acme'):
+                for suite in ('maddy', 'runtime'):
                     path.write_text(json.dumps({suite + '_modules': modules}))
                     with self.assertRaises(ValueError):
                         native._timeout(suite)

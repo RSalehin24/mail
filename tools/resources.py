@@ -30,7 +30,7 @@ class FixtureBudget:
 
 
 def fixture_budget(suite: str) -> FixtureBudget:
-    if suite in {'acme', 'qualification'}:
+    if suite == 'qualification':
         return FixtureBudget(192, 128 + 64 + 64 + MADDY_MEMORY_MIB + WEB_MEMORY_MIB)
     if suite == "runtime":
         return FixtureBudget(128, WEB_MEMORY_MIB + MADDY_MEMORY_MIB)

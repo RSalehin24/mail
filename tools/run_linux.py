@@ -56,10 +56,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--suite",
-        choices=("unit", "integration", "maddy", "runtime", "acme"),
+        choices=("unit", "integration", "maddy", "runtime"),
         default="maddy",
     )
-    parser.add_argument("--module", help="Run one Maddy/runtime/ACME module; partial suite")
+    parser.add_argument("--module", help="Run one Maddy/runtime module; partial suite")
     arguments = parser.parse_args()
     entrypoint = suite_command(arguments.suite, arguments.module)
     require_fixture_disk(ROOT)
@@ -138,7 +138,7 @@ def main() -> None:
             )
             if arguments.suite == "maddy" and arguments.module is None:
                 code = run_maddy(command, root, docker)
-            elif arguments.suite in {"runtime", "acme"} and arguments.module is None:
+            elif arguments.suite == "runtime" and arguments.module is None:
                 code = run_modules(command, (root, arguments.suite), docker)
             else:
                 result = subprocess.run(  # noqa: S603, S607 -- fixed pinned fixture command.

@@ -7,7 +7,6 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from host.docker import Docker
-from tests.tls_compose_support import close_private_compose
 from tools.resources import WEB_MEMORY_MIB
 
 
@@ -23,6 +22,20 @@ def displaced_source(path):
         if path.exists() or path.is_symlink():
             path.rename(path.with_name(path.name + '.fault-' + identifier))
         retained.rename(path)
+
+
+def close_private_compose(docker, project, names):
+    identifiers = docker.run(('ps', '-aq', '--filter',
+                              'label=mail-admin.fixture=' + project)).splitlines()
+    for identifier in identifiers:
+        record = docker.inspect(identifier)
+        if record['Name'].removeprefix('/') not in names:
+            raise RuntimeError('Unexpected private Compose fixture container')
+        docker.run(('rm', '--force', identifier))
+    networks = docker.run(('network', 'ls', '-q', '--filter',
+                           'label=com.docker.compose.project=' + project))
+    for network in networks.splitlines():
+        docker.run(('network', 'rm', network))
 
 
 class RuntimeCompose:

@@ -53,7 +53,7 @@ class MailboxRecoveryWorkerTests(unittest.TestCase):
                 "backup_sources": {"dashboard": str(dashboard)},
             },
             docker=SimpleNamespace(),
-            generations=SimpleNamespace(),
+            intents=SimpleNamespace(),
             coordination=writers,
         )
         worker = MailboxRecovery(context, root)
@@ -160,7 +160,7 @@ class MailboxRecoveryWorkerTests(unittest.TestCase):
         self.assertEqual(worker.records.get(identifier)["state"], "restored")
         # Failure before commit cannot leave partial credentials/metadata. A new
         # worker resumes only the recorded operation's staged body names.
-        context.generations = SimpleNamespace(read=lambda: {"consumers": {"maddy": {}}})
+        context.intents = SimpleNamespace(read=lambda: {"consumers": {"maddy": {}}})
         context.docker = SimpleNamespace(inspect=lambda name: {})
         from host.mailbox_store import import_rows as real_import
         from host.mailbox_store import stage_bodies as real_stage
@@ -232,7 +232,7 @@ class MailboxRecoveryWorkerTests(unittest.TestCase):
             worker.run()
         self.assertEqual(worker.records.job(interrupted_id)["state"], "reconciliation_required")
         self.assertIn(email, fixture.maddy.inventories()["storage"])
-        context.generations = SimpleNamespace(read=lambda: {"consumers": {"maddy": {}}})
+        context.intents = SimpleNamespace(read=lambda: {"consumers": {"maddy": {}}})
         context.docker = SimpleNamespace(inspect=lambda name: {})
         reconcile_id = str(uuid.uuid4())
         worker.control.handle(

@@ -15,7 +15,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from tools.fixture_images import ACME_IMAGES  # noqa: E402
 from tools.maddy_fixture import fixture_reference  # noqa: E402
 from tools.maddy_modules import MODULE_TIMEOUT_SECONDS, module_inventory  # noqa: E402
 from tools.resources import FIXTURE_DISK_RESERVE_BYTES, fixture_budget  # noqa: E402
@@ -123,7 +122,6 @@ def local_archive(path: Path) -> str:
             "mail-admin:candidate",
             "mail-admin:qualification",
             fixture_reference(),
-            *ACME_IMAGES,
         )
     )
     if images != image_snapshot() or source != source_digest():
@@ -134,15 +132,12 @@ def local_archive(path: Path) -> str:
         images['mail-admin:qualification'],
         lambda arguments: command(('docker',) + arguments), 'runtime',
     )
-    acme_inventory = module_inventory(images['mail-admin:qualification'],
-                                     lambda arguments: command(('docker',) + arguments), 'acme')
     if any(record['source_sha256'] != source
-           for record in (inventory, runtime_inventory, acme_inventory)):
+           for record in (inventory, runtime_inventory)):
         raise RuntimeError('Frozen module inventory differs from the exported source')
     (path.parent / "images.json").write_text(json.dumps({
         "images": images, "source_sha256": source, 'maddy_modules': inventory['modules'],
         'runtime_modules': runtime_inventory['modules'],
-        'acme_modules': acme_inventory['modules'],
     }, indent=2) + "\n")
     with raw.open("rb") as reader, gzip.open(path, "xb", compresslevel=1) as writer:
         shutil.copyfileobj(reader, writer)
@@ -169,8 +164,7 @@ def live_observation(record: dict[str, object]) -> dict[str, object]:
 def fixture_support_files() -> tuple[Path, ...]:
     return tuple(ROOT / "tools" / name for name in (
         "run_linux.py", "resources.py", "maddy_modules.py", "run_tests.py",
-        'run_remote.py', 'fixture_images.py',
-        'maddy_fixture.py',
+        'run_remote.py', 'maddy_fixture.py',
     ))
 
 
@@ -178,7 +172,7 @@ class NativeRun:
     def __init__(self, host: str, paths: tuple[Path, str]) -> None:
         self.host, (self.local, self.remote) = host, paths
         self.outcomes = {
-            suite: "not_run" for suite in ("unit", "integration", "maddy", "runtime", 'acme')
+            suite: "not_run" for suite in ("unit", "integration", "maddy", "runtime")
         }
         self.collected = False
 
@@ -210,7 +204,7 @@ class NativeRun:
         self.outcomes[suite] = "pass" if result.returncode == 0 else "fail"
 
     def _timeout(self, suite: str) -> int:
-        if suite not in {'maddy', 'runtime', 'acme'}:
+        if suite not in {'maddy', 'runtime'}:
             return MODULE_TIMEOUT_SECONDS
         modules = json.loads((self.local / 'images.json').read_bytes())[suite + '_modules']
         if (not isinstance(modules, list) or not 1 <= len(modules) <= 128
@@ -287,7 +281,7 @@ def main() -> None:
     ssh(arguments.host, ("sudo", "-n", "docker", "load", "-i", remote + "/images.tar.gz"))
     native = NativeRun(arguments.host, (local, remote))
     try:
-        for suite in ("unit", "integration", "maddy", "runtime", 'acme'):
+        for suite in ("unit", "integration", "maddy", "runtime"):
             print("Native isolated suite: " + suite, flush=True)
             capacity = ssh(
                 arguments.host,

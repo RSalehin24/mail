@@ -3,7 +3,7 @@ PYTHON ?= .venv/bin/python
 # Every Docker suite rebuilds and retags mail-admin:qualification; parallel runs replace each other's image.
 .NOTPARALLEL:
 
-.PHONY: fixture-space wheels restic build lint typecheck unit integration maddy-integration runtime-integration acme-integration linux-check browser check plan
+.PHONY: fixture-space wheels restic build lint typecheck unit integration maddy-integration runtime-integration linux-check browser check plan
 fixture-space:
 	$(PYTHON) tools/check_fixture_disk.py
 restic:
@@ -28,10 +28,7 @@ maddy-integration: fixture-space wheels restic build
 runtime-integration: build restic
 	docker build --platform linux/amd64 --target qualification -t mail-admin:qualification .
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) tools/run_linux.py --suite runtime
-acme-integration: fixture-space wheels restic build
-	docker build --platform linux/amd64 --target qualification -t mail-admin:qualification .
-	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) tools/run_linux.py --suite acme
-linux-check: maddy-integration runtime-integration acme-integration
+linux-check: maddy-integration runtime-integration
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) tools/run_linux.py --suite unit
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) tools/run_linux.py --suite integration
 browser: build
