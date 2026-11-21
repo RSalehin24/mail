@@ -20,7 +20,7 @@ Updated 2026-11-21 (final, after the owner's dashboard and mail check). Resume h
 1. Tonight's 03:00 Dhaka backup is the first scheduled run on the final code: check it is `verified` with 9 accounts (the journal now says why a run failed).
 2. Billing: look at Billing, then Reports, in a few days for any non-zero line; the $0.01 alert `zero-cost-guard` is set.
 3. Maddy's first real certificate renewal is about two months out.
-4. Optional live checks that need the owner's TOTP or approval: create, delete and restore a temporary mailbox (deleted-mailbox recovery), re-save the relay settings, send one test alert email.
+4. Optional live checks that need the owner's TOTP or approval: create, delete and restore a temporary mailbox (deleted-mailbox recovery) (the relay re-save was dropped by the owner, D-055).
 5. Left on purpose: kernel 7.0.0-1016 as a fallback; old backup staging folders under the backup app's own retention; `backend/operator.py` (run inside the dashboard image by `host/image_tools.py` for offline recovery); `/root/cutover-20261121/{refactor,rollback-dns-update.sh,stage2.env}`.
 
 ## Known limits

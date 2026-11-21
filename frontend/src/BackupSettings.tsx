@@ -80,7 +80,7 @@ export function BackupSettings({ authorize, notify }: { authorize: Authorize; no
   const logHasActions = jobs?.items.some(job => (job.state === 'failed' && job.kind === 'backup') || job.state === 'reconciliation_required' || (job.kind === 'preflight' && job.state === 'complete')) ?? false;
   return <Stack spacing={3}>
     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
-      <Box><Typography variant="h5" component="h2">Backup &amp; Recovery</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>Verified restore points for your mailbox data.</Typography></Box>
+      <Box><Typography variant="h5" component="h2">Backup &amp; Recovery</Typography></Box>
       <Stack direction="row" spacing={1}><Button disabled={busy || blocked} onClick={() => submit('refresh')}>Refresh backups</Button><Button variant="contained" disabled={busy || blocked} onClick={() => submit('backup')}>Back up now</Button></Stack>
     </Stack>
     <Tabs value={view} onChange={(_, value: 'backups' | 'logs') => selectView(value)} aria-label="Backup and recovery sections">
@@ -94,7 +94,6 @@ export function BackupSettings({ authorize, notify }: { authorize: Authorize; no
         <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'background.paper', color: 'primary.main', display: { xs: 'none', sm: 'flex' } }}><CloudDoneOutlined/></Box>
         <Box sx={{ minWidth: 0, flex: 1 }}><Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Daily encrypted backups</Typography>
           <Typography variant="body2" color="text.secondary">3:00 AM · Asia/Dhaka · 7-day retention</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>The latest verified backup each day is kept. Recovery may temporarily retain extra snapshots.</Typography>
         </Box>
       </Stack>
     </Paper>

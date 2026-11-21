@@ -1,5 +1,6 @@
 import { formatDate, formatTime } from './format';
 import { EmptyState, LoadingState } from './PageState';
+import { PageHeader, StatCard, StatGrid, StatusDot } from './ui';
 import { PaginationControls } from './PaginationControls';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Avatar, Box, Button, Card, Checkbox, Chip, Divider, IconButton, InputAdornment, Menu, MenuItem, Paper, Stack,
@@ -64,14 +65,17 @@ export function Dashboard({ authorize, notify }: { authorize: Authorize; notify:
     if (menu) navigate(mailboxPath(menu.mailbox.email, mode === 'config' ? 'connections' : 'configuration')); setMenu(null);
   }
   return <>
-    <Stack className="page-heading" direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}>
-      <Box><Typography variant="h4" component="h1">Mailboxes</Typography></Box>
-      <Button variant="contained" startIcon={<AddRounded/>} onClick={() => setDialog({ mode: 'create' })}>New mailbox</Button>
-    </Stack>
+    <PageHeader title="Mailboxes" action={<Button variant="contained" startIcon={<AddRounded/>} onClick={() => setDialog({ mode: 'create' })}>New mailbox</Button>}/>
+    <StatGrid>
+      <StatCard label="Mailboxes" value={mailboxes.length}/>
+      <StatCard label="Inbox ready" value={mailboxes.filter(mailbox => mailbox.status === 'ready').length} tone={mailboxes.every(mailbox => mailbox.status === 'ready') ? 'success' : 'warning'}/>
+      <StatCard label="Sending verified" value={mailboxes.filter(mailbox => mailbox.outbound_readiness === 'confirmed').length} detail="Outgoing mail tested"/>
+      <StatCard label="Awaiting receipt" value={pending.length} tone={pending.length ? 'warning' : 'neutral'}/>
+    </StatGrid>
     {error && <Alert severity="warning" sx={{ mb: 2 }}>{error} Previously loaded accounts may be out of date.</Alert>}
     {!!diagnostics?.host.unresolved?.length && <Alert severity="warning" sx={{ mb: 2 }}>A mailbox operation needs administrator review before further changes.</Alert>}
     {pending.length > 0 && <Alert severity="info" className="receipt-notice" action={<Button color="inherit" size="small" onClick={() => setVerification(pending.map(mailbox => mailbox.email))}>Review receipts</Button>}>Test emails are waiting for confirmation for {pending.length} {pending.length === 1 ? 'mailbox' : 'mailboxes'}.</Alert>}
-    <Paper variant="outlined" className="mailbox-surface" sx={{ mt: 3 }}>
+    <Paper variant="outlined" className="mailbox-surface" sx={{ mt: 2.5 }}>
       {loading && <Box sx={{ p: 3 }}><LoadingState label="Loading mailboxes"/></Box>}
       <Stack className="table-toolbar" direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}>
         <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center' }}><Typography variant="h6" sx={{ fontSize: '1rem' }}>All mailboxes</Typography><Chip size="small" label={mailboxes.length}/></Stack>
@@ -99,14 +103,14 @@ export function Dashboard({ authorize, notify }: { authorize: Authorize; notify:
         <TableCell><Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}><Avatar className="mailbox-avatar">{mailbox.email[0].toUpperCase()}</Avatar><Box sx={{ minWidth: 0 }}><Typography component="a" href={mailboxPath(mailbox.email)} onClick={event => { event.preventDefault(); navigate(mailboxPath(mailbox.email)); }} variant="body2" sx={{ color: 'primary.main', fontWeight: 600, overflowWrap: 'anywhere' }}>{mailbox.email}</Typography>{mailbox.display_name && <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{mailbox.display_name}</Typography>}{mailbox.notes && <Typography variant="caption" color="text.secondary">{mailbox.notes}</Typography>}</Box></Stack></TableCell>
 
         <TableCell sx={{ whiteSpace: 'nowrap' }}><Typography variant="body2" component="time" dateTime={mailbox.created ? new Date(mailbox.created * 1000).toISOString() : undefined}>{creationDate(mailbox)}</Typography></TableCell>
-        <TableCell><Chip size="small" className="status-chip" color={mailbox.status === 'ready' ? 'success' : 'warning'} variant="outlined" label={mailbox.status === 'ready' ? 'Ready' : 'Needs review'}/></TableCell>
+        <TableCell><StatusDot tone={mailbox.status === 'ready' ? 'success' : 'warning'} label={mailbox.status === 'ready' ? 'Ready' : 'Needs review'}/></TableCell>
         <TableCell>{sending(mailbox)}</TableCell><TableCell>{rowActions(mailbox)}</TableCell>
       </TableRow>)}</TableBody></Table></TableContainer>
       <Box className="mailbox-cards">{rows.map(mailbox => <Card variant="outlined" className="mailbox-mobile-card" key={mailbox.email}>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><Checkbox checked={selected.includes(mailbox.email)} onChange={() => toggle(mailbox.email)} slotProps={{ input: { 'aria-label': `Select ${mailbox.email}` } }}/><Box sx={{ minWidth: 0, flex: 1 }}><Button size="small" sx={{ display: 'block' }} onClick={() => navigate(mailboxPath(mailbox.email, 'configuration'))}>{mailbox.display_name || 'Add name'}</Button><Typography component="a" href={mailboxPath(mailbox.email)} onClick={event => { event.preventDefault(); navigate(mailboxPath(mailbox.email)); }} variant="body2" sx={{ color: 'primary.main', fontWeight: 650, overflowWrap: 'anywhere' }}>{mailbox.email}</Typography></Box>{rowActions(mailbox)}</Stack>
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>Creation Date: {creationDate(mailbox)}</Typography>
         <Divider sx={{ my: 1.5 }}/><Stack direction="row" sx={{ justifyContent: 'space-between', gap: 2 }}>
-          <Box><Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.7 }}>Inbox</Typography><Chip size="small" variant="outlined" color={mailbox.status === 'ready' ? 'success' : 'warning'} label={mailbox.status === 'ready' ? 'Ready' : 'Needs review'}/></Box>
+          <Box><Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.7 }}>Inbox</Typography><StatusDot tone={mailbox.status === 'ready' ? 'success' : 'warning'} label={mailbox.status === 'ready' ? 'Ready' : 'Needs review'}/></Box>
           <Box sx={{ textAlign: 'right' }}><Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.7 }}>Sending</Typography>{sending(mailbox)}</Box>
         </Stack>{mailbox.notes && <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>{mailbox.notes}</Typography>}
       </Card>)}</Box>

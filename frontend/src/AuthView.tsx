@@ -38,9 +38,8 @@ export function AuthView({ onLogin, onCodes }: { onLogin: () => void; onCodes: (
   }
   return <Box className="auth-stage"><Paper className="auth-card" elevation={0}>
     <Box className="auth-icon"><ShieldOutlined/></Box>
-    <Typography variant="overline" color="primary">PRIVATE MAIL OPERATIONS</Typography>
     <Typography variant="h4" component="h1">{setup ? 'Set up your dashboard' : challenge ? 'One more step' : 'Welcome back'}</Typography>
-    <Typography color="text.secondary" sx={{ mt: 1, mb: 3 }}>{setup ? 'Use the private token provided by your operator.' : 'Manage your mail with a little peace of mind.'}</Typography>
+    <Typography color="text.secondary" sx={{ mt: 1, mb: 3 }}>{setup ? 'Use the private token provided by your operator.' : ''}</Typography>
     <Stack component="form" spacing={2.5} onSubmit={event => { event.preventDefault(); void submit(); }}>
       {error && <Alert severity="error">{error}</Alert>}
       {setup && !material && <TextField label="Private bootstrap token" type="password" autoComplete="off" value={token} onChange={event => setToken(event.target.value)}/>}

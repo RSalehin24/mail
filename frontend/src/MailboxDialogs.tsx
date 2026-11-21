@@ -46,7 +46,6 @@ export function PasswordDialog({ mode, mailbox, onClose, onChanged, notify, auth
       <Stack direction="row" spacing={1}><Button onClick={() => { setPassword(generatePassword()); setVisible(true); }} disabled={busy || uncertain}>Generate 24-character password</Button>
         <Button startIcon={<ContentCopyOutlined/>} disabled={!password} onClick={async () => { await navigator.clipboard.writeText(password); notify('Password copied'); }}>Copy</Button></Stack>
       <FormControlLabel control={<Checkbox checked={visible} onChange={event => setVisible(event.target.checked)}/>} label="Show password for this flow"/>
-      {mode === 'create' && <Typography variant="body2" color="text.secondary">After creation, add and verify this sender in Brevo’s Senders & Domains settings. Then use “Test sender” and confirm receipt. Incoming provisioning does not authorize outgoing mail.</Typography>}
       {uncertain && <Typography variant="body2">Keep operation ID {identifier}. Reconcile the recorded outcome with the operator before trying another mutation.</Typography>}
     </Stack></DialogContent>
     <DialogActions><Button onClick={onClose} disabled={busy}>Close</Button><Button variant="contained"
@@ -71,7 +70,6 @@ export function DeleteDialog({ mailbox, cutoff, ...common }: Common & { mailbox:
       <FormControlLabel control={<Checkbox checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)}/>}
         label="I understand mail arriving after this cutoff is outside the backup."/>
       <TextField label="Type the exact email address" value={confirmation} autoComplete="off" onChange={event => setConfirmation(event.target.value)}/>
-      <Typography variant="body2" color="text.secondary">The helper rechecks archive availability, account coverage, incarnation and protected recipient policy before any deletion.</Typography>
     </Stack></DialogContent>
     <DialogActions><Button onClick={common.onClose} disabled={busy}>Cancel</Button><Button color="error" variant="contained"
       disabled={busy || attempted || !cutoff || !acknowledged || confirmation !== mailbox.email} onClick={() => common.authorize(async () => {

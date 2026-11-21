@@ -7,6 +7,7 @@ import MenuOutlined from '@mui/icons-material/MenuOutlined';
 import { ApiError, api, clearSessionData } from './api';
 import { AuthView } from './AuthView';
 import { Dashboard } from './Dashboard';
+import { Overview } from './Overview';
 import { SettingsView } from './SettingsView';
 import { Reauthenticate, RecoveryCodes } from './components';
 import './styles.css';
@@ -24,7 +25,7 @@ export function App() {
   const [ready, setReady] = useState(false);
   const [sessionError, setSessionError] = useState('');
   const path = usePath();
-  const view = path === '/forwarding' ? 'forwarding' : path === '/settings' ? 'settings' : path === '/server' ? 'server' : path === '/deleted' ? 'deleted' : 'mailboxes';
+  const view = path === '/' ? 'overview' : path === '/forwarding' ? 'forwarding' : path === '/settings' ? 'settings' : path === '/server' ? 'server' : path === '/deleted' ? 'deleted' : 'mailboxes';
   const match = /^\/mailboxes\/([^/]+)\/(details|configuration|connections)$/.exec(path);
   const [toast, setToast] = useState<{ text: string; severity: 'success' | 'error' } | null>(null);
   const notify = useCallback((text: string) => setToast(text ? { text, severity: 'success' } : null), []);
@@ -70,8 +71,9 @@ export function App() {
     : view === 'forwarding' ? <Forwarding authorize={authorize} notify={notify}/>
     : view === 'server' ? <ServerPage/>
     : view === 'settings' ? <SettingsView authorize={authorize} notify={notify} onRevoked={revoke}/>
-    : path === '/' ? <Dashboard authorize={authorize} notify={notify}/>
-    : <Alert severity="warning">Page not found. <Button onClick={() => navigate('/')}>Go to mailboxes</Button></Alert>;
+    : view === 'overview' ? <Overview/>
+    : path === '/mailboxes' ? <Dashboard authorize={authorize} notify={notify}/>
+    : <Alert severity="warning">Page not found. <Button onClick={() => navigate('/')}>Go to overview</Button></Alert>;
   return <ThemeProvider theme={theme}><CssBaseline/>
     <AppBar position="sticky" color="inherit" elevation={0} sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
       <Toolbar sx={{ minHeight: 64, gap: 0.5 }}>

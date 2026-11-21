@@ -1,5 +1,6 @@
 import { Button, Stack } from '@mui/material';
 import type { ReactElement } from 'react';
+import HomeOutlined from '@mui/icons-material/HomeOutlined';
 import MailOutline from '@mui/icons-material/MailOutlineOutlined';
 import ForwardToInboxOutlined from '@mui/icons-material/ForwardToInboxOutlined';
 import DeleteOutline from '@mui/icons-material/DeleteOutlined';
@@ -7,12 +8,13 @@ import DnsOutlined from '@mui/icons-material/DnsOutlined';
 import SettingsOutlined from '@mui/icons-material/SettingsOutlined';
 import { navigate } from './navigation';
 
-export type View = 'mailboxes' | 'forwarding' | 'deleted' | 'server' | 'settings';
+export type View = 'overview' | 'mailboxes' | 'forwarding' | 'deleted' | 'server' | 'settings';
 interface Item { view: View; label: string; path: string; icon: ReactElement }
 
 // One list drives the desktop rail and the mobile drawer.
 export const NAVIGATION_ITEMS: Item[] = [
-  { view: 'mailboxes', label: 'Mailboxes', path: '/', icon: <MailOutline/> },
+  { view: 'overview', label: 'Overview', path: '/', icon: <HomeOutlined/> },
+  { view: 'mailboxes', label: 'Mailboxes', path: '/mailboxes', icon: <MailOutline/> },
   { view: 'forwarding', label: 'Forwarding', path: '/forwarding', icon: <ForwardToInboxOutlined/> },
   { view: 'deleted', label: 'Deleted', path: '/deleted', icon: <DeleteOutline/> },
   { view: 'server', label: 'Server', path: '/server', icon: <DnsOutlined/> },

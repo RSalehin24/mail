@@ -78,7 +78,6 @@ function OutgoingSettings({ authorize, notify }: Pick<Props, 'authorize' | 'noti
           notify(result.smtp_accepted ? 'Test accepted by SMTP. Confirm the matching message below after receipt.' : 'SMTP delivery test failed.'); await load();
         })}>Send explicit delivery test</Button>
       </Stack>
-      <Alert severity="info"><Typography variant="subtitle2">Administrator email delivery</Typography><Typography variant="body2">Tests from mail@rsalehin24.me go to rsalehin24@gmail.com. Each mailbox has its own sending verification and history on its Details page. Saving provider credentials requires a new delivery test.</Typography></Alert>
       {!!relay?.tests.filter(test => test.sender === 'mail@rsalehin24.me').length && <Typography variant="subtitle2">Administrator delivery history</Typography>}
       {delivery.rows.map(test => <Box key={test.id} sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
         <Typography variant="body2">From {test.sender} · {formatDateTime(test.created)}</Typography>

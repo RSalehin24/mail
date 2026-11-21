@@ -12,6 +12,17 @@ import { connect } from './browser_connection.mjs';
 // Only the theme preference (MUI's mui-* keys) may be stored in the browser; nothing else.
 const STORED_DATA = "Object.keys(localStorage).filter(key => !key.startsWith('mui-')).length + sessionStorage.length";
 
+async function openMailboxes(connection) {
+  await connection.click({ tag: 'button', name: 'Mailboxes' });
+  await connection.until(`document.querySelector('h1')?.textContent === 'Mailboxes'`);
+}
+
+async function chooseTheme(connection, name) {
+  await connection.click({ tag: 'button', name: 'Theme' });
+  await connection.click({ tag: 'button', name });
+  await connection.until(`document.querySelector('[role=menu]') === null`);
+}
+
 async function responsive(connection) {
   for (const width of [360, 768, 1280]) {
     await connection.call('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -24,8 +35,7 @@ async function responsive(connection) {
 }
 
 async function recoveryControls(connection) {
-  await connection.click({ tag: 'a', name: 'RSalehin24 Mail Admin home' });
-  await connection.until(`document.querySelector('h1')?.textContent === 'Mailboxes'`);
+  await openMailboxes(connection);
   await connection.until(`document.querySelector('a[href="/mailboxes/cloud%40rsalehin24.me/details"]') !== null`);
   await connection.click({ tag: 'a', name: 'cloud@rsalehin24.me' });
   await connection.until(`document.querySelector('[role=tab]')?.textContent === 'Details'`);
@@ -101,14 +111,14 @@ async function settingsTabs(connection) {
   await connection.until(`document.body.textContent.includes('protected13@rsalehin24.me')`);
   await connection.click({ tag: 'button', name: 'Go to first page' });
   for (const dark of [false, true]) {
-    if (dark) await connection.click({ tag: 'button', name: 'Toggle dark mode' });
+    if (dark) await chooseTheme(connection, 'Dark');
     for (const width of [360, 768, 1280]) {
       await connection.call('Emulation.setDeviceMetricsOverride', { width, height: 1000, deviceScaleFactor: 1, mobile: false });
       await connection.screenshot(`protected-mailboxes-${dark ? 'dark' : 'light'}-${width}`);
       assert.equal(await connection.read('document.documentElement.scrollWidth <= innerWidth'), true);
     }
   }
-  await connection.click({ tag: 'button', name: 'Toggle dark mode' });
+  await chooseTheme(connection, 'Light');
   await connection.call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 1000, deviceScaleFactor: 1, mobile: false });
   await connection.click({ tag: 'button', name: 'Configure' });
   await connection.until(`document.body.textContent.includes('Enable mailbox deletion')`);
@@ -122,14 +132,14 @@ async function settingsTabs(connection) {
   await connection.click({ tag: 'button', name: 'Logs' });
   await connection.until(`document.body.textContent.includes('Retry backup')`);
   for (const dark of [false, true]) {
-    if (dark) await connection.click({ tag: 'button', name: 'Toggle dark mode' });
+    if (dark) await chooseTheme(connection, 'Dark');
     for (const width of [360, 768, 1280]) {
       await connection.call('Emulation.setDeviceMetricsOverride', { width, height: 1000, deviceScaleFactor: 1, mobile: false });
       await connection.screenshot(`backup-settings-${dark ? 'dark' : 'light'}-${width}`);
       assert.equal(await connection.read('document.documentElement.scrollWidth <= innerWidth'), true);
     }
   }
-  await connection.click({ tag: 'button', name: 'Toggle dark mode' });
+  await chooseTheme(connection, 'Light');
   await connection.call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 1000, deviceScaleFactor: 1, mobile: false });
   await connection.call('Page.reload');
   await connection.until(`document.querySelector('[role=tab][aria-selected=true]')?.textContent === 'Backup & Recovery'`);
@@ -204,8 +214,7 @@ async function mailboxFlows(connection, fixture) {
 
   await connection.read('history.forward()');
   await connection.until(`location.pathname.endsWith('/details')`);
-  await connection.click({ tag: 'a', name: 'RSalehin24 Mail Admin home' });
-  await connection.until(`document.querySelector('h1')?.textContent === 'Mailboxes'`);
+  await openMailboxes(connection);
   await connection.until(`document.body.textContent.includes('Updated mailbox')`);
   assert.equal(await connection.read(`getComputedStyle(document.querySelector('thead th:nth-child(3)')).textAlign`), 'left');
   assert.equal(await connection.read(`document.querySelector('.stat-row') === null`), true);
@@ -218,14 +227,14 @@ async function mailboxFlows(connection, fixture) {
   assert.equal(favicon.headers.get('content-type').includes('image/svg+xml'), true);
   assert.equal((await favicon.text()).startsWith('<svg'), true);
   for (const dark of [false, true]) {
-    if (dark) await connection.click({ tag: 'button', name: 'Toggle dark mode' });
+    if (dark) await chooseTheme(connection, 'Dark');
     for (const width of [360, 768, 1280]) {
       await connection.call('Emulation.setDeviceMetricsOverride', { width, height: 1000, deviceScaleFactor: 1, mobile: false });
       await connection.screenshot(`redesign-${dark ? 'dark' : 'light'}-${width}`);
       assert.equal(await connection.read('document.documentElement.scrollWidth <= innerWidth'), true);
     }
   }
-  await connection.click({ tag: 'button', name: 'Toggle dark mode' });
+  await chooseTheme(connection, 'Light');
 }
 
 async function relayFlows(connection) {
@@ -244,8 +253,7 @@ async function relayFlows(connection) {
 }
 
 async function verificationFlows(connection) {
-  await connection.click({ tag: 'a', name: 'RSalehin24 Mail Admin home' });
-  await connection.until(`document.querySelector('h1')?.textContent === 'Mailboxes'`);
+  await openMailboxes(connection);
   await connection.until(`document.querySelector('input[aria-label="Select cloud@rsalehin24.me"]') !== null`);
   await connection.click({ tag: 'input', name: 'Select cloud@rsalehin24.me' });
   await connection.click({ tag: 'input', name: 'Select mail@rsalehin24.me' });
@@ -289,7 +297,7 @@ async function securityAndServer(connection) {
   assert.ok(times.slice(2).every((value, index) => value - times[index + 1] >= 700 && value - times[index + 1] <= 1800), 'Steady resource polling targets one second');
   assert.equal(await connection.read(`document.querySelectorAll('svg[role=img]').length >= 3`), true);
   for (const dark of [false, true]) {
-    if (dark) await connection.click({ tag: 'button', name: 'Toggle dark mode' });
+    if (dark) await chooseTheme(connection, 'Dark');
     for (const width of [360, 768, 1280]) {
       await connection.call('Emulation.setDeviceMetricsOverride', { width, height: 1100, deviceScaleFactor: 1, mobile: false });
       await connection.read('scrollTo(0,0)'); await delay(300);
@@ -297,7 +305,7 @@ async function securityAndServer(connection) {
       await connection.screenshot(`server-charts-${dark ? 'dark' : 'light'}-${width}`);
     }
   }
-  await connection.click({ tag: 'button', name: 'Toggle dark mode' });
+  await chooseTheme(connection, 'Light');
   connection.events.delete('Network.requestWillBeSent'); connection.events.delete('Network.loadingFinished'); connection.events.delete('Network.loadingFailed');
   await connection.click({ tag: 'button', name: 'Settings' });
   await connection.click({ tag: 'button', name: 'Security' });
@@ -470,7 +478,9 @@ async function verify(connection, report) {
   assert.equal(await connection.read(`document.querySelector('input[type=password]') === null`), true);
   await connection.fill('Digit 1 of 6', fixture.totp);
   await connection.click({ tag: 'button', name: 'Verify and sign in' });
-  await connection.until(`document.querySelector('h1')?.textContent === 'Mailboxes'`);
+  await connection.until(`document.querySelector('h1')?.textContent === 'Overview'`);
+  await connection.screenshot('overview');
+  await openMailboxes(connection);
   assert.equal(await connection.read(`document.querySelectorAll('.desktop-table tbody tr').length`), 8);
   assert.equal(await connection.read(`document.cookie.includes('mail_admin')`), false);
   await connection.read(`(() => {const select = document.querySelector('.MuiTablePagination-root select'); select.value = '5'; select.dispatchEvent(new Event('change', {bubbles: true}));})()`);
@@ -499,7 +509,7 @@ async function verify(connection, report) {
   await incomingDeliveryControls(connection);
   await concurrentLoadingAndPagination(connection);
   await connection.screenshot('settings');
-  await connection.click({ tag: 'button', name: 'Toggle dark mode' });
+  await chooseTheme(connection, 'Dark');
   await connection.screenshot('settings-dark');
   await connection.click({ tag: 'button', name: 'Sign out' });
   await connection.until(`document.querySelector('h1')?.textContent === 'Welcome back'`);

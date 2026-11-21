@@ -38,7 +38,6 @@ export function SenderVerification({ emails, mailboxes, authorize, notify, onClo
   return <Dialog open fullWidth maxWidth="sm" onClose={busy ? undefined : onClose} aria-labelledby="sender-verification-title">
     <DialogTitle id="sender-verification-title" sx={{ pb: 1 }}>Verify outgoing email</DialogTitle>
     <DialogContent>
-      <Typography color="text.secondary" sx={{ mb: 3 }}>Send a test from each selected address to rsalehin24@gmail.com. Match the test ID in the email, then confirm receipt below.</Typography>
       {currentSender && <Typography role="status" sx={{ mb: 2 }}>Sending test from {currentSender}…</Typography>}
       <Stack spacing={2}>{emails.map(email => {
         const mailbox = mailboxes.find(value => value.email === email);
@@ -63,7 +62,6 @@ export function SenderVerification({ emails, mailboxes, authorize, notify, onClo
         </Box>;
       })}</Stack>
       <Divider sx={{ my: 2 }}/>
-      <Typography variant="caption" color="text.secondary">Your sender address or domain must be authorized in Brevo. SMTP acceptance alone does not confirm that an email reached your inbox.</Typography>
     </DialogContent>
     <DialogActions sx={{ px: 3, pb: 2.5 }}><Button onClick={onClose} disabled={busy}>Done</Button>
       <Button variant="contained" onClick={send} disabled={busy || emails.every(email => sent.includes(email) || mailboxes.find(mailbox => mailbox.email === email)?.sender_tests?.some(test => test.accepted))}>

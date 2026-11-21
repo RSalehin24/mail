@@ -71,7 +71,6 @@ export function RecoverySettings({ authorize, notify, section = 'deletion' }: { 
       <FormControlLabel control={<Switch checked={policy.permanent_deletion_enabled} disabled={busy} onChange={(_, checked) => update({ permanent_deletion_enabled: checked, ...(!checked && policy.default_retention === 'none' ? { default_retention: '7_days' as const } : {}) })}/>} label="Allow permanent deletion"/>
       </>}
       {protecting && <>
-      <Typography variant="body2" color="text.secondary">Protected mailboxes cannot be deleted. Add a mailbox or edit the reason for its protection.</Typography>
       <Stack ref={form} direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
         <TextField label="Mailbox to protect" value={email} disabled={busy || editing} onChange={event => setEmail(event.target.value)} size="small"/>
         <TextField inputRef={reasonInput} label="Protection reason" value={reason} disabled={busy} onChange={event => setReason(event.target.value)} size="small"/>

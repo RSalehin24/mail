@@ -25,7 +25,7 @@ export function MailboxPage({ encodedEmail, tab, authorize, notify }: {
   useEffect(() => { void load(); }, [load]);
   const common = { authorize, notify, onChanged: () => { void load(); }, onClose: () => setDialog('') };
   return <Stack spacing={3}>
-    <Breadcrumbs aria-label="Breadcrumb"><Button href="/" onClick={event => { event.preventDefault(); navigate('/'); }}>Mailboxes</Button><Typography>{mailbox?.email ?? 'Mailbox'}</Typography></Breadcrumbs>
+    <Breadcrumbs aria-label="Breadcrumb"><Button href="/mailboxes" onClick={event => { event.preventDefault(); navigate('/mailboxes'); }}>Mailboxes</Button><Typography>{mailbox?.email ?? 'Mailbox'}</Typography></Breadcrumbs>
     {error && <Alert severity="error" action={<Button onClick={() => { void load(); }}>Retry</Button>}>{error}</Alert>}
     {!mailbox && !error && <LoadingState label="Loading mailbox…"/>}
     {mailbox && <>
@@ -40,7 +40,6 @@ export function MailboxPage({ encodedEmail, tab, authorize, notify }: {
               <Box><Typography variant="caption" color="text.secondary">Display name</Typography><Typography>{mailbox.display_name || 'Not set'}</Typography></Box>
               <Box><Typography variant="caption" color="text.secondary">Notes</Typography><Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{mailbox.notes || 'Not set'}</Typography></Box>
               <Button variant="outlined" sx={{ alignSelf: 'start' }} onClick={() => navigate(mailboxPath(mailbox.email, 'configuration'))}>Edit details</Button>
-              <Typography variant="caption" color="text.secondary">The display name is a dashboard label. Set your outgoing From name in your mail client.</Typography>
             </Stack>
           </Box>
           <Box component="section" sx={{ p: { xs: 2, sm: 3 }, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
@@ -62,7 +61,7 @@ export function MailboxPage({ encodedEmail, tab, authorize, notify }: {
         {tab === 'connections' && <ClientConfig mailbox={mailbox} {...common} embedded/>}
       </Paper>
       {dialog === 'password' && <PasswordDialog mailbox={mailbox} mode="reset" {...common}/>}
-      {dialog === 'delete' && <RecoveryAction email={mailbox.email} mode="delete" {...common} onChanged={() => navigate('/')}/>}
+      {dialog === 'delete' && <RecoveryAction email={mailbox.email} mode="delete" {...common} onChanged={() => navigate('/mailboxes')}/>}
       {dialog === 'verify' && <SenderVerification emails={[mailbox.email]} mailboxes={[mailbox]} {...common} onChanged={load}/>}
     </>}
   </Stack>;
