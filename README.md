@@ -1,7 +1,7 @@
 # Mail Admin
 
 Self-hosted mail for `rsalehin24.me`: the Maddy mail server and the Mail Admin
-dashboard on one small VM. Design contract: [docs/mail-admin-implementation](docs/mail-admin-implementation/README.md).
+dashboard on one small VM.
 Plans and decisions: [planning/](planning/STATUS.md) (start with `STATUS.md`).
 
 The HTTPS web application never has Docker access. It runs the host operations
@@ -12,9 +12,8 @@ changes need an owner-approved plan and a restore point.
 
 Mail clients use `mail.rsalehin24.me` for IMAP 993/TLS and SMTP 587/STARTTLS,
 with the full mailbox address and mailbox password for both. Enable saving sent
-messages in the server IMAP Sent folder. See [SMTP submission and Sent storage](verification/smtp-submission.md).
-Forwarding controls are in the main navigation and mailbox Configuration pages;
-see [forwarding status](verification/forwarding-implementation-status.md).
+messages in the server IMAP Sent folder.
+Forwarding controls are in the main navigation and mailbox Configuration pages.
 
 Paths: `frontend/` (React/MUI), `backend/` (API/domain/data), `shared/` (validators),
 `helper/` (private Unix service), `host/` (root lifecycle tools and systemd units),
@@ -23,7 +22,7 @@ Paths: `frontend/` (React/MUI), `backend/` (API/domain/data), `shared/` (validat
 ## Setup
 
 Use Python 3.15 and Node 24 LTS. Image builds need Docker Engine, the Buildx plugin
-and Docker Compose. See also the [Linux setup notes](verification/linux-continuation.md).
+and Docker Compose.
 
 ```sh
 python3.15 -m venv .venv
@@ -55,7 +54,6 @@ mkdir -p build
 | `make runtime-integration` | the non-root HTTPS image: in-process host and real Maddy, TLS, enrollment, restarts |
 | `make acme-integration` | private ACME with pinned Certbot and Pebble images; pull the references in `tools/fixture_images.py` first |
 | `make linux-check` | the three Docker suites plus unit and integration inside Linux containers |
-| `make plan` | validates the design-contract docs |
 
 `make check` runs lint, typecheck, reads, unit and integration. The Docker suites
 need about 2 GiB free disk. To run one module after rebuilding the test image:
@@ -70,5 +68,4 @@ sessions, mailbox management, client configuration, DNS/Maddy diagnostics, encry
 relay settings, delivery confirmation, backups and recovery. Email OTP and permanent
 deletion default to disabled. No incoming mailbox password is stored in plaintext.
 
-Before maintenance read the [operator handoff](verification/operator-handoff.md) and the
-[security assessment](verification/maddy-security-assessment.md).
+Before maintenance read [planning/RUNBOOK.md](planning/RUNBOOK.md).

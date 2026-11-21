@@ -29,7 +29,6 @@ QUALIFIED_FILES = frozenset(
         "host/repository_backup.py",
         "host/daily_retention.py",
         "host/restic_repository.py",
-        "host/initial_cleanup.py",
     }
 )
 

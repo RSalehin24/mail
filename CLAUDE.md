@@ -43,13 +43,12 @@ Precedence: the user's explicit instruction, then the nearest `AGENTS.md`, then 
 - **T3** helper, host, DNS or mail path: T2 plus Maddy/runtime/ACME suites where still valid, a restore point taken first, and an explicit rollback plan.
 
 ## Commands (from `Makefile`/`README.md`; run from the repo root)
-`make lint typecheck reads unit integration` (or `make check`), `make build` (needs Docker + Buildx), `make browser`, `make plan`. Setup: Python 3.15 `.venv` from `requirements-dev.lock`, `npm --prefix frontend ci --ignore-scripts`.
+`make lint typecheck reads unit integration` (or `make check`), `make build` (needs Docker + Buildx), `make browser`. Setup: Python 3.15 `.venv` from `requirements-dev.lock`, `npm --prefix frontend ci --ignore-scripts`.
 
 ## Layout
-`backend/` FastAPI app and API; `helper/` root Unix-socket service (the only code that changes Maddy); `host/` root lifecycle tools and systemd units; `shared/` validators and Maddy config generation; `frontend/` React/MUI; `tools/` build and evidence tooling; `tests/`; `docs/mail-admin-implementation/` the reviewed contract; `verification/` historical evidence.
+`backend/` FastAPI app and API; `helper/` host-operation code the dashboard runs in-process (the only code that changes Maddy); `host/` root lifecycle tools and systemd units; `shared/` validators and Maddy config generation; `frontend/` React/MUI; `tools/` build and evidence tooling; `tests/`; `planning/` status, decisions and the runbook.
 
 ## Working style
-- `verification/*` handovers are historical; do not read them in full. Start from `verification/mail-admin-completion.md` only when production history matters.
 - Read by section (`offset`/`limit`) or `rg`; never re-read a file already in context. Delegate broad searches to `Explore` and keep conclusions.
 - Independent work goes in parallel in one message. Keep replies short: changes, not content.
 - Write durations as hours and minutes ("3 h 8 min").

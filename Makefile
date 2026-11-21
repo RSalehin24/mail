@@ -3,7 +3,7 @@ PYTHON ?= .venv/bin/python
 # Every Docker suite rebuilds and retags mail-admin:qualification; parallel runs replace each other's image.
 .NOTPARALLEL:
 
-.PHONY: fixture-space wheels restic build lint typecheck unit integration maddy-integration runtime-integration linux-check browser check plan
+.PHONY: fixture-space wheels restic build lint typecheck unit integration maddy-integration runtime-integration linux-check browser check
 fixture-space:
 	$(PYTHON) tools/check_fixture_disk.py
 restic:
@@ -37,5 +37,3 @@ browser: build
 reads:
 	cd frontend && npm run test:reads
 check: lint typecheck reads unit integration
-plan:
-	PYTHONDONTWRITEBYTECODE=1 python3 docs/mail-admin-implementation/tools/verify_plan.py --run-tests --check-examples
