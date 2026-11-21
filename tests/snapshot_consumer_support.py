@@ -1,6 +1,6 @@
 """Keep actual stop/start and served-TLS checks inside the private consumer project."""
 
-from host.certificates import verify_served
+from host.certificates import served_fingerprint, verify_served
 from host.docker import Docker
 
 
@@ -27,7 +27,7 @@ class SnapshotConsumerDocker:
     def stop_for_maintenance(self, role):
         Docker.stop_for_maintenance(self, role)
 
-    def verify(self, endpoint, expected, timeout):
+    def published_endpoint(self, endpoint):
         roles = {('127.0.0.1', 993): 'maddy', ('127.0.0.1', 443): 'mail-admin'}
         if endpoint not in roles:
             raise AssertionError('Unexpected snapshot verification endpoint')
@@ -37,4 +37,10 @@ class SnapshotConsumerDocker:
         if not ports:
             raise AssertionError('Restarted snapshot consumer has no published TLS port')
         # Docker can allocate a different ephemeral host port when restarting a fixture.
-        verify_served(('127.0.0.1', int(ports[0]['HostPort'])), expected, timeout)
+        return ('127.0.0.1', int(ports[0]['HostPort']))
+
+    def verify(self, endpoint, expected, timeout):
+        verify_served(self.published_endpoint(endpoint), expected, timeout)
+
+    def fingerprint(self, endpoint):
+        return served_fingerprint(self.published_endpoint(endpoint))

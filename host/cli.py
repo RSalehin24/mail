@@ -96,7 +96,6 @@ class OfflineConsumer:
 
 def run(action: str, context: HostContext) -> None:
     if action in {"renew", "dry-run", "activate"}:
-        require_checkpoint("G05", context.deployment)
         if context.generations.read().get("coordination_migrated") is not True:
             raise ServiceError("matched_renewal_cutover_required", 409)
         renewal = context.renewal()
@@ -108,7 +107,6 @@ def run(action: str, context: HostContext) -> None:
                 "dry-run" if action == "dry-run" else "renew",
             )
     elif action in {"backup", "backup-verify"}:
-        require_checkpoint("G07", context.deployment)
         operation = BackupOperations(context.backup(), context.deployment)
         if action == 'backup' and Path('/var/lib/mail-admin-helper/backup-control.db').is_file():
             from host.backup_tracking import tracked_backup

@@ -77,6 +77,24 @@ class ConsumerTests(unittest.TestCase):
             snapshots.running()
         self.assertEqual(self.docker.calls, [])
 
+    def test_resume_expects_the_certificate_served_just_before_the_pause_not_the_recorded_one(self):
+        # Maddy renews its own certificate, so the fingerprint stored at issue time goes stale.
+        consumers = {"maddy": {"intent": "expected_running", "served_sha256": "stale"}}
+        generations = MagicMock()
+        generations.read.return_value = {"consumers": consumers}
+        docker = MagicMock()
+        docker.inspect.return_value = {"State": {"Running": False}}
+        snapshots = DockerSnapshots((docker, MagicMock(), generations))
+        with patch("host.docker.served_fingerprint", return_value="fresh") as served:
+            with patch.object(snapshots, "_verify_resumed") as verify:
+                docker.inspect.side_effect = [
+                    {"State": {"Running": False}}, {"State": {"Running": True}},
+                ]
+                snapshots.pause(["maddy"])
+                snapshots.resume(["maddy"])
+        served.assert_called_once_with(("127.0.0.1", 993))
+        verify.assert_called_once_with("maddy", "fresh")
+
     def test_offline_recovery_blocks_backup_even_when_the_web_container_is_stopped(self):
         generations = SimpleNamespace(
             read=lambda: {

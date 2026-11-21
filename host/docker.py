@@ -125,7 +125,13 @@ class DockerSnapshots:
 
     def pause(self, names: list[str]) -> None:
         state = self.generations.read()
-        self.prior_intent = {name: dict(state["consumers"][name]) for name in names}
+        # Maddy renews its own certificate, so the fingerprint recorded at issue time can be
+        # stale; resuming must serve what was served just before the pause.
+        self.prior_intent = {
+            name: {**state["consumers"][name],
+                   "served_sha256": served_fingerprint(("127.0.0.1", self._tls_port(name)))}
+            for name in names
+        }
         for name in names:
             self.generations.maintenance(name, "backup_capture")
             self.docker.run(("stop", "--time", "30", name))
@@ -156,6 +162,10 @@ class DockerSnapshots:
             raise ServiceError("backup_consumer_recovery_failed", 503)
 
 
+    @staticmethod
+    def _tls_port(name: str) -> int:
+        return 993 if name == "maddy" else 443
+
     def _verify_resumed(self, name: str, expected: str) -> None:
         # Running is observable before the service begins accepting TLS connections.
         # Retry readiness within the existing verification budget, never extend it.
@@ -165,9 +175,7 @@ class DockerSnapshots:
             if remaining <= 0:
                 raise ServiceError("consumer_certificate_unverified", 503)
             try:
-                verify_served(
-                    ("127.0.0.1", 993 if name == "maddy" else 443), expected, remaining
-                )
+                verify_served(("127.0.0.1", self._tls_port(name)), expected, remaining)
                 return
             except (OSError, ServiceError):
                 if time.monotonic() >= deadline:

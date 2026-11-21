@@ -30,9 +30,9 @@ def helper_with_observed_cli(channel, operation):
             blocked.execute('BEGIN IMMEDIATE')
         return record
 
-    def collect(process, timeout):
+    def collect(process, timeout, separate_stderr=False):
         if tuple(process.args[-3:]) != ('creds', 'create', request.email):
-            return _collect(process, timeout)
+            return _collect(process, timeout, separate_stderr)
         wait_for_native_cli(fixture, request.email)
         fixture.command(('pause', fixture.identifier))
         channel.send(('helper_cli_paused', None))

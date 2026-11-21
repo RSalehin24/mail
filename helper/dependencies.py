@@ -62,8 +62,20 @@ def build_dependencies(
         ), locations.owner),
     )
     if (data / "submission-relay.conf").is_file():
-        with HostLock(dependencies.lock, dependencies.lock_policy):
-            dependencies = replace(dependencies, submission=SubmissionControl(
-                data, Path(deployment["backup_sources"]["dashboard"]) / "admin_data.db",
-                locations.relay))
+        database = Path(deployment["backup_sources"]["dashboard"]) / "admin_data.db"
+        if interrupted_relay_change(data):
+            # Finishing the change races with the workers, so it needs the mailbox lock.
+            with HostLock(dependencies.lock, dependencies.lock_policy):
+                submission = SubmissionControl(data, database, locations.relay)
+        else:
+            # Starting must never wait for a backup that is waiting for this process to start.
+            submission = SubmissionControl(data, database, locations.relay)
+        dependencies = replace(dependencies, submission=submission)
     return dependencies
+
+
+def interrupted_relay_change(data: Path) -> bool:
+    return any(
+        (data / name).exists()
+        for name in ("submission-relay.rollback", "submission-relay.pending.json")
+    )

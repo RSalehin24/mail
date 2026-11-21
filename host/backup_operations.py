@@ -10,7 +10,7 @@ from host.repository_backup import RepositoryBackup
 from host.retention import BackupRetention
 from host.rollout import operational_guard, rollout_directory
 from shared.errors import ServiceError
-from shared.files import protected_json
+from shared.files import protected_json, state_owner_uid
 
 BACKUP_LOCK = Path("/run/lock/mail-admin-backup.lock")
 
@@ -18,14 +18,17 @@ BACKUP_LOCK = Path("/run/lock/mail-admin-backup.lock")
 class BackupOperations:
     def __init__(self, backup: BackupService, deployment: dict[str, Any]) -> None:
         self.backup, self.deployment = backup, deployment
-        self.lock_policy = LockPolicy(deployment["inputs"]["lock_wait_seconds"])
+        wait = deployment["inputs"]["lock_wait_seconds"]
+        self.lock_policy = LockPolicy(wait)
+        # The backup lock is shared with the dashboard's user, like the other /run/lock files.
+        self.backup_lock_policy = LockPolicy(wait, state_owner_uid(deployment))
 
     def baseline(self) -> dict[str, Any]:
-        with HostLock(BACKUP_LOCK, self.lock_policy):
+        with HostLock(BACKUP_LOCK, self.backup_lock_policy):
             return self.backup.transfer(self.backup.capture())
 
     def run(self) -> dict[str, Any]:
-        with HostLock(BACKUP_LOCK, self.lock_policy):
+        with HostLock(BACKUP_LOCK, self.backup_lock_policy):
             manifest = self.backup.transfer(self.backup.capture())
             protected = self._protected(manifest)
             if isinstance(self.backup, RepositoryBackup):
@@ -47,7 +50,7 @@ class BackupOperations:
             return manifest
 
     def verify(self) -> dict[str, Any]:
-        with HostLock(BACKUP_LOCK, self.lock_policy):
+        with HostLock(BACKUP_LOCK, self.backup_lock_policy):
             return self.backup.verify_latest()
 
     def baseline_manifest(self) -> dict[str, Any] | None:

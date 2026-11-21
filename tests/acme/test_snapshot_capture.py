@@ -59,6 +59,7 @@ class ActualSnapshotCaptureTests(PrivateAcmeCase):
             return original(snapshot)
 
         with (patch.object(capture, '_copy', side_effect=observed),
+              patch('host.docker.served_fingerprint', side_effect=self.docker.fingerprint),
               patch('host.docker.verify_served', side_effect=self.docker.verify)):
             return capture.capture()
 
