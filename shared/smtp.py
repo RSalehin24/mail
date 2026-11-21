@@ -27,6 +27,7 @@ class OutboundMessage:
     sender: str
     subject: str
     body: str
+    html: str | None = None
 
 
 @contextmanager
@@ -57,6 +58,8 @@ def send_message(connection: smtplib.SMTP, message: OutboundMessage) -> None:
     envelope["Date"] = formatdate(usegmt=True)
     envelope["Message-ID"] = make_msgid(domain=MAIL_HOST)
     envelope.set_content(message.body)
+    if message.html:
+        envelope.add_alternative(message.html, subtype="html")
     rejected = connection.send_message(envelope, from_addr=message.sender, to_addrs=[ADMIN_EMAIL])
     if rejected:
         raise ServiceError("relay_recipient_rejected", 502)

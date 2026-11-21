@@ -70,7 +70,9 @@ class SmtpTests(unittest.TestCase):
         self.assertEqual(envelope["To"], "rsalehin24@gmail.com")
         self.assertIn("backup", envelope["Subject"].lower())
         self.assertTrue(envelope["Subject"].startswith('[Mail Admin] Action required:'))
-        self.assertIn('Check: Backup\nStatus: Failed\n', envelope.get_content())
+        plain = envelope.get_body(preferencelist=("plain",)).get_content()
+        self.assertIn('Check: Backup\nStatus: Failed\n', plain)
+        self.assertIsNotNone(envelope.get_body(preferencelist=("html",)))
         self.assertNotIn("fixture-secret", str(envelope))
 
     def test_another_alert_recipient_is_refused_before_network_access(self):

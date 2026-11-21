@@ -14,6 +14,8 @@ Updated 2026-11-21 (final, after the owner's dashboard and mail check). Resume h
 ## Verified by the owner and in the logs (2026-11-21)
 - The owner checked the dashboard pages and confirmed mail works in a client; the server log shows a real inbound message accepted through Cloudflare routing and the message count rising from 153 to 155, with an empty outbound queue.
 
+## Next: Stages A, B and C are fully coded and pass local checks (D-049 to D-052); nothing is deployed. Next: one approved T3 deploy (restore point first, rollback plan, then a test alert with TOTP)
+
 ## Open (only things that depend on time or on the owner)
 1. Tonight's 03:00 Dhaka backup is the first scheduled run on the final code: check it is `verified` with 9 accounts (the journal now says why a run failed).
 2. Billing: look at Billing, then Reports, in a few days for any non-zero line; the $0.01 alert `zero-cost-guard` is set.

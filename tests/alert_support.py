@@ -18,6 +18,10 @@ from tests.support import StateFixture
 from tests.tls_support import CertificateFixture, TlsPeer
 
 
+def readable(value):
+    return value.replace('_', ' ').capitalize()
+
+
 def smtp_alerts(directory, clock):
     credentials, path = directory / 'smtp.json', directory / 'alerts.json'
     atomic_json(credentials, {'username': 'synthetic', 'credential': 'fixture-secret'})
@@ -69,7 +73,8 @@ class AlertDeliveryFixture(unittest.TestCase):
         return scope
 
     def assert_received(self, condition, count):
-        messages = [message for message in self.smtp.messages if condition.encode() in message]
+        status = f'Status: {readable(condition)}'.encode()
+        messages = [message for message in self.smtp.messages if status in message]
         self.assertEqual(len(messages), count)
         self.assertTrue(all(b'fixture-secret' not in message for message in messages))
         self.assertTrue(all(secured for event, secured in self.smtp.events

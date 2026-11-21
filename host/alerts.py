@@ -41,8 +41,7 @@ class SmtpAlertTransport:
         )
         bounded_text(event["name"], 128)
         bounded_text(event["condition"], 128)
-        subject, body = operational_alert(event)
-        message = OutboundMessage(OTP_SENDER, subject, body)
+        message = OutboundMessage(OTP_SENDER, *operational_alert(event))
         try:
             with authenticated(connection_details, 5) as connection:
                 send_message(connection, message)

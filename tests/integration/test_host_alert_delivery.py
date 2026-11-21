@@ -9,7 +9,7 @@ from unittest.mock import patch
 from host import cli
 from shared.errors import ServiceError
 from shared.files import atomic_json, protected_json
-from tests.alert_support import AlertDeliveryFixture
+from tests.alert_support import AlertDeliveryFixture, readable
 
 
 class HostAlertDeliveryTests(AlertDeliveryFixture):
@@ -86,10 +86,11 @@ class HostAlertDeliveryTests(AlertDeliveryFixture):
 
     def assert_condition_order(self, names):
         for name in names:
-            messages = [message for message in self.smtp.messages if name.encode() in message]
+            check = f'Check: {readable(name)}'.encode()
+            messages = [message for message in self.smtp.messages if check in message]
             self.assertEqual(len(messages), 3)
-            self.assertNotIn(b'"condition": "recovered"', messages[1])
-            self.assertIn(b'recovered', messages[2])
+            self.assertNotIn(b'Status: Recovered', messages[1])
+            self.assertIn(b'Status: Recovered', messages[2])
 
     def test_missed_backup_and_capacity_alerts_retry_without_dashboard(self):
         with self.host_scope():

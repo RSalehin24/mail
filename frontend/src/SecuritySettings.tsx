@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Alert, Avatar, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, Switch, FormControlLabel, TextField, Typography } from '@mui/material';
+import { LoadingState } from './PageState';
 import LockOutlined from '@mui/icons-material/LockOutlined';
 import ShieldOutlined from '@mui/icons-material/ShieldOutlined';
 import KeyOutlined from '@mui/icons-material/KeyOutlined';
@@ -49,7 +50,7 @@ export function SecuritySettings({ authorize, onRevoked, onDeliverySettings }: {
       <Typography variant="h6" component="h3">Email verification codes</Typography>
       <Typography variant="body2" color="text.secondary">Use an email code as a second factor after your master password. Your authenticator and recovery codes remain available.</Typography>
       {emailError && <Alert severity="error">{emailError}</Alert>}
-      {!emailAuth && !emailError && <Typography role="status">Loading email authentication settings…</Typography>}
+      {!emailAuth && !emailError && <LoadingState label="Loading email authentication settings…"/>}
       {emailAuth && <>
         <Typography variant="body2">Codes are sent from {emailAuth.sender} to {emailAuth.recipient}.</Typography>
         <Alert severity={emailAuth.delivery_verified ? 'success' : 'info'}>{emailAuth.delivery_verified ? 'Administrator email delivery is verified for the current provider settings.' : 'Send an administrator delivery test and confirm its receipt before enabling email codes.'}</Alert>

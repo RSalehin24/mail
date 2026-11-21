@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from shared.errors import ServiceError
 from shared.validation import MAIL_HOST
-from tests.alert_support import AlertDeliveryFixture
+from tests.alert_support import AlertDeliveryFixture, readable
 from tests.silent_peer_support import SilentPeer
 
 
@@ -39,11 +39,11 @@ class ExternalAlertDeliveryTests(AlertDeliveryFixture):
     def assert_outage_precedes_recovery(self):
         records = json.loads(self.alerts.path.read_bytes())
         for port in (993, 443):
-            messages = [message for message in self.smtp.messages
-                        if f'external_tls_{port}'.encode() in message]
+            check = f'Check: {readable(f"external_tls_{port}")}'.encode()
+            messages = [message for message in self.smtp.messages if check in message]
             self.assertEqual(len(messages), 3)
-            self.assertIn(b'unreachable_or_untrusted', messages[1])
-            self.assertIn(b'recovered', messages[2])
+            self.assertIn(b'Status: Unreachable or untrusted', messages[1])
+            self.assertIn(b'Status: Recovered', messages[2])
             self.assertTrue(records[f'external_tls_{port}']['delivered'])
             self.assertEqual(records[f'external_tls_{port}']['pending'], [])
 

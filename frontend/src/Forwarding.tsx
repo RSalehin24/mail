@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, MenuItem, Paper, Stack, Switch, Tab, Tabs, TextField, Typography } from '@mui/material';
+import { LoadingState } from './PageState';
 import { AdminTable } from './AdminTable';
 import { api, errorMessage, type Authorize, type Mailbox, type Notify } from './api';
 import { usePagination } from './PaginationControls';
@@ -57,7 +58,7 @@ export function Forwarding({ authorize, notify, mailbox }: { authorize: Authoriz
       <Typography variant="body2" color="text.secondary">Keep incoming messages in the mailbox and forward a copy to an external address. Only new inbox messages are forwarded; existing messages stay untouched.</Typography>
       <Alert severity="info">Forwarding preserves the original sender, subject, and message body. A transparent forwarding connection must be verified before delivery can start.</Alert>
       {result?.connection && <Alert severity={result.connection.state === 'connected' ? 'success' : result.connection.state === 'sync_failed' ? 'error' : 'warning'}>{result.connection.state === 'connected' ? 'Cloudflare delivery and forwarding are synchronized. Local copies are always retained.' : result.connection.state === 'pending' ? 'Applying forwarding changes to Cloudflare. Changes take effect after synchronization.' : result.connection.state === 'verification_pending' ? 'Destination verification or local delivery setup is pending. Existing routes are preserved until local delivery is verified.' : result.connection.state === 'sync_failed' ? 'Cloudflare synchronization failed. Some changes may still be pending. Contact the operator to restore the connection.' : result.connection.state === 'stale' ? 'The Cloudflare connection has not been verified recently. Refresh or contact the operator.' : 'Forwarding delivery is not connected. Saved rules do not change your existing Cloudflare routes.'}</Alert>}
-      {!result && !error && <Typography role="status">Loading forwarding settings…</Typography>}
+      {!result && !error && <LoadingState label="Loading forwarding settings…"/>}
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
         {!mailbox && <TextField select label="Mailbox" value={email} disabled={busy || editing} onChange={event => { const value = event.target.value; const rule = result?.rules.find(row => row.email === value); setEmail(value); setTarget(rule?.destination ?? ''); setEnabled(rule?.enabled ?? true); setEditing(!!rule); }} sx={{ flex: 1, minWidth: 0 }}>{accounts.map(account => <MenuItem key={account.email} value={account.email}>{account.email}</MenuItem>)}</TextField>}
         <TextField label="Forward to" type="email" value={target} disabled={busy} onChange={event => { setDirty(true); setTarget(event.target.value); }} placeholder="recipient@example.com" sx={{ flex: 1, minWidth: 0 }}/>

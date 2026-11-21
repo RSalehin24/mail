@@ -9,6 +9,9 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { connect } from './browser_connection.mjs';
 
+// Only the theme preference (MUI's mui-* keys) may be stored in the browser; nothing else.
+const STORED_DATA = "Object.keys(localStorage).filter(key => !key.startsWith('mui-')).length + sessionStorage.length";
+
 async function responsive(connection) {
   for (const width of [360, 768, 1280]) {
     await connection.call('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -187,7 +190,7 @@ async function mailboxFlows(connection, fixture) {
   await connection.fill('Recovery code', fixture.recovery_code);
   await connection.click({ tag: 'button', name: 'Verify second factor' });
   await connection.until(`document.querySelector('[role=dialog]') === null`);
-  assert.equal(await connection.read('localStorage.length + sessionStorage.length'), 0);
+  assert.equal(await connection.read(STORED_DATA), 0);
   await connection.fill('Display name', 'Updated mailbox');
   await connection.click({ tag: 'button', name: 'Save details' });
   await connection.until(`document.querySelector('h1')?.nextElementSibling?.textContent === 'Updated mailbox'`);
@@ -204,9 +207,9 @@ async function mailboxFlows(connection, fixture) {
   await connection.click({ tag: 'a', name: 'RSalehin24 Mail Admin home' });
   await connection.until(`document.querySelector('h1')?.textContent === 'Mailboxes'`);
   await connection.until(`document.body.textContent.includes('Updated mailbox')`);
-  assert.equal(await connection.read(`getComputedStyle(document.querySelector('thead th:nth-child(3)')).textAlign`), 'center');
+  assert.equal(await connection.read(`getComputedStyle(document.querySelector('thead th:nth-child(3)')).textAlign`), 'left');
   assert.equal(await connection.read(`document.querySelector('.stat-row') === null`), true);
-  assert.deepEqual(await connection.read(`[...document.querySelectorAll('.desktop-table th')].map(cell => cell.textContent.trim()).filter(Boolean)`), ['Name', 'Mailbox', 'Creation Date', 'Inbox', 'Sending', 'Actions']);
+  assert.deepEqual(await connection.read(`[...document.querySelectorAll('.desktop-table th')].map(cell => cell.textContent.trim()).filter(Boolean)`), ['Mailbox', 'Creation Date', 'Inbox', 'Sending', 'Actions']);
   assert.equal(await connection.read(`Boolean(document.querySelector('.MuiPagination-root [aria-label="Go to first page"]')) && Boolean(document.querySelector('[aria-label="Go to last page"]'))`), true);
 
   assert.match(await connection.read(`document.querySelector('.desktop-table tbody time').textContent`), /^[A-Z][a-z]{2} \d{1,2}, \d{4}$/);
@@ -237,7 +240,7 @@ async function relayFlows(connection) {
   assert.equal(await connection.read(`document.body.textContent.includes('Administrator email delivery needs verification')`), true);
   await connection.click({ tag: 'button', name: 'Refresh provider credits' });
   await connection.until(`document.body.textContent.includes('No API key configured')`);
-  assert.equal(await connection.read('localStorage.length + sessionStorage.length'), 0);
+  assert.equal(await connection.read(STORED_DATA), 0);
 }
 
 async function verificationFlows(connection) {

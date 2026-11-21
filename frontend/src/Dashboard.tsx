@@ -1,7 +1,8 @@
 import { formatDate, formatTime } from './format';
+import { EmptyState, LoadingState } from './PageState';
 import { PaginationControls } from './PaginationControls';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Avatar, Box, Button, Card, Checkbox, Chip, Divider, IconButton, InputAdornment, Menu, MenuItem, Paper, Stack, Skeleton,
+import { Alert, Avatar, Box, Button, Card, Checkbox, Chip, Divider, IconButton, InputAdornment, Menu, MenuItem, Paper, Stack,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip, Typography } from '@mui/material';
 import AddRounded from '@mui/icons-material/AddRounded';
 import RefreshRounded from '@mui/icons-material/RefreshRounded';
@@ -71,7 +72,7 @@ export function Dashboard({ authorize, notify }: { authorize: Authorize; notify:
     {!!diagnostics?.host.unresolved?.length && <Alert severity="warning" sx={{ mb: 2 }}>A mailbox operation needs administrator review before further changes.</Alert>}
     {pending.length > 0 && <Alert severity="info" className="receipt-notice" action={<Button color="inherit" size="small" onClick={() => setVerification(pending.map(mailbox => mailbox.email))}>Review receipts</Button>}>Test emails are waiting for confirmation for {pending.length} {pending.length === 1 ? 'mailbox' : 'mailboxes'}.</Alert>}
     <Paper variant="outlined" className="mailbox-surface" sx={{ mt: 3 }}>
-      {loading && <Box role="status" aria-label="Loading mailboxes" sx={{ p: 3 }}><Skeleton/><Skeleton/><Skeleton/></Box>}
+      {loading && <Box sx={{ p: 3 }}><LoadingState label="Loading mailboxes"/></Box>}
       <Stack className="table-toolbar" direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}>
         <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center' }}><Typography variant="h6" sx={{ fontSize: '1rem' }}>All mailboxes</Typography><Chip size="small" label={mailboxes.length}/></Stack>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
@@ -90,18 +91,16 @@ export function Dashboard({ authorize, notify }: { authorize: Authorize; notify:
         <TableCell padding="checkbox" align="center"><Checkbox checked={rows.length > 0 && rows.every(mailbox => selected.includes(mailbox.email))}
           indeterminate={rows.some(mailbox => selected.includes(mailbox.email)) && !rows.every(mailbox => selected.includes(mailbox.email))}
           slotProps={{ input: { 'aria-label': 'Select visible mailboxes' } }} onChange={(_, checked) => selectVisible(checked)}/></TableCell>
-        <TableCell align="center">Name</TableCell>
-        <TableCell align="center">Mailbox</TableCell>
-        <TableCell align="center" sortDirection={reverse ? 'asc' : 'desc'}><Button color="inherit" className="column-sort" size="small" aria-label={reverse ? 'Creation Date, oldest first. Sort newest first' : 'Creation Date, newest first. Sort oldest first'} endIcon={<ArrowDownwardRounded sx={{ fontSize: '14px !important', transform: reverse ? 'rotate(180deg)' : undefined }}/>} onClick={() => { setReverse(!reverse); setPage(0); }}>Creation Date</Button></TableCell>
-        <TableCell align="center">Inbox</TableCell><TableCell align="center">Sending</TableCell><TableCell align="center" sx={{ width: 88 }}>Actions</TableCell>
+        <TableCell>Mailbox</TableCell>
+        <TableCell sortDirection={reverse ? 'asc' : 'desc'}><Button color="inherit" className="column-sort" size="small" aria-label={reverse ? 'Creation Date, oldest first. Sort newest first' : 'Creation Date, newest first. Sort oldest first'} endIcon={<ArrowDownwardRounded sx={{ fontSize: '14px !important', transform: reverse ? 'rotate(180deg)' : undefined }}/>} onClick={() => { setReverse(!reverse); setPage(0); }}>Creation Date</Button></TableCell>
+        <TableCell>Inbox</TableCell><TableCell>Sending</TableCell><TableCell align="center" sx={{ width: 88 }}>Actions</TableCell>
       </TableRow></TableHead><TableBody>{rows.map(mailbox => <TableRow hover selected={selected.includes(mailbox.email)} key={mailbox.email}>
         <TableCell padding="checkbox" align="center"><Checkbox checked={selected.includes(mailbox.email)} onChange={() => toggle(mailbox.email)} slotProps={{ input: { 'aria-label': `Select ${mailbox.email}` } }}/></TableCell>
-        <TableCell align="center"><Button size="small" className="name-button" onClick={() => navigate(mailboxPath(mailbox.email, 'configuration'))}>{mailbox.display_name || 'Add name'}</Button></TableCell>
-        <TableCell><Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}><Avatar className="mailbox-avatar">{mailbox.email[0].toUpperCase()}</Avatar><Box sx={{ minWidth: 0 }}><Typography component="a" href={mailboxPath(mailbox.email)} onClick={event => { event.preventDefault(); navigate(mailboxPath(mailbox.email)); }} variant="body2" sx={{ color: 'primary.main', fontWeight: 600, overflowWrap: 'anywhere' }}>{mailbox.email}</Typography>{mailbox.notes && <Typography variant="caption" color="text.secondary">{mailbox.notes}</Typography>}</Box></Stack></TableCell>
+        <TableCell><Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}><Avatar className="mailbox-avatar">{mailbox.email[0].toUpperCase()}</Avatar><Box sx={{ minWidth: 0 }}><Typography component="a" href={mailboxPath(mailbox.email)} onClick={event => { event.preventDefault(); navigate(mailboxPath(mailbox.email)); }} variant="body2" sx={{ color: 'primary.main', fontWeight: 600, overflowWrap: 'anywhere' }}>{mailbox.email}</Typography>{mailbox.display_name && <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{mailbox.display_name}</Typography>}{mailbox.notes && <Typography variant="caption" color="text.secondary">{mailbox.notes}</Typography>}</Box></Stack></TableCell>
 
-        <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}><Typography variant="body2" component="time" dateTime={mailbox.created ? new Date(mailbox.created * 1000).toISOString() : undefined}>{creationDate(mailbox)}</Typography></TableCell>
-        <TableCell align="center"><Chip size="small" className="status-chip" color={mailbox.status === 'ready' ? 'success' : 'warning'} variant="outlined" label={mailbox.status === 'ready' ? 'Ready' : 'Needs review'}/></TableCell>
-        <TableCell align="center">{sending(mailbox)}</TableCell><TableCell align="center">{rowActions(mailbox)}</TableCell>
+        <TableCell sx={{ whiteSpace: 'nowrap' }}><Typography variant="body2" component="time" dateTime={mailbox.created ? new Date(mailbox.created * 1000).toISOString() : undefined}>{creationDate(mailbox)}</Typography></TableCell>
+        <TableCell><Chip size="small" className="status-chip" color={mailbox.status === 'ready' ? 'success' : 'warning'} variant="outlined" label={mailbox.status === 'ready' ? 'Ready' : 'Needs review'}/></TableCell>
+        <TableCell>{sending(mailbox)}</TableCell><TableCell>{rowActions(mailbox)}</TableCell>
       </TableRow>)}</TableBody></Table></TableContainer>
       <Box className="mailbox-cards">{rows.map(mailbox => <Card variant="outlined" className="mailbox-mobile-card" key={mailbox.email}>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><Checkbox checked={selected.includes(mailbox.email)} onChange={() => toggle(mailbox.email)} slotProps={{ input: { 'aria-label': `Select ${mailbox.email}` } }}/><Box sx={{ minWidth: 0, flex: 1 }}><Button size="small" sx={{ display: 'block' }} onClick={() => navigate(mailboxPath(mailbox.email, 'configuration'))}>{mailbox.display_name || 'Add name'}</Button><Typography component="a" href={mailboxPath(mailbox.email)} onClick={event => { event.preventDefault(); navigate(mailboxPath(mailbox.email)); }} variant="body2" sx={{ color: 'primary.main', fontWeight: 650, overflowWrap: 'anywhere' }}>{mailbox.email}</Typography></Box>{rowActions(mailbox)}</Stack>
@@ -111,7 +110,7 @@ export function Dashboard({ authorize, notify }: { authorize: Authorize; notify:
           <Box sx={{ textAlign: 'right' }}><Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.7 }}>Sending</Typography>{sending(mailbox)}</Box>
         </Stack>{mailbox.notes && <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>{mailbox.notes}</Typography>}
       </Card>)}</Box>
-      {!loading && !error && !filtered.length && <Box sx={{ py: 8, textAlign: 'center' }}><Typography variant="h6">{search ? 'No matching mailboxes' : 'No mailboxes'}</Typography><Typography color="text.secondary" variant="body2" sx={{ mt: 1 }}>{search ? 'Try another address or name.' : 'Create a mailbox.'}</Typography></Box>}
+      {!loading && !error && !filtered.length && <EmptyState title={search ? 'No matching mailboxes' : 'No mailboxes'} hint={search ? 'Try another address or name.' : 'Create a mailbox.'}/>}
       <PaginationControls count={filtered.length} page={currentPage} size={rowsPerPage} onPage={setPage} onSize={value => { setRowsPerPage(value); setPage(0); }}/>
     </Paper>
     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between', mt: 2, px: 0.5 }}>

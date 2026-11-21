@@ -1,5 +1,6 @@
 import { formatDateTime } from './format';
 import { AdminTable } from './AdminTable';
+import { LoadingState } from './PageState';
 import { PaginationControls } from './PaginationControls';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Chip, Stack, Tab, Tabs, Typography } from '@mui/material';
@@ -28,7 +29,7 @@ export function DeletedMailboxes({ authorize, notify, embedded = false }: { auth
   return <Stack spacing={3}>
     <Stack direction="row" sx={{ justifyContent: 'space-between', gap: 2 }}><Typography variant={embedded ? 'h5' : 'h4'} component={embedded ? 'h2' : 'h1'}>Deleted Mailboxes</Typography><Button onClick={() => { void load(); }}>Refresh</Button></Stack>
     {error && <Alert severity="error">{error}</Alert>}
-    {!result && !error && <Typography role="status">Loading deleted mailboxes…</Typography>}
+    {!result && !error && <LoadingState label="Loading deleted mailboxes…"/>}
     <Tabs value={tab} onChange={(_, value: string) => { setTab(value); const url = new URL(location.href); url.searchParams.set('tab', value); history.replaceState(null, '', url); }} variant="scrollable" aria-label="Deleted mailbox sections">
       <Tab value="configure" label="Configure"/><Tab value="protected" label="Protected Mailboxes"/><Tab value="deleted" label="Deleted Mailboxes"/>
     </Tabs>

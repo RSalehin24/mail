@@ -1,5 +1,6 @@
 import { AdminTable } from './AdminTable';
 import { usePagination } from './PaginationControls';
+import { LoadingState } from './PageState';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, MenuItem, Paper, Stack, Switch, TextField, Typography, Checkbox } from '@mui/material';
 import { api, type Authorize, type Notify } from './api';
@@ -60,7 +61,7 @@ export function RecoverySettings({ authorize, notify, section = 'deletion' }: { 
   return <Paper variant="outlined" component="section" sx={{ p: { xs: 2, sm: 3 } }}><Stack spacing={2.5}>
     <Typography variant="h6">{protecting ? 'Protected Mailboxes' : 'Deletion and Recovery'}</Typography>
     {(error || loadError) && <Alert severity="error" action={loadError ? <Button onClick={() => { void load(); }}>Retry</Button> : undefined}>{error || loadError}</Alert>}
-    {!policy && !loadError && <Typography role="status">Loading deletion policy…</Typography>}
+    {!policy && !loadError && <LoadingState label="Loading deletion policy…"/>}
     {policy && <>
       {!protecting && <>
       <FormControlLabel control={<Switch checked={policy.enabled} disabled={busy} onChange={(_, checked) => update({ enabled: checked })}/>} label="Enable mailbox deletion"/>

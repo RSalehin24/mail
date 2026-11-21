@@ -1,5 +1,6 @@
 import { Forwarding } from './Forwarding';
 import { useCallback, useEffect, useState } from 'react';
+import { LoadingState } from './PageState';
 import { Alert, Box, Breadcrumbs, Button, Chip, Paper, Stack, Tab, Tabs, Typography } from '@mui/material';
 import { api, cached, type Authorize, type Mailbox, type Notify } from './api';
 import { MailboxDetails } from './MailboxDetails';
@@ -26,7 +27,7 @@ export function MailboxPage({ encodedEmail, tab, authorize, notify }: {
   return <Stack spacing={3}>
     <Breadcrumbs aria-label="Breadcrumb"><Button href="/" onClick={event => { event.preventDefault(); navigate('/'); }}>Mailboxes</Button><Typography>{mailbox?.email ?? 'Mailbox'}</Typography></Breadcrumbs>
     {error && <Alert severity="error" action={<Button onClick={() => { void load(); }}>Retry</Button>}>{error}</Alert>}
-    {!mailbox && !error && <Typography role="status">Loading mailbox…</Typography>}
+    {!mailbox && !error && <LoadingState label="Loading mailbox…"/>}
     {mailbox && <>
       <Box><Typography variant="h4" component="h1" sx={{ overflowWrap: 'anywhere' }}>{mailbox.email}</Typography><Typography color="text.secondary" sx={{ mt: 1 }}>{mailbox.display_name || 'No display name'}</Typography></Box>
       <Tabs value={tab} onChange={(_, value: string) => navigate(mailboxPath(mailbox.email, value))} variant="scrollable" allowScrollButtonsMobile aria-label="Mailbox pages">

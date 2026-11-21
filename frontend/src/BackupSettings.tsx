@@ -1,5 +1,6 @@
 import { formatDate, formatTime, formatDateTime } from './format';
 import CloudDoneOutlined from '@mui/icons-material/CloudDoneOutlined';
+import { LoadingState } from './PageState';
 import CheckCircleOutlineRounded from '@mui/icons-material/CheckCircleOutlineRounded';
 import ContentCopyRounded from '@mui/icons-material/ContentCopyRounded';
 import RestoreRounded from '@mui/icons-material/RestoreRounded';
@@ -103,7 +104,7 @@ export function BackupSettings({ authorize, notify }: { authorize: Authorize; no
     </Stack>
     {blocked && <Alert severity="info" action={<Button color="inherit" onClick={() => selectView('logs')}>View logs</Button>}>A backup or recovery operation is in progress or needs reconciliation. Follow its status in Logs.</Alert>}
     {snapshots?.observation?.error && <Alert severity="warning">{errorMessage(snapshots.observation.error)} Previously observed backups may have changed.</Alert>}
-    {!snapshots && !error && <Typography role="status">Loading backups…</Typography>}
+    {!snapshots && !error && <LoadingState label="Loading backups…"/>}
     <AdminTable columns={['Backup Date', 'Snapshot', 'Verification', 'Actions']} empty="No backups recorded." rows={(snapshots?.items ?? []).map(snapshot => ({ key: snapshot.id, cells: [
       <Stack key="date" spacing={0.5}><Typography variant="body2" sx={{ fontWeight: 600 }}>{backupDay(snapshot.cutoff)}</Typography><Typography variant="caption" color="text.secondary">{backupTime(snapshot.cutoff)} · Dhaka</Typography></Stack>,
       <Stack key="snapshot" direction="row" spacing={0.5} sx={{ alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'center' } }}><Tooltip title={snapshot.id}><Typography component="code" variant="body2" sx={{ fontFamily: 'monospace', bgcolor: 'action.hover', px: 1, py: 0.5, borderRadius: 1 }}>{snapshot.id.slice(0, 12)}…{snapshot.id.slice(-8)}</Typography></Tooltip><Tooltip title="Copy snapshot ID"><IconButton size="small" aria-label={`Copy snapshot ${snapshot.id}`} onClick={() => { void navigator.clipboard.writeText(snapshot.id).then(() => notify('Snapshot ID copied')).catch(() => notify('Could not copy snapshot ID')); }}><ContentCopyRounded sx={{ fontSize: 16 }}/></IconButton></Tooltip></Stack>,
