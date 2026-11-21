@@ -14,7 +14,7 @@ Updated 2026-11-21 (final, after the owner's dashboard and mail check). Resume h
 ## Verified by the owner and in the logs (2026-11-21)
 - The owner checked the dashboard pages and confirmed mail works in a client; the server log shows a real inbound message accepted through Cloudflare routing and the message count rising from 153 to 155, with an empty outbound queue.
 
-## Next: UI and notification mail are DEPLOYED (D-053, image mail-admin:stage10, rollback10.sh). Owner to confirm the two test alert mails and the logged-in dashboard; tonight 03:00 Dhaka backup is the first scheduled run on this code
+## Next: Notification mail and both UI passes are deployed (D-053, D-058; image mail-admin:stage11, rollbacks rollback10.sh and rollback11.sh). Owner to check the new dashboard and the email-code login mail; tonight 03:00 Dhaka backup is the first scheduled run on this code
 
 ## Open (only things that depend on time or on the owner)
 1. Tonight's 03:00 Dhaka backup is the first scheduled run on the final code: check it is `verified` with 9 accounts (the journal now says why a run failed).
