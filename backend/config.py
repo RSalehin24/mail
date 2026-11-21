@@ -19,6 +19,8 @@ class Settings:
     operation_timeout: float
     email_otp_enabled: bool = False
     permanent_deletion_enabled: bool = False
+    tls_certificate: Path = Path("/tls/fullchain.pem")
+    tls_key: Path = Path("/tls/privkey.pem")
 
     @classmethod
     def from_environment(cls) -> Settings:
@@ -38,4 +40,6 @@ class Settings:
             timeout,
             capability(os.environ.get("EMAIL_OTP_ENABLED", "false")),
             capability(os.environ.get("PERMANENT_DELETION_ENABLED", "false")),
+            Path(os.environ.get("TLS_CERTIFICATE_FILE", "/tls/fullchain.pem")),
+            Path(os.environ.get("TLS_KEY_FILE", "/tls/privkey.pem")),
         )

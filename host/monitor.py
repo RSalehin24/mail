@@ -49,7 +49,6 @@ class Monitor:
         )
         self.alerts.observe("host_capacity", condition)
         self._backup()
-        self._certificate()
         self._report("monitor-observation.json", {"outcome": "checks_completed"})
         self.alerts.flush()
 
@@ -70,18 +69,6 @@ class Monitor:
         except (OSError, ValueError, KeyError, TypeError, ServiceError):
             healthy = False
         self.alerts.observe("backup", "recovered" if healthy else "failed_or_missed")
-
-    def _certificate(self) -> None:
-        try:
-            record = protected_json(Path("/var/lib/mail-admin-certificates/state.json"))
-            self.alerts.observe("certificate_expiry", expiry_condition(record, self.clock()))
-            self.alerts.observe(
-                "certificate_activation",
-                "recovered" if record["outcome"] == "active" else "pending_or_failed",
-            )
-        except (OSError, ValueError, KeyError, TypeError, ServiceError):
-            self.alerts.observe("certificate_expiry", "unknown")
-            self.alerts.observe("certificate_activation", "unknown")
 
     def external(self) -> None:
         consumers: dict[str, Any] = {}

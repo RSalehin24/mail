@@ -15,6 +15,7 @@ printf '%s\\n' "$@" > "$STUB_DIRECTORY/argv"
 printf '%s %s\\n' "$MADDY_DOMAIN" "$MADDY_HOSTNAME" "$HOME" > "$STUB_DIRECTORY/environment"
 cat > "$STUB_DIRECTORY/stdin"
 cat "$STUB_DIRECTORY/reply"
+if [ -f "$STUB_DIRECTORY/errors" ]; then cat "$STUB_DIRECTORY/errors" >&2; fi
 """
 
 
@@ -68,6 +69,21 @@ class LocalMaddyTests(unittest.TestCase):
         )
         self.reply("No users.\n")
         self.assertEqual(self.maddy.inventories(), {"credentials": [], "storage": []})
+
+    def test_log_lines_on_stderr_are_not_read_as_accounts(self):
+        # The ACME loader logs certificate maintenance whenever the CLI loads the config.
+        self.reply("a@rsalehin24.me\n")
+        (self.root / "errors").write_text(
+            'tls.loader.acme/maintenance: started background certificate maintenance\t{}\n'
+        )
+        self.assertEqual(self.maddy.inventories()["credentials"], ["a@rsalehin24.me"])
+
+    def test_an_error_logged_on_stderr_with_exit_code_zero_is_still_an_error(self):
+        self.reply("")
+        (self.root / "errors").write_text('app.Run failed\t{"reason":"bad config"}\n')
+        with self.assertRaises(ServiceError) as caught:
+            self.maddy.inventories()
+        self.assertEqual(caught.exception.code, "inventory_unavailable")
 
     def test_an_error_reported_with_exit_code_zero_is_not_an_inventory(self):
         self.reply('app.Run failed\t{"reason":"mkdir /run/maddy: permission denied"}\n')

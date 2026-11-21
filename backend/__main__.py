@@ -14,18 +14,21 @@ def main() -> None:
     settings = Settings.from_environment()
     require_existing_database(Path("/app/data/admin_data.db"))
     RuntimePolicy().require_running()
-    require_runtime_sources()
+    require_runtime_sources(certificates=(settings.tls_certificate, settings.tls_key))
     # Reject a lost data mount before loading the HTTP and cryptographic dependency graph.
     import uvicorn
 
+    from backend.certificate_watch import restart_when_replaced
+
+    restart_when_replaced(settings.tls_certificate)
     uvicorn.run(
         "backend.main:create_app",
         factory=True,
         host=os.environ.get("BIND_HOST", "127.0.0.1"),
         port=8443,
         workers=1,
-        ssl_certfile="/tls/fullchain.pem",
-        ssl_keyfile="/tls/privkey.pem",
+        ssl_certfile=str(settings.tls_certificate),
+        ssl_keyfile=str(settings.tls_key),
         access_log=False,
         proxy_headers=False,
         server_header=False,

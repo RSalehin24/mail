@@ -36,7 +36,7 @@ class RuntimeCompose:
     def environment_file(self):
         values = {'IMAGE': os.environ['MAIL_ADMIN_RUNTIME_REFERENCE'], 'UID': '10001',
                   'GID': '10001', 'MEMORY_LIMIT': str(WEB_MEMORY_MIB) + 'm',
-                  'TLS_DIRECTORY': self.fixture.daemon_path(self.fixture.tls),
+                  'DNS_TOKEN': 'fixture-token',
                   'TMPFS_LIMIT': '8388608', 'HASH_MEMORY_KIB': '8192',
                   'HASH_PARALLELISM': '1', 'HTTP_CONCURRENCY': '4',
                   'OPERATION_TIMEOUT_SECONDS': '5'}
@@ -59,6 +59,11 @@ class RuntimeCompose:
                         'labels': {'mail-admin.fixture': self.project},
                         'ports': ['127.0.0.1::8443'], 'memswap_limit': service['mem_limit'],
                         'cpus': 0.5, 'pids_limit': 128})
+        # The shipped file reads Maddy's certificate store; the fixture serves its own directory.
+        service['volumes'].append({'type': 'bind', 'source': '', 'target': '/tls',
+                                   'read_only': True, 'bind': {'create_host_path': False}})
+        service['environment'].update({'TLS_CERTIFICATE_FILE': '/tls/fullchain.pem',
+                                       'TLS_KEY_FILE': '/tls/privkey.pem'})
         self.private_sources(service['volumes'])
         configuration.update({'name': self.project,
                               'networks': {'default': {'name': self.project + '-default'}}})
@@ -68,6 +73,8 @@ class RuntimeCompose:
         sources = {target: self.fixture.daemon_path(source)
                    for source, target in self.fixture.bind_sources()}
         sources['/tls'] = self.fixture.daemon_path(self.fixture.tls)
+        # Maddy's own certificates replace the certificate directory the CLI used to load.
+        sources.pop('/data/tls')
         observed = set()
         for volume in volumes:
             if volume['type'] != 'bind':

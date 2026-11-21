@@ -14,7 +14,9 @@ class BindAdmissionTests(unittest.TestCase):
         self.compose.prepare()
 
     def sources(self):
-        return [source for source, _ in self.fixture.bind_sources()] + [self.fixture.tls]
+        # The shipped file no longer binds Maddy's certificate directory (/data/tls).
+        return [source for source, target in self.fixture.bind_sources()
+                if target != '/data/tls'] + [self.fixture.tls]
 
     def assert_compatible_startup(self):
         self.compose.start()

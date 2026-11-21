@@ -60,9 +60,10 @@ def current_record(api: Cloudflare, name: str) -> dict[str, Any]:
     # Exactly one record: creating or choosing between records is the owner's decision.
     if not isinstance(rows, list) or len(rows) != 1:
         raise ServiceError("dns_record_not_unique", 503)
-    if RECORD_ID.fullmatch(str(rows[0].get("id"))) is None:
+    record: dict[str, Any] = rows[0]
+    if RECORD_ID.fullmatch(str(record.get("id"))) is None:
         raise ServiceError("dns_record_invalid", 503)
-    return rows[0]
+    return record
 
 
 def synchronize(api: Cloudflare, name: str, address: str, dry_run: bool) -> str:

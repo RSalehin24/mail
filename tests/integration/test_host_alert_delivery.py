@@ -7,20 +7,16 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from host import cli
-from host.certificates import PairValidator
 from shared.errors import ServiceError
 from shared.files import atomic_json, protected_json
 from tests.alert_support import AlertDeliveryFixture
-from tests.tls_support import openssl_executable
 
 
 class HostAlertDeliveryTests(AlertDeliveryFixture):
     def setUp(self):
         super().setUp()
         self.paths = {Path('/var/lib/mail-admin-backup/manifest.json'):
-                      self.state.root / 'manifest.json',
-                      Path('/var/lib/mail-admin-certificates/state.json'):
-                      self.state.root / 'certificate-state.json'}
+                      self.state.root / 'manifest.json'}
         self.monitor.configuration = {'inputs': {'disk_free_minimum_bytes': 1,
             'inode_free_minimum': 1, 'recovery_point_seconds': 93600}}
         self.filesystem = os.statvfs
@@ -32,16 +28,12 @@ class HostAlertDeliveryTests(AlertDeliveryFixture):
             self.addCleanup(capacity.cleanup)
             self.capacity_root = Path(capacity.name)
         self.capacity = self.filesystem(self.capacity_root)
-        validator = PairValidator(self.issuer.trust, openssl_executable())
-        self.certificate = validator.validate(self.issuer.issue())
         self.write_healthy()
 
     def write_healthy(self):
         atomic_json(self.paths[Path('/var/lib/mail-admin-backup/manifest.json')], {
             'verified': True, 'available': True, 'availability_observed_at': self.state.now,
             'cutoff': datetime.fromtimestamp(self.state.now - 1, UTC).isoformat()})
-        atomic_json(self.paths[Path('/var/lib/mail-admin-certificates/state.json')], {
-            **self.certificate, 'outcome': 'active', 'consumers': {}})
 
     def fixed_state(self, path):
         return protected_json(self.paths[path], os.getuid())
@@ -66,15 +58,13 @@ class HostAlertDeliveryTests(AlertDeliveryFixture):
         self.assertLess(age, 2)
         with self.host_scope():
             self.monitor.host()
-        self.assert_received('recovered', 4)
+        self.assert_received('recovered', 2)
 
     def fail_delivery_with_host_faults(self):
-        manifest, certificate = self.paths.values()
+        manifest, = self.paths.values()
         record = protected_json(manifest, os.getuid())
         record['cutoff'] = datetime.fromtimestamp(self.state.now - 93601, UTC).isoformat()
         atomic_json(manifest, record)
-        atomic_json(certificate, {'expiry': self.state.now + 6 * 86400,
-                                 'outcome': 'activation_pending', 'consumers': {}})
         inputs = self.monitor.configuration['inputs']
         inputs['disk_free_minimum_bytes'] = self.capacity.f_blocks * self.capacity.f_frsize + 1
         self.smtp.reject_auth = True
@@ -101,20 +91,24 @@ class HostAlertDeliveryTests(AlertDeliveryFixture):
             self.assertNotIn(b'"condition": "recovered"', messages[1])
             self.assertIn(b'recovered', messages[2])
 
-    def test_missed_backup_capacity_activation_and_expiry_alerts_retry_without_dashboard(self):
+    def test_missed_backup_and_capacity_alerts_retry_without_dashboard(self):
         with self.host_scope():
             self.monitor.host()
-            self.assert_received('recovered', 4)
+            self.assert_received('recovered', 2)
             failed = self.fail_delivery_with_host_faults()
             self.recover_pending_host_notifications(failed)
         self.assert_received('failed_or_missed', 1)
-        self.assert_received('critical_7_days', 1)
-        self.assert_received('pending_or_failed', 1)
-        self.assert_received('recovered', 8)
-        self.assertEqual(len(self.smtp.messages), 12)
+        self.assert_received('low', 1)
+        self.assert_received('recovered', 4)
+        self.assertEqual(len(self.smtp.messages), 6)
         self.assert_condition_order(failed)
 
-    def test_actual_free_inode_threshold_and_certificate_warning_windows_are_delivered(self):
+    def serve_expiring_certificates(self, days):
+        served = {'expiry': self.state.now + days * 86400, 'served_sha256': 'a' * 64}
+        with patch('host.monitor.served_certificate', return_value=served):
+            self.monitor.external()
+
+    def test_actual_free_inode_threshold_is_delivered_and_recovers(self):
         with self.host_scope():
             self.monitor.host()
             inputs = self.monitor.configuration['inputs']
@@ -122,17 +116,18 @@ class HostAlertDeliveryTests(AlertDeliveryFixture):
             self.monitor.host()
             self.assert_received('low', 1)
             inputs['inode_free_minimum'] = 1
-            certificate = self.paths[Path('/var/lib/mail-admin-certificates/state.json')]
-            for days in (21, 7):
-                atomic_json(certificate, {'expiry': self.state.now + days * 86400,
-                                         'outcome': 'active', 'consumers': {}})
-                self.monitor.host()
-            self.assert_received('warning_21_days', 1)
-            self.assert_received('critical_7_days', 1)
-            self.write_healthy()
             self.monitor.host()
-        self.assert_received('recovered', 6)
-        self.assertEqual(len(self.smtp.messages), 9)
+        self.assert_received('recovered', 3)
+        self.assertEqual(len(self.smtp.messages), 4)
+
+    def test_served_certificate_warning_windows_are_delivered_for_both_endpoints(self):
+        with self.delivery_scope():
+            for days in (60, 21, 7, 60):
+                self.serve_expiring_certificates(days)
+        self.assert_received('warning_21_days', 2)
+        self.assert_received('critical_7_days', 2)
+        self.assert_received('recovered', 4)
+        self.assertEqual(len(self.smtp.messages), 8)
 
     def assert_cli_failure(self, failure):
         context = SimpleNamespace(alerts=self.alerts)

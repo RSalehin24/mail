@@ -26,6 +26,8 @@ services:
     environment:
       MADDY_DOMAIN: rsalehin24.me
       MADDY_HOSTNAME: mail.rsalehin24.me
+      # Maddy's built-in ACME client answers the DNS challenge with this zone-scoped token.
+      CLOUDFLARE_API_TOKEN: ${MAIL_ADMIN_DNS_TOKEN:?Set the Cloudflare DNS token for certificates}
     ports: ["25:25", "993:993", "587:587"]
     tmpfs: [*maddy-runtime-tmpfs]
     volumes:
@@ -36,11 +38,6 @@ services:
       - type: bind
         source: /opt/maddy/config/maddy.conf
         target: /data/maddy.conf
-        read_only: true
-        bind: {create_host_path: false}
-      - type: bind
-        source: ${MAIL_ADMIN_TLS_DIRECTORY:?Set validated immutable certificate generation}
-        target: /data/tls
         read_only: true
         bind: {create_host_path: false}
       - type: bind
@@ -70,12 +67,6 @@ services:
         source: ./data
         target: /app/data
         bind: {create_host_path: false}
-      # The certificate generation the dashboard serves HTTPS with.
-      - type: bind
-        source: ${MAIL_ADMIN_TLS_DIRECTORY:?Set validated immutable certificate generation}
-        target: /tls
-        read_only: true
-        bind: {create_host_path: false}
       # Maddy's data: the Maddy CLI the dashboard runs creates and removes mailboxes here.
       - type: bind
         source: /opt/maddy/data
@@ -85,12 +76,6 @@ services:
       - type: bind
         source: /opt/maddy/config/maddy.conf
         target: /data/maddy.conf
-        read_only: true
-        bind: {create_host_path: false}
-      # The CLI loads the certificate files the config names.
-      - type: bind
-        source: ${MAIL_ADMIN_TLS_DIRECTORY:?Set validated immutable certificate generation}
-        target: /data/tls
         read_only: true
         bind: {create_host_path: false}
       # Journal, queues and recovery records, shared with the root workers (a directory, so replaced files stay visible).
@@ -149,6 +134,9 @@ services:
       # maddy.conf reads these with {env:...}; the Maddy CLI the dashboard runs cannot parse it without them.
       MADDY_DOMAIN: rsalehin24.me
       MADDY_HOSTNAME: mail.rsalehin24.me
+      # Maddy's certificate store is inside the data directory the dashboard already shares.
+      TLS_CERTIFICATE_FILE: /data/acme/certificates/acme-v02.api.letsencrypt.org-directory/mail.rsalehin24.me/mail.rsalehin24.me.crt
+      TLS_KEY_FILE: /data/acme/certificates/acme-v02.api.letsencrypt.org-directory/mail.rsalehin24.me/mail.rsalehin24.me.key
       HASH_MEMORY_KIB: ${MAIL_ADMIN_HASH_MEMORY_KIB:?Set measured hash memory}
       HASH_PARALLELISM: ${MAIL_ADMIN_HASH_PARALLELISM:?Set measured hash concurrency}
       HTTP_CONCURRENCY: ${MAIL_ADMIN_HTTP_CONCURRENCY:?Set measured HTTP concurrency}

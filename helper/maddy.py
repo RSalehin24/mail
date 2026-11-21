@@ -17,8 +17,21 @@ LAUNCHER = "/usr/local/libexec/mail-admin-maddy"
 def cli_reported_error(response: CommandResult) -> bool:
     # The pinned 0.9.5 CLI can log app.Run failure and still exit zero.
     # Password prompts need not end with a newline before that diagnostic.
-    return (re.search(r"(?<!\S)app\.Run failed(?=\s|$)", response.output) is not None
-            or response.output.startswith('Failed to initialize update pipe, '))
+    return any(
+        re.search(r"(?<!\S)app\.Run failed(?=\s|$)", stream) is not None
+        or stream.startswith('Failed to initialize update pipe, ')
+        for stream in (response.output, response.error_output)
+    )
+
+
+def with_diagnostics(response: CommandResult) -> CommandResult:
+    """Maddy logs to stderr (certificate maintenance, for one), so a good answer is stdout alone.
+
+    A failed command keeps its stderr in the output: that is where the reason is.
+    """
+    if response.code or cli_reported_error(response):
+        return CommandResult(response.code, response.output + response.error_output)
+    return response
 
 
 def cli_succeeded(response: CommandResult) -> bool:
@@ -26,8 +39,9 @@ def cli_succeeded(response: CommandResult) -> bool:
 
 
 def provisioning_warning(response: CommandResult) -> bool:
-    return "warning" in response.output.lower() or bool(
-        re.search(r"Failed to create (?:sent|trash|junk|drafts|archive) folder:", response.output)
+    text = response.output + response.error_output
+    return "warning" in text.lower() or bool(
+        re.search(r"Failed to create (?:sent|trash|junk|drafts|archive) folder:", text)
     )
 
 
@@ -130,7 +144,9 @@ class DockerMaddy(MaddyCli):
     def change(self, arguments: tuple[str, ...], password: str = "") -> CommandResult:
         prefix = (self.executable, "exec", "-i", "maddy", LAUNCHER)
         payload = (password + "\n" + password + "\n").encode() if password else b""
-        return execute(Command(prefix + arguments, payload, self.timeout))
+        return with_diagnostics(
+            execute(Command(prefix + arguments, payload, self.timeout, merge_stderr=False))
+        )
 
 
 class LocalMaddy(MaddyCli):
@@ -156,7 +172,9 @@ class LocalMaddy(MaddyCli):
     def change(self, arguments: tuple[str, ...], password: str = "") -> CommandResult:
         payload = (password + "\n" + password + "\n").encode() if password else b""
         command = (str(self.binary), "-config", str(self.config)) + arguments
-        return execute(Command(command, payload, self.timeout, self.config_environment()))
+        return with_diagnostics(execute(Command(
+            command, payload, self.timeout, self.config_environment(), merge_stderr=False
+        )))
 
     @staticmethod
     def config_environment() -> dict[str, str]:

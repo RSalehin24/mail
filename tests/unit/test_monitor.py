@@ -25,13 +25,6 @@ class MonitorTests(unittest.TestCase):
             },
         }
 
-    def test_new_desired_certificate_does_not_hide_the_expiring_served_generation(self):
-        alerts = MagicMock()
-        with patch("host.monitor.protected_json", return_value=self.record()):
-            Monitor(alerts, ({}, lambda: 0))._certificate()
-        alerts.observe.assert_any_call("certificate_expiry", "critical_7_days")
-        alerts.observe.assert_any_call("certificate_activation", "pending_or_failed")
-
     def test_missing_served_expiry_is_unknown_unless_the_recorded_generation_matches(self):
         record = self.record()
         record["consumers"]["maddy"].pop("served_expiry")
@@ -40,14 +33,6 @@ class MonitorTests(unittest.TestCase):
         self.assertEqual(expiry_condition(record, 0), "recovered")
         record["consumers"]["maddy"] = {"intent": "never_deployed"}
         self.assertEqual(expiry_condition(record, 0), "recovered")
-
-    def test_invalid_expiry_state_reports_unknown_instead_of_retaining_a_healthy_signal(self):
-        alerts = MagicMock()
-        record = self.record()
-        record.pop("expiry")
-        with patch("host.monitor.protected_json", return_value=record):
-            Monitor(alerts, ({}, lambda: 0))._certificate()
-        alerts.observe.assert_any_call("certificate_expiry", "unknown")
 
     def test_recent_verification_cannot_disguise_a_missed_backup(self):
         now = 1800000000.0
