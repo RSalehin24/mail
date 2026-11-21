@@ -16,6 +16,9 @@ from helper.retention import RecoveryPolicy
 from shared.errors import ServiceError
 from shared.validation import address, request_id
 
+# Jobs waiting or running at once; keeps a runaway client from filling the ledger.
+QUEUE_LIMIT = 20
+
 
 class RecoveryRecords:
     def __init__(self, path: Path) -> None:
@@ -241,10 +244,7 @@ class RecoveryRecords:
                 ):
                     raise ServiceError("request_id_conflict", 409)
                 return self._public_job(dict(existing))
-            if connection.execute(
-                "SELECT 1 FROM recovery_jobs WHERE state IN ('queued','running')",
-            ).fetchone():
-                raise ServiceError("recovery_operation_in_progress", 409)
+            self._admit(connection, email)
             connection.execute(
                 "INSERT INTO recovery_jobs VALUES(?,?,?,?,?,?,?,?)",
                 (identifier, kind, record_id, email, value, "queued", now, ""),
@@ -255,6 +255,20 @@ class RecoveryRecords:
                 (now, kind, identifier, email, "queued"),
             )
         return {"request_id": identifier, "state": "queued", "error": ""}
+
+    @staticmethod
+    def _admit(connection: sqlite3.Connection, email: str) -> None:
+        # Different mailboxes may wait in line, but one mailbox never has two jobs at once.
+        if connection.execute(
+            "SELECT 1 FROM recovery_jobs WHERE email=? AND state IN ('queued','running')",
+            (email,),
+        ).fetchone():
+            raise ServiceError("recovery_operation_in_progress", 409)
+        waiting = connection.execute(
+            "SELECT COUNT(*) FROM recovery_jobs WHERE state IN ('queued','running')"
+        ).fetchone()[0]
+        if waiting >= QUEUE_LIMIT:
+            raise ServiceError("recovery_queue_full", 409)
 
     def _public_job(self, row: dict[str, Any]) -> dict[str, Any]:
         return {"request_id": row["id"], "state": row["state"], "error": row["error"]}
@@ -277,7 +291,7 @@ class RecoveryRecords:
                 (now,),
             )
             row = connection.execute(
-                "SELECT * FROM recovery_jobs WHERE state='queued' ORDER BY updated_at,id LIMIT 1"
+                "SELECT * FROM recovery_jobs WHERE state='queued' ORDER BY updated_at,rowid LIMIT 1"
             ).fetchone()
             if row is None:
                 return None

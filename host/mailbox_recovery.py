@@ -20,6 +20,10 @@ from host.mailbox_transaction import mailbox_transaction
 from shared.errors import ServiceError
 from shared.files import protected_json, state_owner_uid, sync_directory
 
+# The unit stops a run after 540 s; stop taking new jobs well before that and leave the rest for
+# the next run, which the path trigger or the fallback timer starts.
+DRAIN_BUDGET_SECONDS = 300
+
 
 class MailboxRecovery:
     def __init__(self, context: HostContext, root: Path) -> None:
@@ -43,32 +47,41 @@ class MailboxRecovery:
     def run(self) -> None:
         lock = self.root / "recovery-worker.lock"
         with HostLock(lock, LockPolicy(0.1)):
-            job = self.records.claim(int(time.time()))
-            if job is not None:
-                try:
-                    self._perform(job)
-                    if job['kind'] == 'recovery_reconcile':
-                        with self.records.transaction() as connection:
-                            connection.execute(
-                                "UPDATE recovery_jobs SET state='complete',error='',updated_at=? "
-                                "WHERE record_id=? AND state='reconciliation_required'",
-                                (int(time.time()), job['record_id']),
-                            )
-                    self.records.finish(job["id"], "complete", int(time.time()))
-                except (OSError, ValueError, sqlite3.Error, ServiceError) as error:
-                    code = error.code if isinstance(error, ServiceError) else "recovery_io_failure"
-                    state = "reconciliation_required"
-                    try:
-                        record = self.records.get(job["record_id"])
-                        if job["kind"] == "recovery_restore" and record["state"] == "deleted":
-                            state = "failed"  # Refused before import began; safe to try again.
-                    except ServiceError as missing:
-                        if missing.code == "deleted_mailbox_not_found":
-                            state = "failed"  # Policy/inventory refused before a deletion began.
-                    self.records.finish(job["id"], state, int(time.time()), code)
-                    # Never automatically repeat a mailbox mutation after an unknown outcome.
-                    return
+            deadline = time.monotonic() + DRAIN_BUDGET_SECONDS
+            while time.monotonic() < deadline:
+                job = self.records.claim(int(time.time()))
+                if job is None:
+                    break
+                if not self._run_job(job):
+                    return  # Never repeat a mailbox mutation after an unknown outcome.
             self._expire()
+
+    def _run_job(self, job: dict[str, Any]) -> bool:
+        try:
+            self._perform(job)
+            if job['kind'] == 'recovery_reconcile':
+                with self.records.transaction() as connection:
+                    connection.execute(
+                        "UPDATE recovery_jobs SET state='complete',error='',updated_at=? "
+                        "WHERE record_id=? AND state='reconciliation_required'",
+                        (int(time.time()), job['record_id']),
+                    )
+            self.records.finish(job["id"], "complete", int(time.time()))
+            return True
+        except (OSError, ValueError, sqlite3.Error, ServiceError) as error:
+            code = error.code if isinstance(error, ServiceError) else "recovery_io_failure"
+            self.records.finish(job["id"], self._failed_state(job), int(time.time()), code)
+            return False
+
+    def _failed_state(self, job: dict[str, Any]) -> str:
+        try:
+            record = self.records.get(job["record_id"])
+            if job["kind"] == "recovery_restore" and record["state"] == "deleted":
+                return "failed"  # Refused before import began; safe to try again.
+        except ServiceError as missing:
+            if missing.code == "deleted_mailbox_not_found":
+                return "failed"  # Policy/inventory refused before a deletion began.
+        return "reconciliation_required"
 
     def _perform(self, job: dict[str, Any]) -> None:
         kind = job["kind"]
