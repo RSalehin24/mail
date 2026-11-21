@@ -1,4 +1,5 @@
 import dataclasses
+import os
 import sqlite3
 
 from helper.forwarding import ForwardingControl
@@ -17,7 +18,7 @@ def configure_forwarding(fixture):
         """)
         for i, email in enumerate(sorted(fixture.host.maddy.storage), 1):
             db.execute("INSERT OR IGNORE INTO users VALUES(?,?)", (i, email))
-    control = ForwardingControl(root, data)
+    control = ForwardingControl(root, data, worker_owner=os.getuid())
     fixture.host.helper.dependencies = dataclasses.replace(
         fixture.host.helper.dependencies, forwarding=control
     )

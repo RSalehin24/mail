@@ -146,6 +146,9 @@ services:
           mode: 01777
     tmpfs: [*maddy-runtime-tmpfs]
     environment:
+      # maddy.conf reads these with {env:...}; the Maddy CLI the dashboard runs cannot parse it without them.
+      MADDY_DOMAIN: rsalehin24.me
+      MADDY_HOSTNAME: mail.rsalehin24.me
       HASH_MEMORY_KIB: ${MAIL_ADMIN_HASH_MEMORY_KIB:?Set measured hash memory}
       HASH_PARALLELISM: ${MAIL_ADMIN_HASH_PARALLELISM:?Set measured hash concurrency}
       HTTP_CONCURRENCY: ${MAIL_ADMIN_HTTP_CONCURRENCY:?Set measured HTTP concurrency}

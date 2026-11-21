@@ -31,6 +31,9 @@ def provisioning_warning(response: CommandResult) -> bool:
     )
 
 
+CONFIG_ENVIRONMENT = ("MADDY_DOMAIN", "MADDY_HOSTNAME")
+
+
 class MaddyAccess(Protocol):
     def validate(self) -> None: ...
     def inventories(self) -> dict[str, list[str]]: ...
@@ -153,4 +156,9 @@ class LocalMaddy(MaddyCli):
     def change(self, arguments: tuple[str, ...], password: str = "") -> CommandResult:
         payload = (password + "\n" + password + "\n").encode() if password else b""
         command = (str(self.binary), "-config", str(self.config)) + arguments
-        return execute(Command(command, payload, self.timeout))
+        return execute(Command(command, payload, self.timeout, self.config_environment()))
+
+    @staticmethod
+    def config_environment() -> dict[str, str]:
+        """The values maddy.conf reads with {env:...}; the rest of the environment is dropped."""
+        return {name: os.environ[name] for name in CONFIG_ENVIRONMENT if name in os.environ}

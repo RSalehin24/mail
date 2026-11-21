@@ -22,7 +22,10 @@ class ForwardingTests(unittest.TestCase):
               INSERT INTO users VALUES(1,'mail@rsalehin24.me');
               INSERT INTO mboxes VALUES(1,'INBOX');INSERT INTO extKeys VALUES('old',1);
               INSERT INTO msgs VALUES('old',1,1,'');""")
-        self.control = ForwardingControl(self.fixture.root, data)
+        self.control = ForwardingControl(self.fixture.root, data, worker_owner=os.getuid())
+
+    def test_worker_records_are_expected_from_root_whoever_owns_the_state_directory(self):
+        self.assertEqual(ForwardingControl(self.fixture.root, self.fixture.root).worker_owner, 0)
 
     def save(self, **changes):
         value = {

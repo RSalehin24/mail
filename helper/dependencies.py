@@ -56,7 +56,7 @@ def build_dependencies(
         else None,
         BackupControl(state),
         # Root workers write the Cloudflare records the forwarding page reads.
-        ForwardingControl(state, data, worker_owner=0),
+        ForwardingControl(state, data),
         read_lock_policy=LockPolicy(max(
             inputs["lock_wait_seconds"], inputs["operation_timeout_seconds"] * 0.75,
         ), locations.owner),

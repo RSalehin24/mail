@@ -59,10 +59,10 @@ def validate_forwarding(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 class ForwardingControl:
-    def __init__(self, root: Path, data: Path, worker_owner: int | None = None) -> None:
+    def __init__(self, root: Path, data: Path, worker_owner: int = 0) -> None:
         self.root, self.data = root, data
-        # Who writes the Cloudflare worker's records: the state owner unless told otherwise.
-        self.worker_owner = root.stat().st_uid if worker_owner is None else worker_owner
+        # The Cloudflare worker runs as root whoever owns the state directory.
+        self.worker_owner = worker_owner
         self.path = root / "forwarding.db"
         if self.path.is_symlink() or (
             self.path.exists()

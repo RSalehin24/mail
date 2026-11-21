@@ -2,6 +2,7 @@ import stat
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from helper.maddy import LocalMaddy
 from shared.errors import ServiceError
@@ -11,6 +12,7 @@ OPERATION_TIMEOUT_SECONDS = 5
 # Stand-in for the Maddy binary: records argv and stdin, then prints a scripted reply.
 STUB = """#!/bin/sh
 printf '%s\\n' "$@" > "$STUB_DIRECTORY/argv"
+printf '%s %s\\n' "$MADDY_DOMAIN" "$MADDY_HOSTNAME" "$HOME" > "$STUB_DIRECTORY/environment"
 cat > "$STUB_DIRECTORY/stdin"
 cat "$STUB_DIRECTORY/reply"
 """
@@ -46,6 +48,16 @@ class LocalMaddyTests(unittest.TestCase):
             ["-config", str(self.config), "creds", "create", "a@rsalehin24.me"],
         )
         self.assertEqual((self.root / "stdin").read_text(), "secret-value\nsecret-value\n")
+
+    def test_the_config_variables_reach_the_command_and_nothing_else_does(self):
+        self.reply("")
+        variables = {"MADDY_DOMAIN": "example.test", "MADDY_HOSTNAME": "mail.example.test",
+                     "HOME": "/leaked"}
+        with mock.patch.dict("os.environ", variables):
+            self.maddy.change(("version",))
+        first, second = (self.root / "environment").read_text().splitlines()
+        self.assertEqual(first, "example.test mail.example.test")
+        self.assertEqual(second.strip(), "")  # HOME did not reach the command
 
     def test_inventories_parse_accounts_and_the_empty_marker(self):
         self.reply("b@rsalehin24.me\na@rsalehin24.me\n")
