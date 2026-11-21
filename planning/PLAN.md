@@ -49,7 +49,7 @@ Spike first, change later.
 6. **Cleanup (after 14 days stable, separate approval):** remove Cloudflare forwarding code (`host/cloudflare_*`, `helper/forwarding.py` Cloudflare parts, `backend/routes_forwarding.py`, the sync timer and UI), drop Cloudflare credentials from backups, update tests and docs.
 - **Exit:** all nine addresses receive directly; `mail@` and `website@` reach Gmail without landing in spam; rollback never needed or proven.
 
-## Phase 3 — UI/UX redesign (T1, vertical slices)
+## Phase 3 — UI/UX redesign (T1, vertical slices) — done 2026-11-21, see UI-NOTIFICATIONS.md and D-049 to D-060
 Frontend is React 19 + MUI 9, about 1,900 lines. New dependencies only by approval (D-002 allows "as far as it can go", not unreviewed packages).
 1. **Audit:** screenshots at 360/768/1280 px, light and dark; list friction points, jargon, dead ends, empty/error/loading states.
 2. **Design system:** one MUI theme (type scale, spacing, colors, density, dark mode), shared components in `components.tsx`, consistent status language (OK / needs attention / failing) with plain wording.

@@ -27,7 +27,7 @@ Current: `shared/mail_templates.operational_alert` builds plain text and appends
 `make lint typecheck reads unit`, `make browser` (extend tests/browser for light, dark and mobile screenshots), then deploy with rollback retained (image tag kept). Stage A also integration and Maddy runtime suites.
 
 ## Status
-All three stages are coded locally (D-049 to D-052); deploy is pending approval.
+Stages A, B and C are deployed (D-049 to D-053). A second pass followed the owner's feedback (D-056 to D-060): new overview home and mailbox dashboard, Linear-style theme with stronger control borders for dark mode, theme dropdown, Name column restored, descriptive text removed. Live image: `mail-admin:stage12`. Not tested live: the email-code sign-in mail.
 
 ## Order and effort
 A first (fixes the visible complaint, isolated), then B, then C. Deploys of B and C need your approval each (VM change).

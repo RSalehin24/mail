@@ -30,6 +30,9 @@ Live host: GCP VM `rsalehin24-mail` (us-east1-c), SSH `deployer@mail.rsalehin24.
 | Maddy itself | continuous | Issues and renews the TLS certificate (Let's Encrypt, DNS-01 through Cloudflare, store `/opt/maddy/data/acme`); the dashboard restarts itself within 6 hours of a renewal |
 | `mail-admin-dns-update.service` | every boot | Point the `mail` A record at the VM's current IP |
 
+## OS updates (done 2026-11-21, D-062, D-063)
+`apt-get update`, then `apt-get -y -o Dpkg::Options::=--force-confold upgrade` as root, run in the background with a log because it takes minutes on the e2-micro. A Docker or containerd upgrade restarts both containers once. Install a newer kernel with `apt-get install linux-gcp linux-image-gcp linux-headers-gcp`, then `sudo systemctl reboot` (about 2 minutes, same IP). Afterwards check the containers, `systemctl --failed`, HTTPS, ports 25, 587, 993 and 443, and the latest backup. Remove a superseded kernel by name with `apt-get purge` once the new one has booted.
+
 ## Cost rules
 External IP on the STANDARD tier, one 30 GB pd-standard disk, no static IP, snapshots, NAT or load balancer, egress under 1 GB a month, $0.01 budget alert. Never switch the IP to PREMIUM.
 
