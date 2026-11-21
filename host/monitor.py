@@ -2,12 +2,12 @@
 
 import os
 from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from host.alerts import Alerts
 from host.certificates import served_certificate
-from host.rollout import timestamp
 from shared.errors import ServiceError
 from shared.files import atomic_json, protected_json
 from shared.validation import MAIL_HOST
@@ -27,6 +27,16 @@ def expiry_condition(record: dict[str, Any], now: float) -> str:
         expiries.append(expiry)
     days = (min(expiries) - now) / 86400
     return "critical_7_days" if days <= 7 else "warning_21_days" if days <= 21 else "recovered"
+
+
+def timestamp(value: Any) -> float:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            raise ValueError("Timezone required")
+        return parsed.timestamp()
+    except (AttributeError, TypeError, ValueError) as error:
+        raise ServiceError("invalid_backup_timestamp", 409) from error
 
 
 class Monitor:

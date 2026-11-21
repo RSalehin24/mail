@@ -16,5 +16,5 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/var/lib/mail-admin-helper /opt/maddy/data /opt/mail-admin/data /var/lib/mail-admin-certificates /run/lock
+ReadWritePaths=/var/lib/mail-admin-helper /opt/maddy/data /opt/mail-admin/data /run/lock
 LogNamespace=mail-admin

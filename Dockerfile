@@ -28,8 +28,8 @@ COPY backend /app/backend
 COPY shared /app/shared
 COPY helper /app/helper
 # Only the host modules backend.local_host imports (its AST import closure).
-COPY host/__init__.py host/certificates.py host/container_policy.py host/docker.py host/locks.py \
-     host/mailbox_archive.py host/mailbox_store.py host/preflight.py host/rollout.py /app/host/
+COPY host/__init__.py host/certificates.py host/consumers.py host/docker.py host/locks.py \
+     host/mailbox_archive.py host/mailbox_store.py host/preflight.py /app/host/
 # The recovery qualification proof is checked against these files' hashes (QUALIFIED_FILES),
 # so the dashboard needs them present although it never imports them.
 COPY host/mailbox_recovery.py host/mailbox_transaction.py host/backup_control.py host/backup_merge.py \

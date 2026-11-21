@@ -37,7 +37,7 @@ class MailboxRecovery:
             raise ServiceError("mailbox_message_store_unsupported", 503)
         self.bodies = self.data / "messages"
         self.maddy = DockerMaddy(context.deployment)
-        self.writers = DockerSnapshots((Docker(timeout=30), self.maddy, context.generations),
+        self.writers = DockerSnapshots((Docker(timeout=30), self.maddy, context.intents),
                                        startup_timeout=30)
 
     def run(self) -> None:
@@ -350,7 +350,7 @@ class MailboxRecovery:
                 self.records.transition(record["id"], "removing", "removed", int(time.time()))
             return
         with self.context.coordination.consistent():
-            state = self.context.generations.read()
+            state = self.context.intents.read()
             consumer = state["consumers"]["maddy"]
             observed = self.context.docker.inspect("maddy")
             if consumer.get("reason") == "backup_capture":
@@ -363,7 +363,7 @@ class MailboxRecovery:
                 self.writers._verify_resumed("maddy", consumer["served_sha256"])
                 consumer.update(intent="expected_running", state="active")
                 consumer.pop("reason", None)
-                self.context.generations.write(state)
+                self.context.intents.write(state)
             self.maddy.validate()
             inventory = self.maddy.inventories()
             credential = job["email"] in inventory["credentials"]

@@ -43,8 +43,6 @@ def render(configuration: dict[str, object], destination: Path) -> None:
     destination.mkdir(mode=0o700, exist_ok=False)
     for name, value in rendered.items():
         (destination / name).write_bytes(value)
-    script = Path(__file__).with_name("renew-cert.sh")
-    (destination / script.name).write_bytes(script.read_bytes())
 
 
 def main() -> None:

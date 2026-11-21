@@ -322,7 +322,7 @@ class BackupWorker:
         if shutil.disk_usage(bodies).free < size * 8 + 1024**3:
             raise ServiceError("insufficient_restore_space", 409)
         writers = DockerSnapshots(
-            (Docker(timeout=30), maddy, self.context.generations), startup_timeout=30
+            (Docker(timeout=30), maddy, self.context.intents), startup_timeout=30
         )
         with connect(data / "imapsql.db") as live:
             live_keys = [row[0] for row in live.execute("SELECT id FROM extKeys")]
@@ -464,9 +464,9 @@ class BackupWorker:
                 with self.context.coordination.consistent():
                     maddy = DockerMaddy(self.context.deployment)
                     writers = DockerSnapshots(
-                        (Docker(timeout=30), maddy, self.context.generations), startup_timeout=30
+                        (Docker(timeout=30), maddy, self.context.intents), startup_timeout=30
                     )
-                    state = self.context.generations.read()
+                    state = self.context.intents.read()
                     for name, consumer in state["consumers"].items():
                         if consumer.get("reason") == "backup_capture":
                             if name == "maddy":
@@ -486,7 +486,7 @@ class BackupWorker:
                             writers._verify_resumed(name, consumer["served_sha256"])
                             consumer.update(intent="expected_running", state="active")
                             consumer.pop("reason", None)
-                    self.context.generations.write(state)
+                    self.context.intents.write(state)
                     with self.control.connect() as connection:
                         committed = (
                             connection.execute(

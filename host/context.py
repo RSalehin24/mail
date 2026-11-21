@@ -10,17 +10,11 @@ from helper.maddy import DockerMaddy
 from host.alerts import Alerts, alert_transport
 from host.backup import FULL_STATE_SOURCES, BackupPaths, CaptureDependencies, SnapshotCapture
 from host.backup_service import BackupService, backup_service
-from host.certificates import (
-    CertificatePolicy,
-    Consumer,
-    GenerationPaths,
-    Generations,
-    PairValidator,
-)
+from host.consumers import ConsumerIntents
 from host.coordination import Coordination, MaintenanceLocks
-from host.docker import Docker, DockerConsumer, DockerSnapshots
+from host.docker import Docker, DockerSnapshots
 from host.locks import LockPolicy
-from host.renewal import Certbot, Renewal
+from shared.errors import ServiceError
 from shared.files import protected_json, state_owner_uid
 
 
@@ -28,7 +22,7 @@ from shared.files import protected_json, state_owner_uid
 class HostContext:
     deployment: dict[str, Any]
     docker: Docker
-    generations: Generations
+    intents: ConsumerIntents
     coordination: Coordination
     alerts: Alerts
 
@@ -36,20 +30,12 @@ class HostContext:
     def load(cls) -> HostContext:
         deployment = protected_json(Path("/etc/mail-admin/deployment.json"))
         inputs, owner = deployment["inputs"], state_owner_uid(deployment)
-        generations = Generations(
-            GenerationPaths(
-                Path("/opt/maddy/tls/generations"),
-                Path("/var/lib/mail-admin-certificates/state.json"),
-            ),
-            (CertificatePolicy(inputs["service_gid"]), PairValidator(), time.time),
-        )
         locks = MaintenanceLocks(
-            Path("/run/lock/mail-admin-renewal.lock"),
             Path("/run/lock/mail-admin-maddy.lock"),
             LockPolicy(inputs["lock_wait_seconds"], owner),
         )
         coordination = Coordination(
-            locks, (Journal(Path("/var/lib/mail-admin-helper/journal.db"), owner), generations)
+            locks, Journal(Path("/var/lib/mail-admin-helper/journal.db"), owner)
         )
         alerts = Alerts(
             Path("/var/lib/mail-admin-alerts/state.json"),
@@ -58,27 +44,14 @@ class HostContext:
         return cls(
             deployment,
             Docker(timeout=inputs["operation_timeout_seconds"]),
-            generations,
+            ConsumerIntents(Path("/var/lib/mail-admin-helper/consumers.json")),
             coordination,
             alerts,
         )
 
-    def renewal(self) -> Renewal:
-        consumers: dict[str, Consumer] = {
-            name: DockerConsumer(record, self.docker)
-            for name, record in self.deployment["consumers"].items()
-        }
-        certbot = Certbot(
-            Docker(timeout=self.deployment["renewal_timeout_seconds"]),
-            (self.generations, self.deployment),
-        )
-        return Renewal(self.coordination, (certbot, consumers))
-
     def backup(self) -> BackupService:
         sources = {name: Path(path) for name, path in self.deployment["backup_sources"].items()}
         if not FULL_STATE_SOURCES <= set(sources):
-            from shared.errors import ServiceError
-
             raise ServiceError("backup_sources_incomplete", 503)
         paths = BackupPaths(
             Path("/var/lib/mail-admin-backup/staging"),
@@ -87,7 +60,7 @@ class HostContext:
             tuple(self.deployment["maddy_message_paths"]),
         )
         services = DockerSnapshots(
-            (Docker(timeout=30), DockerMaddy(self.deployment), self.generations),
+            (Docker(timeout=30), DockerMaddy(self.deployment), self.intents),
             startup_timeout=30,
         )
         capture = SnapshotCapture(

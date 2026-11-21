@@ -19,10 +19,8 @@ from shared.files import atomic_json, protected_json, sync_directory
 
 FULL_STATE_SOURCES = frozenset(
     {
-        "maddy", "dashboard", "operator", "helper", "certificates", "host_tools",
-        "units", "tmpfiles", "docker_ordering", "launcher", "alerts",
-        "maddy_configuration", "maddy_compose", "tls", "acme", "acme_lib",
-        "renewal_script", "release_artifacts",
+        "maddy", "dashboard", "operator", "helper", "host_tools", "units", "tmpfiles",
+        "docker_ordering", "launcher", "alerts", "maddy_configuration", "maddy_compose",
     }
 )
 

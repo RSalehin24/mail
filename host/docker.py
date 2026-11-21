@@ -3,12 +3,12 @@
 import json
 import logging
 import time
-from pathlib import Path
 from typing import Any
 
 from helper.maddy import DockerMaddy
 from helper.process import Command, execute
-from host.certificates import Generations, served_fingerprint, verify_served
+from host.certificates import served_fingerprint, verify_served
+from host.consumers import ConsumerIntents
 from shared.errors import ServiceError
 
 
@@ -44,64 +44,15 @@ class Docker:
             raise ServiceError("consumer_stop_incomplete", 503)
 
 
-class DockerConsumer:
-    def __init__(self, record: dict[str, Any], docker: Docker) -> None:
-        self.record, self.docker = record, docker
-
-    def activate(self, generation: Path, certificate: dict[str, Any]) -> None:
-        container = self.docker.inspect(self.record["container"])
-        if self._matches(container, generation) and container["State"]["Running"]:
-            if self._served(certificate):
-                return
-        environment = {**self.record["environment"], self.record["tls_variable"]: str(generation)}
-        arguments = (
-            "compose",
-            "-f",
-            self.record["compose_file"],
-            "up",
-            "-d",
-            "--no-build",
-            "--pull",
-            "never",
-            "--no-deps",
-            "--force-recreate",
-            self.record["service"],
-        )
-        self.docker.run(arguments, environment)
-        container = self.docker.inspect(self.record["container"])
-        if not self._matches(container, generation) or not container["State"]["Running"]:
-            raise ServiceError("consumer_binding_mismatch", 503)
-        deadline = time.monotonic() + self.docker.timeout
-        while time.monotonic() < deadline:
-            if self._served(certificate):
-                return
-            time.sleep(0.1)
-        raise ServiceError("served_generation_mismatch", 503)
-
-    def _matches(self, container: dict[str, Any], generation: Path) -> bool:
-        actual = {mount["Destination"]: mount["Source"] for mount in container["Mounts"]}
-        return container["Image"] == self.record["image_id"] and actual.get(
-            self.record["tls_target"]
-        ) == str(generation)
-
-    def _served(self, certificate: dict[str, Any]) -> bool:
-        try:
-            return served_fingerprint(("127.0.0.1", self.record["tls_port"])) == str(
-                certificate["served_sha256"]
-            )
-        except (OSError, ServiceError):
-            return False
-
-
 class DockerSnapshots:
-    def __init__(self, dependencies: tuple[Docker, DockerMaddy, Generations],
+    def __init__(self, dependencies: tuple[Docker, DockerMaddy, ConsumerIntents],
                  *, startup_timeout: float | None = None) -> None:
-        self.docker, self.maddy, self.generations = dependencies
+        self.docker, self.maddy, self.intents = dependencies
         self.prior_intent: dict[str, dict[str, Any]] = {}
         self.startup_timeout = startup_timeout
 
     def inventories(self) -> dict[str, list[str]]:
-        consumers = self.generations.read()["consumers"].values()
+        consumers = self.intents.read()["consumers"].values()
         if any(
             consumer.get("intent") == "maintenance" and consumer.get("reason") == "offline_recovery"
             for consumer in consumers
@@ -111,11 +62,9 @@ class DockerSnapshots:
         return self.maddy.inventories()
 
     def running(self) -> list[str]:
-        state = self.generations.read()
+        state = self.intents.read()
         names = []
         for name, record in state["consumers"].items():
-            if record["intent"] == "never_deployed":
-                continue
             running = self.docker.inspect(name)["State"]["Running"]
             if running and record["intent"] != "expected_running":
                 raise ServiceError("maintenance_consumer_unexpectedly_running", 409)
@@ -124,16 +73,17 @@ class DockerSnapshots:
         return names
 
     def pause(self, names: list[str]) -> None:
-        state = self.generations.read()
-        # Maddy renews its own certificate, so the fingerprint recorded at issue time can be
-        # stale; resuming must serve what was served just before the pause.
+        state = self.intents.read()
+        # Maddy renews its own certificate, so resuming must see what was served just before.
         self.prior_intent = {
             name: {**state["consumers"][name],
                    "served_sha256": served_fingerprint(("127.0.0.1", self._tls_port(name)))}
             for name in names
         }
         for name in names:
-            self.generations.maintenance(name, "backup_capture")
+            self.intents.maintenance(
+                name, "backup_capture", self.prior_intent[name]["served_sha256"]
+            )
             self.docker.run(("stop", "--time", "30", name))
             if self.docker.inspect(name)["State"]["Running"]:
                 raise ServiceError("consumer_stop_incomplete", 503)
@@ -149,9 +99,9 @@ class DockerSnapshots:
                 if not isinstance(expected, str):
                     raise ServiceError("consumer_certificate_unverified", 503)
                 self._verify_resumed(name, expected)
-                state = self.generations.read()
+                state = self.intents.read()
                 state["consumers"][name] = self.prior_intent[name]
-                self.generations.write(state)
+                self.intents.write(state)
             except (OSError, ServiceError) as error:
                 logging.getLogger(__name__).error(
                     'consumer_resume_failed consumer=%s code=%s', name,

@@ -25,7 +25,6 @@ class HostStatusPaths:
 
     maddy_data: Path = Path("/opt/maddy/data")
     deployment: Path = Path("/etc/mail-admin/deployment.json")
-    certificate_state: Path = Path("/var/lib/mail-admin-certificates/state.json")
     served_certificates: Path = Path("/var/lib/mail-admin-alerts/served-certificates.json")
     monitoring: Path = Path("/var/lib/mail-admin-alerts/monitor-observation.json")
     external_monitoring: Path = Path("/var/lib/mail-admin-alerts/external-monitoring.json")
@@ -108,13 +107,7 @@ def _thresholds(deployment: Path = HostStatusPaths.deployment) -> dict[str, Any]
 
 
 def _certificates(now: float, paths: HostStatusPaths) -> dict[str, Any]:
-    renewal = _observation(paths.certificate_state, now)
-    served = _observation(paths.served_certificates, now, 600)
-    if "consumers" in served:
-        return {**renewal, **served, "outcome": renewal.get("outcome", "unavailable"),
-                "state": served.get("state", "fresh"), "reason": served.get("reason"),
-                "renewal_observed_at": renewal.get("observed_at")}
-    return renewal
+    return _observation(paths.served_certificates, now, 600)
 
 
 def _cpu_ticks() -> dict[str, int]:

@@ -8,7 +8,6 @@ from typing import Any, Protocol
 
 from helper.process import Command, CommandResult, execute
 from shared.errors import ServiceError
-from shared.files import protected_json
 from shared.validation import address
 
 LAUNCHER = "/usr/local/libexec/mail-admin-maddy"
@@ -127,19 +126,7 @@ class DockerMaddy(MaddyCli):
         return str(version)
 
     def expected_mounts(self) -> dict[str, str]:
-        expected = dict(self.deployment["maddy_mounts"])
-        state_path = self.deployment.get("certificate_state")
-        if state_path is None:
-            return expected
-        state = protected_json(Path(state_path))
-        if state.get("coordination_migrated") is not True:
-            return expected
-        generation = state.get("consumers", {}).get("maddy", {}).get("active_generation")
-        if not isinstance(generation, str) or not re.fullmatch(r"[0-9a-f]{64}", generation):
-            raise ServiceError("maddy_generation_unknown", 503)
-        target = self.deployment["maddy_tls_target"]
-        expected[target] = str(Path(self.deployment["tls_generations_directory"]) / generation)
-        return expected
+        return dict(self.deployment["maddy_mounts"])
 
     def change(self, arguments: tuple[str, ...], password: str = "") -> CommandResult:
         prefix = (self.executable, "exec", "-i", "maddy", LAUNCHER)

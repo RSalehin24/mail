@@ -8,8 +8,7 @@ MARKER = 'run/mail-admin-installation.json'
 # The dashboard works on Maddy's files itself, so these mounts are all it needs from the host.
 DIRECTORIES = (
     'app/data', 'run/secrets/mail-admin', 'data', 'var/lib/mail-admin-helper',
-    'run/mail-admin-host/etc', 'var/lib/mail-admin-backup', 'var/lib/mail-admin-alerts',
-    'var/lib/mail-admin-certificates',
+    'run/mail-admin-host/etc', 'var/lib/mail-admin-backup', 'var/lib/mail-admin-alerts'
 )
 FILES = (
     MARKER, 'data/maddy.conf', 'run/lock/mail-admin-maddy.lock',

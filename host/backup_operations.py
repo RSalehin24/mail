@@ -8,7 +8,6 @@ from host.backup_service import BackupService
 from host.locks import HostLock, LockPolicy
 from host.repository_backup import RepositoryBackup
 from host.retention import BackupRetention
-from host.rollout import operational_guard, rollout_directory
 from shared.errors import ServiceError
 from shared.files import protected_json, state_owner_uid
 
@@ -22,10 +21,6 @@ class BackupOperations:
         self.lock_policy = LockPolicy(wait)
         # The backup lock is shared with the dashboard's user, like the other /run/lock files.
         self.backup_lock_policy = LockPolicy(wait, state_owner_uid(deployment))
-
-    def baseline(self) -> dict[str, Any]:
-        with HostLock(BACKUP_LOCK, self.backup_lock_policy):
-            return self.backup.transfer(self.backup.capture())
 
     def run(self) -> dict[str, Any]:
         with HostLock(BACKUP_LOCK, self.backup_lock_policy):
@@ -53,19 +48,8 @@ class BackupOperations:
         with HostLock(BACKUP_LOCK, self.backup_lock_policy):
             return self.backup.verify_latest()
 
-    def baseline_manifest(self) -> dict[str, Any] | None:
-        path = rollout_directory(self.deployment) / "baseline-manifest.json"
-        return protected_json(path) if path.exists() else None
-
     def _protected(self, manifest: dict[str, Any]) -> set[str]:
         protected = {manifest["snapshot_id"], *self.deployment["rollback_snapshot_ids"]}
-        baseline = self.baseline_manifest()
-        if baseline is None:
-            return protected - self._retired()
-        try:
-            operational_guard(self.deployment).checkpoint("G08")
-        except (OSError, ServiceError):
-            protected.add(baseline["snapshot_id"])
         return protected - self._retired()
 
     def _retired(self) -> set[str]:

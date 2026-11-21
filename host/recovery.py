@@ -5,7 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Protocol
 
-from host.certificates import Generations
+from host.consumers import ConsumerIntents
 from host.coordination import Coordination
 from host.locks import HostLock
 from shared.errors import ServiceError
@@ -25,10 +25,11 @@ class RecoveryConsumer(Protocol):
 
 class Recovery:
     def __init__(
-        self, coordination: Coordination, dependencies: tuple[Generations, RecoveryConsumer, Path]
+        self, coordination: Coordination,
+        dependencies: tuple[ConsumerIntents, RecoveryConsumer, Path],
     ) -> None:
         self.coordination = coordination
-        self.generations, self.consumer, self.outcome = dependencies
+        self.intents, self.consumer, self.outcome = dependencies
 
     def run(self) -> None:
         with HostLock(self.outcome.with_suffix(".lock"), self.coordination.locks.policy):
@@ -37,11 +38,10 @@ class Recovery:
     def _run(self) -> None:
         name = "mail-admin-recovery-" + str(uuid.uuid4())
         with self.coordination.consistent():
-            self._require_migrated()
             if self.outcome.exists():
                 self.consumer.discard_recovery(self._record()["utility_name"])
             self.consumer.pause_runtime()
-            self.generations.maintenance("mail-admin", "offline_recovery")
+            self.intents.maintenance("mail-admin", "offline_recovery")
             self.consumer.stop()
             self.consumer.snapshot_authentication()
             atomic_json(
@@ -65,7 +65,7 @@ class Recovery:
         )
 
     def _record(self) -> dict[str, Any]:
-        record = protected_json(self.outcome, self.generations.policy.owner)
+        record = protected_json(self.outcome, self.intents.owner)
         state = record.get("state")
         if (
             not isinstance(state, str)
@@ -84,18 +84,13 @@ class Recovery:
 
     def _authorize_resume(self) -> None:
         with self.coordination.consistent():
-            self._require_migrated()
             record = self._record()
             self.consumer.verify_recovery(record["utility_name"])
             self.consumer.stop()
             record["state"] = "resume_authorized"
             atomic_json(self.outcome, record)
             self.consumer.allow_runtime()
-            self.generations.register("mail-admin")
-
-    def _require_migrated(self) -> None:
-        if self.generations.read().get("coordination_migrated") is not True:
-            raise ServiceError("matched_renewal_cutover_required", 409)
+            self.intents.register("mail-admin")
 
     def _confirm_activation(self) -> None:
         with self.coordination.consistent():

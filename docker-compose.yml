@@ -106,12 +106,6 @@ services:
         target: /var/lib/mail-admin-alerts
         read_only: true
         bind: {create_host_path: false}
-      # state.json written by certificate renewal.
-      - type: bind
-        source: /var/lib/mail-admin-certificates
-        target: /var/lib/mail-admin-certificates
-        read_only: true
-        bind: {create_host_path: false}
       # Application keys.
       - type: bind
         source: /etc/mail-admin/secrets
