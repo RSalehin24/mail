@@ -260,7 +260,9 @@ def main() -> int:
     try:
         run(arguments.action, context)
         context.alerts.observe(arguments.action, "recovered")
-    except (OSError, ServiceError):
+    except (OSError, ServiceError) as error:
+        # The alert only says the action failed; the journal needs the reason.
+        print(f"{arguments.action} failed: {type(error).__name__}: {error}", file=sys.stderr)
         context.alerts.observe(arguments.action, "failed_or_deferred")
         context.alerts.flush()
         return 1

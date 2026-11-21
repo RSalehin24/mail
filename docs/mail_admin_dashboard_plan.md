@@ -2,7 +2,7 @@
 
 The [structured implementation and verification package](mail-admin-implementation/README.md) is the authoritative guide for implementation, acceptance evidence and rollout. This overview is retained as the consolidated review background.
 
-Build, secure, and deploy a self-hosted **Mail Admin Dashboard** for `rsalehin24.me` on the existing GCP mail server (`35.237.68.175`, accessible with `ssh deployer@35.237.68.175`). The original workstation's `mail.sh` shortcut is not distributed with this repository.
+Build, secure, and deploy a self-hosted **Mail Admin Dashboard** for `rsalehin24.me` on the existing GCP mail server (`mail.rsalehin24.me`, accessible with `ssh deployer@mail.rsalehin24.me`). The original workstation's `mail.sh` shortcut is not distributed with this repository.
 
 The system pairs a **FastAPI backend** with a **minimalist React + Material UI (MUI)** frontend compiled to static assets. It is fully responsive across **Android phones, laptops, and desktops**. Build the Linux runtime image outside the mail VM and measure resource usage before deployment; the earlier 50 MB runtime estimate is not verified.
 
@@ -14,7 +14,7 @@ These facts were checked over SSH and, where noted, from an external client. The
 
 | Item | Verified state |
 | :--- | :--- |
-| Host | Ubuntu 26.04 LTS, Linux/amd64, `35.237.68.175` |
+| Host | Ubuntu 26.04 LTS, Linux/amd64, `mail.rsalehin24.me` |
 | Maddy | Running version **0.9.5**, using the mutable `foxcpp/maddy:latest` image tag |
 | Configuration and storage | `/opt/maddy/config/maddy.conf`; SQLite `credentials.db` and `imapsql.db` under `/opt/maddy/data` |
 | Existing data permissions | Follow-up review confirmed `nobody` can read both Maddy databases and all **143 stored message files**; data directories are traversable and files are `0644`. Restrict access before deployment. |
@@ -73,7 +73,7 @@ flowchart TD
         LaptopDesktop["Laptop / Desktop\n• Data table & sorting\n• Side-by-side tabs\n• Keyboard navigation"]
     end
 
-    subgraph Server ["GCP VM 35.237.68.175 (953 MiB RAM / 28 GiB Disk)"]
+    subgraph Server ["GCP VM mail.rsalehin24.me (953 MiB RAM / 28 GiB Disk)"]
         subgraph AdminContainer ["Docker: mail-admin (Host 443 to container 8443)"]
             FastAPI["FastAPI Backend\n(Static files + REST API)"]
             AuthEngine["Auth & 2FA Engine\n• Argon2 Hashing\n• TOTP (pyotp)\n• Email OTP"]
@@ -637,7 +637,7 @@ From the local Mac terminal, verify HTTPS using the certificate hostname and nor
 
 ```bash
 curl --fail --silent --show-error --max-time 15 \
-  --resolve mail.rsalehin24.me:443:35.237.68.175 \
+  --resolve mail.rsalehin24.me:443:<current-ip> \
   https://mail.rsalehin24.me/api/status
 ```
 
@@ -663,9 +663,9 @@ Expected: HTTP 401 with no sensitive response. Repeat authorization checks throu
 Inspect live memory, restart/OOM state, and the daily renewal schedule:
 
 ```bash
-ssh deployer@35.237.68.175 'sudo docker stats --no-stream maddy mail-admin'
-ssh deployer@35.237.68.175 'sudo docker inspect mail-admin --format "{{.State.OOMKilled}} {{.RestartCount}}"'
-ssh deployer@35.237.68.175 'systemctl list-timers --all maddy-cert-renew.timer'
+ssh deployer@mail.rsalehin24.me 'sudo docker stats --no-stream maddy mail-admin'
+ssh deployer@mail.rsalehin24.me 'sudo docker inspect mail-admin --format "{{.State.OOMKilled}} {{.RestartCount}}"'
+ssh deployer@mail.rsalehin24.me 'systemctl list-timers --all maddy-cert-renew.timer'
 ```
 
 Record idle and peak memory during an agreed bounded workload. The dashboard and helper must remain within their measured budget, leave capacity for Maddy/host activity, and exhibit no OOM kills or unexpected restarts. A single idle snapshot cannot substantiate the earlier 60 MB estimate. Confirm clock synchronization, post-restore authentication/readiness invalidation, helper journal recovery, scheduled off-VM backup success, independent alerts, free-space headroom, maintenance coordination, renewal outcome, and the certificate actually served on both 993 and 443. Verify helper access and file permissions after the agreed reboot; if swap is added, verify it persists too.

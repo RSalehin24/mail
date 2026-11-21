@@ -9,7 +9,7 @@ flowchart TD
         LaptopDesktop["Laptop / Desktop\n• Data table & sorting\n• Side-by-side tabs\n• Keyboard navigation"]
     end
 
-    subgraph Server ["GCP VM 35.237.68.175 (953 MiB RAM / 28 GiB Disk)"]
+    subgraph Server ["GCP VM mail.rsalehin24.me (953 MiB RAM / 28 GiB Disk)"]
         subgraph AdminContainer ["Docker: mail-admin (Host 443 to container 8443)"]
             FastAPI["FastAPI Backend\n(Static files + REST API)"]
             AuthEngine["Auth & 2FA Engine\n• Argon2 Hashing\n• TOTP (pyotp)\n• Email OTP"]
