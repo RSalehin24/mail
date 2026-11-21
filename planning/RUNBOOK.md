@@ -4,7 +4,7 @@ Live host: GCP VM `rsalehin24-mail` (us-east1-c), SSH `deployer@mail.rsalehin24.
 
 ## Deploy
 1. `make check` and `make build` locally; `docker tag mail-admin:candidate mail-admin:<name>`; `docker save mail-admin:<name> | gzip | ssh ... 'gunzip | docker load'`.
-2. Library changes: copy the changed files into `/usr/local/lib/mail-admin/{host,helper,shared}` (root:root 0644). Files listed in `helper.recovery.QUALIFIED_FILES` need a new recovery proof first (`tools/record_recovery_qualification.py`, owner reviews, install to `/var/lib/mail-admin-helper/recovery-qualified.json`, root:10001 0640).
+2. Library changes: copy the changed files into `/usr/local/lib/mail-admin/{host,helper,shared}` (root:root 0644). Files listed in `helper.recovery.QUALIFIED_FILES` (also `host/backup_control.py`, `host/backup_operations.py`, `host/mailbox_recovery.py`) need a new recovery proof first (`tools/record_recovery_qualification.py`, owner reviews, install to `/var/lib/mail-admin-helper/recovery-qualified.json`, root:10001 0640).
 3. Compose: `cd /opt/mail-admin; set -a; . /root/cutover-20261121/stage2.env; set +a; export MAIL_ADMIN_IMAGE=mail-admin:<name> MAIL_ADMIN_DNS_TOKEN="$(cat /etc/mail-admin/dns-update.token)"; docker compose up -d --no-deps mail-admin` (never `--remove-orphans`; the token is only for the `maddy` service and must be exported whenever compose is run).
 4. Keep the previous image tag for rollback (`mail-admin:pre-stage2` is the pre-Stage-2 image).
 
@@ -32,3 +32,6 @@ Live host: GCP VM `rsalehin24-mail` (us-east1-c), SSH `deployer@mail.rsalehin24.
 
 ## Cost rules
 External IP on the STANDARD tier, one 30 GB pd-standard disk, no static IP, snapshots, NAT or load balancer, egress under 1 GB a month, $0.01 budget alert. Never switch the IP to PREMIUM.
+
+## Backup pause marker
+`/var/lib/mail-admin-helper/consumers.json` records which consumers a backup or offline recovery stopped on purpose; a crash leaves it in `maintenance`, which blocks the next backup until the backup-control reconcile job restarts the consumers. Reconcile from the dashboard Backups page, or file a `reconcile` job for the stuck backup.
