@@ -5,7 +5,7 @@ Live host: GCP VM `rsalehin24-mail` (us-east1-c), SSH `deployer@mail.rsalehin24.
 ## Deploy
 1. `make check` and `make build` locally; `docker tag mail-admin:candidate mail-admin:<name>`; `docker save mail-admin:<name> | gzip | ssh ... 'gunzip | docker load'`.
 2. Library changes: copy the changed files into `/usr/local/lib/mail-admin/{host,helper,shared}` (root:root 0644). Files listed in `helper.recovery.QUALIFIED_FILES` need a new recovery proof first (`tools/record_recovery_qualification.py`, owner reviews, install to `/var/lib/mail-admin-helper/recovery-qualified.json`, root:10001 0640).
-3. Compose: `cd /opt/mail-admin; set -a; . /root/cutover-20261121/stage2.env; set +a; export MAIL_ADMIN_IMAGE=mail-admin:<name>; docker compose up -d --no-deps mail-admin` (never `--remove-orphans`).
+3. Compose: `cd /opt/mail-admin; set -a; . /root/cutover-20261121/stage2.env; set +a; export MAIL_ADMIN_IMAGE=mail-admin:<name> MAIL_ADMIN_DNS_TOKEN="$(cat /etc/mail-admin/dns-update.token)"; docker compose up -d --no-deps mail-admin` (never `--remove-orphans`; the token is only for the `maddy` service and must be exported whenever compose is run).
 4. Keep the previous image tag for rollback (`mail-admin:pre-stage2` is the pre-Stage-2 image).
 
 ## Restore
@@ -14,6 +14,7 @@ Live host: GCP VM `rsalehin24-mail` (us-east1-c), SSH `deployer@mail.rsalehin24.
 - Whole stack rollback to the pre-Stage-2 setup: `/root/cutover-20261121/stage3/rollback3.sh` (as root).
 
 ## Rotate secrets
+- Certificate and DNS token: `/etc/mail-admin/dns-update.token` is read by the DNS-update service and passed to the Maddy container as `CLOUDFLARE_API_TOKEN` at `docker compose up`; rotating it means installing the new file, then recreating `maddy`.
 - Cloudflare forwarding token: `/etc/mail-admin/secrets/cloudflare-forwarding.token` (root-only); DNS update token: `/etc/mail-admin/dns-update.token` (0600 root, create with a minimal "Zone, DNS, Edit" token; install through ssh stdin, never paste in chat).
 - Dashboard application keys: `/etc/mail-admin/secrets` (root:mail-admin 0750). Rotating them signs everyone out.
 - Backup (restic/R2) keys: rotate in R2, update the backup configuration under `/etc/mail-admin`, run a backup, confirm `verified`.
@@ -26,7 +27,7 @@ Live host: GCP VM `rsalehin24-mail` (us-east1-c), SSH `deployer@mail.rsalehin24.
 | `mail-admin-maddy-restart.path` | on request file | Restart Maddy after a relay change |
 | `mail-admin-forwarding.timer` | 30 s | Sync forwarding with Cloudflare |
 | `mail-admin-monitor.timer` / `-independent-monitor` / `-tls-observation` | 5 min / 15 min / 2 min | Capacity, backup age, certificate expiry alerts |
-| `maddy-cert-renew.timer` | 03:00 UTC | Certbot renewal and TLS generation switch |
+| Maddy itself | continuous | Issues and renews the TLS certificate (Let's Encrypt, DNS-01 through Cloudflare, store `/opt/maddy/data/acme`); the dashboard restarts itself within 6 hours of a renewal |
 | `mail-admin-dns-update.service` | every boot | Point the `mail` A record at the VM's current IP |
 
 ## Cost rules

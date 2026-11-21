@@ -1,4 +1,4 @@
-# Plan: Maddy's built-in ACME instead of certbot (Stage 3, D-036). Repo only; not scheduled.
+# Maddy's built-in ACME instead of certbot (Stage 3). DONE on the live host 2026-11-21 (D-037, D-038); the plan below is the original analysis.
 
 ## What was checked (2026-11-21)
 - The pinned Maddy 0.9.6 binary contains the `tls.loader.acme` loader and the libdns providers cloudflare, digitalocean, gandi, gcore, hetzner, namecheap and vultr (scanned the binary inside the running dashboard container).
@@ -12,3 +12,6 @@
 
 ## If it is ever done
 Spike on a throwaway hostname with the Let's Encrypt staging CA and a zone-scoped token; confirm renewal timing, file layout and reload behaviour first; keep certbot until two renewals of the new path succeeded; add a restore point and rollback (T3).
+
+## What was done (2026-11-21)
+Staging test in a throwaway container (D-037) proved issuance through DNS-01 and the store layout `acme/certificates/<CA>/<host>/<host>.crt|key` (full chain in `.crt`, files 0600 owned by 10001, about 10 MiB of memory). The production certificate was then issued by a second throwaway container into `/opt/maddy/data/acme` before the switch (no downtime), `maddy.conf` got the `tls { loader acme { ... } }` block (token from `{env:CLOUDFLARE_API_TOKEN}`, contact email as chosen by the owner), compose passes the token to Maddy only, and the dashboard reads the same files (`TLS_CERTIFICATE_FILE`, `TLS_KEY_FILE`) and restarts itself when the certificate file changes (`backend/certificate_watch.py`, checked every 6 hours). Findings: the Maddy CLI the dashboard runs also loads the ACME config and logs certificate maintenance to stderr, so `LocalMaddy` now reads only stdout for answers and checks both streams for errors. Rollback: `/root/cutover-20261121/acme/rollback-acme.sh`. Certbot's timer is disabled; its code and image are still present.
