@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Request, Response
 
-from backend.auth import Credentials, Verification
+from backend.auth import GRANT_SECONDS, Credentials, Verification
 from backend.authorization import COOKIE_NAME, authenticated, peer, recent, services, session
 from backend.email_auth import EmailAuthentication
 from backend.enrollment import Enrollment
@@ -115,6 +115,17 @@ async def reauth(body: LoginRequest, request: Request) -> dict[str, Any]:
         "challenge": challenge,
         "email_otp_available": available,
     }
+
+
+@protected.post("/security/confirm")
+async def confirm(body: LoginRequest, request: Request) -> dict[str, int]:
+    application = services(request)
+    await application.hashes.run(
+        lambda: application.authentication.confirm_password(
+            Credentials(body.email, body.password, peer(request)), session(request)
+        )
+    )
+    return {"grant_seconds": GRANT_SECONDS}
 
 
 @protected.post("/security/reauth/verify")

@@ -4,7 +4,7 @@ import unittest
 import uuid
 from pathlib import Path
 
-from backend.local_host import LocalHost
+from backend.local_host import RECOVERY_REQUEST, LocalHost
 from helper.deletion import DeletionPaths
 from helper.dependencies import HostLocations, build_dependencies
 from helper.journal import Journal
@@ -89,3 +89,40 @@ class LocalHostTests(unittest.TestCase):
         # The missing host record is an OSError inside; callers only ever see a safe 503.
         with self.assertRaisesRegex(ServiceError, "helper_unavailable"):
             self.host.call(deletion)
+
+
+class FakeHelper:
+    def __init__(self, response):
+        self.response = response
+
+    def handle(self, request):
+        return self.response
+
+
+class RecoveryWakeTests(unittest.TestCase):
+    """Queued recovery work wakes the root worker through its own trigger file."""
+
+    def host(self, response, state):
+        return LocalHost(FakeHelper(response), state)
+
+    def call(self, host, operation):
+        return host.call({"operation": operation, "request_id": str(uuid.uuid4())})
+
+    def test_a_queued_recovery_job_writes_the_trigger_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory)
+            self.call(self.host({"state": "queued"}, state), "recovery_policy")
+            self.assertTrue((state / RECOVERY_REQUEST).is_file())
+
+    def test_other_results_and_operations_leave_the_trigger_alone(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory)
+            self.call(self.host({"state": "complete"}, state), "recovery_policy")
+            self.call(self.host({"state": "queued"}, state), "inventory")
+            self.assertFalse((state / RECOVERY_REQUEST).exists())
+
+    def test_a_failed_wake_does_not_fail_a_queued_job(self):
+        with tempfile.TemporaryDirectory() as directory:
+            missing = Path(directory) / "absent"
+            result = self.call(self.host({"state": "queued"}, missing), "recovery_policy")
+            self.assertEqual(result, {"state": "queued"})

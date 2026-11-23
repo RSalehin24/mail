@@ -4,14 +4,14 @@ Live host: GCP VM `rsalehin24-mail` (us-east1-c), SSH `deployer@mail.rsalehin24.
 
 ## Deploy
 1. `make check` and `make build` locally; `docker tag mail-admin:candidate mail-admin:<name>`; `docker save mail-admin:<name> | gzip | ssh ... 'gunzip | docker load'`.
-2. Library changes: copy the changed files into `/usr/local/lib/mail-admin/{host,helper,shared}` (root:root 0644). Files listed in `helper.recovery.QUALIFIED_FILES` (also `host/backup_control.py`, `host/backup_operations.py`, `host/mailbox_recovery.py`) need a new recovery proof first (`tools/record_recovery_qualification.py`, owner reviews, install to `/var/lib/mail-admin-helper/recovery-qualified.json`, root:10001 0640).
+2. Library changes: copy the changed files into `/usr/local/lib/mail-admin/{host,helper,shared}` (root:root 0644). There is no recovery proof any more (D-078); the tests are the gate.
 3. Compose: `cd /opt/mail-admin; set -a; . /root/cutover-20261121/stage2.env; set +a; export MAIL_ADMIN_IMAGE=mail-admin:<name> MAIL_ADMIN_DNS_TOKEN="$(cat /etc/mail-admin/dns-update.token)"; docker compose up -d --no-deps mail-admin` (never `--remove-orphans`; the token is only for the `maddy` service and must be exported whenever compose is run).
-4. Keep the previous image tag for rollback and write a small rollback script next to `stage2.env` in `/root/cutover-20261121/` (the current one is `rollback-dashboard.sh`, back to `mail-admin:stage11`). Dashboard-only deploys need no restore point; changes to host files do (take a backup and keep copies of the replaced files).
+4. Keep the previous image tag for rollback and write a small rollback script next to `stage2.env` in `/root/cutover-20261121/` (the current one is `rollback-v13.sh`, back to `mail-admin:stage12`, including the recovery files, proof and unit). Dashboard-only deploys need no restore point; changes to host files do (take a backup and keep copies of the replaced files).
 
 ## Restore
 - Latest snapshot check without touching mail: `ResticRepository(ResticProcess(HostContext.load().deployment), time.time).verify({"reference", "content_sha256"})` from the manifest, as root in `/usr/local/lib/mail-admin` (about 25 s; restores to a scratch folder and deletes it).
 - Mailbox recovery and additive restore: dashboard Backups and Recovery pages. Full-server rehearsal (done 2026-11-21): `ResticRepository.restore(reference, staging/rehearsal-restore)` as root, chown the `maddy/` folder to 10001, copy `maddy_configuration` to `maddy/maddy.conf`, run the pinned Maddy image offline (`--network none`, uid 10001, no capabilities, entrypoint `/usr/local/libexec/mail-admin-maddy`) with `creds list` and `imap-acct list`, compare message counts in `imapsql.db` with the live one, then delete the folder. The snapshot holds Maddy data, config, compose, certificates, dashboard database, helper state and operator files (about 200 MB).
-- Roll back the last dashboard deploy: `/root/cutover-20261121/rollback-dashboard.sh` (as root; needs image `mail-admin:stage11`, which stays on the VM). Undo the DNS update service: `/root/cutover-20261121/rollback-dns-update.sh`.
+- Roll back the last dashboard deploy: `/root/cutover-20261121/rollback-dashboard.sh` (as root; needs image `mail-admin:stage11`, which stays on the VM). Roll back the v13 deploy (password-only confirmation, queue code): `/root/cutover-20261121/rollback-v13.sh` (needs `mail-admin:stage12`). Undo the DNS update service: `/root/cutover-20261121/rollback-dns-update.sh`.
 
 ## Rotate secrets
 - Certificate and DNS token: `/etc/mail-admin/dns-update.token` is read by the DNS-update service and passed to the Maddy container as `CLOUDFLARE_API_TOKEN` at `docker compose up`; rotating it means installing the new file, then recreating `maddy`.
@@ -23,7 +23,8 @@ Live host: GCP VM `rsalehin24-mail` (us-east1-c), SSH `deployer@mail.rsalehin24.
 | Unit | When | Does |
 |---|---|---|
 | `mail-admin-backup.timer` | 03:00 Asia/Dhaka | Backup to R2 (Restic), verified by a restore to scratch |
-| `mail-admin-backup-control` / `-recovery` `.path` + `.timer` | on request file; 5 min fallback | Dashboard-requested backups, restores, mailbox recovery |
+| `mail-admin-backup-control` `.path` + `.timer` | on request file; 5 min fallback | Dashboard-requested backups and restores |
+| `mail-admin-recovery-expire` `.timer` | daily | Removes deleted-mailbox archives whose retention ended (`host.expire_recovery`) |
 | `mail-admin-maddy-restart.path` | on request file | Restart Maddy after a relay change |
 | `mail-admin-forwarding.timer` | 30 s | Sync forwarding with Cloudflare |
 | `mail-admin-monitor.timer` / `-independent-monitor` / `-tls-observation` | 5 min / 15 min / 2 min | Capacity, backup age, certificate expiry alerts |
@@ -49,3 +50,9 @@ Rehearsal result: a second Maddy and dashboard started only from the snapshot (o
 
 ## Forcing a new external IP (test of the DNS update)
 Stop the VM, `gcloud compute instances delete-access-config` then `add-access-config --network-tier=STANDARD` (never an address reservation), start it, and check the Cloudflare record and the ports within a minute.
+
+## Deleted mailboxes (D-078)
+- Deleting is a direct dashboard action: the dashboard archives the mailbox (encrypted, in `/var/lib/mail-admin-helper/recovery-points`), removes it from Maddy and records it, while Maddy keeps running. There is no queue and no worker.
+- Restore a deleted mailbox (rare, on the VM as root): `sudo python3 -m host.restore_mailbox <record-id>` (the id is shown on the dashboard's Deleted page; the command asks for the new mailbox password). Maddy keeps running.
+- Expiry: `mail-admin-recovery-expire.timer` runs daily. Run it by hand with `sudo python3 -m host.expire_recovery`.
+- The dashboard user must own `recovery-points/` and `recovery.key` (D-078): `sudo chown -R mail-admin:mail-admin /var/lib/mail-admin-helper/recovery-points /var/lib/mail-admin-helper/recovery.key`.

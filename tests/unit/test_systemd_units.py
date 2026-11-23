@@ -8,7 +8,6 @@ HELPER_STATE = "/var/lib/mail-admin-helper"
 # Each worker is started by a request landing in its database; the timer is only a fallback.
 WORKERS = {
     "mail-admin-backup-control": "backup-control.db",
-    "mail-admin-recovery": "recovery.db",
 }
 MINIMUM_FALLBACK_SECONDS = 60
 SECONDS_PER_UNIT = {"s": 1, "sec": 1, "min": 60}
@@ -52,6 +51,18 @@ class WorkerActivationTests(unittest.TestCase):
                 self.assertEqual(path["Path"]["PathChanged"], f"{HELPER_STATE}/{database}")
                 self.assertEqual(path["Path"]["Unit"], worker + ".service")
                 self.assertEqual(path["Install"]["WantedBy"], "paths.target")
+
+    def test_recovery_has_no_worker_only_a_daily_expiry_timer(self):
+        for removed in ("mail-admin-recovery.path", "mail-admin-recovery.timer"):
+            self.assertFalse((UNITS / removed).exists(), removed)
+        timer = unit("mail-admin-recovery-expire.timer")
+        self.assertEqual(timer["Timer"]["OnCalendar"], "daily")
+        self.assertEqual(timer["Timer"]["Persistent"], "true")
+        service = unit("mail-admin-recovery-expire.service")
+        self.assertEqual(service["Service"]["Type"], "oneshot")
+        self.assertEqual(
+            service["Service"]["ExecStart"], "/usr/bin/python3 -m host.expire_recovery")
+        self.assertEqual(service["Service"]["ReadWritePaths"], HELPER_STATE)
 
     def test_fallback_timers_do_not_poll_every_few_seconds(self):
         for worker in WORKERS:

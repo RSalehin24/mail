@@ -27,7 +27,7 @@ export function SenderVerification({ emails, mailboxes, authorize, notify, onClo
             else failures[email] = 'Delivery was rejected. Check this sender in Brevo, then retry.';
           } catch (failure) {
             failures[email] = (failure as Error).message;
-            if (failure instanceof ApiError && ['recent_authentication_required', 'authentication_required'].includes(failure.code)) throw failure;
+            if (failure instanceof ApiError && ['recent_authentication_required', 'password_confirmation_required', 'authentication_required'].includes(failure.code)) throw failure;
           }
         }
         setErrors(failures); await onChanged();

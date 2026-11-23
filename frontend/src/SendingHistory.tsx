@@ -28,7 +28,7 @@ export function SendingHistory({ mailbox, authorize, notify, onChanged, onSend }
         {!!test.accepted && !test.confirmed && current && <Button sx={{ mt: 1.5 }} variant="outlined" size="small" disabled={!!busy} onClick={() => authorize(async () => {
           setBusy(test.id); setError('');
           try { await api(`/relay-tests/${test.id}/confirm`, {}); await onChanged(); notify(`Sending verified for ${mailbox.email}`); }
-          catch (failure) { if (failure instanceof ApiError && ['recent_authentication_required', 'authentication_required'].includes(failure.code)) throw failure; setError((failure as Error).message); }
+          catch (failure) { if (failure instanceof ApiError && ['recent_authentication_required', 'password_confirmation_required', 'authentication_required'].includes(failure.code)) throw failure; setError((failure as Error).message); }
           finally { setBusy(''); }
         })}>Confirm receipt</Button>}
       </Box>;

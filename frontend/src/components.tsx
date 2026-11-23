@@ -45,6 +45,28 @@ export function RecoveryCodes({ codes, onSaved }: { codes: string[]; onSaved: ()
   </Dialog>;
 }
 
+export function ConfirmPassword({ onVerified, onCancel }: { onVerified: () => void; onCancel: () => void }) {
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function confirm() {
+    setBusy(true); setError('');
+    try { await api('/security/confirm', { email: 'rsalehin24@gmail.com', password }); setPassword(''); onVerified(); }
+    catch (failure) { setError((failure as Error).message); }
+    finally { setBusy(false); }
+  }
+  return <Dialog open fullWidth maxWidth="xs" onClose={busy ? undefined : onCancel} aria-labelledby="confirm-title">
+    <DialogTitle id="confirm-title">Confirm your password</DialogTitle>
+    <DialogContent><Stack spacing={2} sx={{ pt: 1 }} onKeyDown={event => { if (event.key === 'Enter' && !busy && password) { event.preventDefault(); void confirm(); } }}>
+      {error && <Alert severity="error">{error}</Alert>}
+      <TextField label="Master password" type="password" value={password} autoFocus autoComplete="current-password"
+        onChange={event => setPassword(event.target.value)}/>
+    </Stack></DialogContent>
+    <DialogActions><Button onClick={onCancel} disabled={busy}>Cancel</Button>
+      <Button variant="contained" onClick={confirm} disabled={busy || !password}>Confirm</Button></DialogActions>
+  </Dialog>;
+}
+
 export function Reauthenticate({ onVerified, onCancel }: { onVerified: () => void; onCancel: () => void }) {
   const [password, setPassword] = useState('');
   const [challenge, setChallenge] = useState('');

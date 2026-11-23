@@ -1,6 +1,6 @@
 """Isolated extraction and row-level import for the pinned imapsql schema.
 
-Callers must stop the mail writer while accessing the live store. Import never
+Maddy may keep running: its database is in WAL mode. Import never
 replaces the shared database, preserves mailbox content and refuses an address
 conflict. Recovery databases contain only the selected account.
 """
@@ -53,10 +53,10 @@ COLUMNS = {
 
 
 @contextmanager
-def connect(path: Path) -> Iterator[sqlite3.Connection]:
+def connect(path: Path, timeout: float = 0.25) -> Iterator[sqlite3.Connection]:
     if path.is_symlink() or not path.is_file():
         raise ServiceError("mailbox_store_missing", 503)
-    connection = sqlite3.connect(path.as_uri() + "?mode=rw", uri=True, timeout=0.25)
+    connection = sqlite3.connect(path.as_uri() + "?mode=rw", uri=True, timeout=timeout)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys=ON")
     connection.execute("PRAGMA synchronous=FULL")

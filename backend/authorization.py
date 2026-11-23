@@ -29,6 +29,14 @@ async def authenticated(request: Request) -> None:
     await application.io.run(lambda: application.authentication.require_session(session(request)))
 
 
+async def confirmed(request: Request) -> None:
+    """Operations: a recent password confirmation or a recent full re-authentication."""
+    application = services(request)
+    await application.io.run(
+        lambda: application.authentication.require_confirmation(session(request))
+    )
+
+
 async def recent(request: Request) -> None:
     application = services(request)
     await application.io.run(

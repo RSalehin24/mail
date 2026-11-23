@@ -17,6 +17,14 @@ Updated 2026-11-21 (after the UI, notification mail, OS update and cleanup work)
 - The owner checked the dashboard pages and confirmed mail works in a client; the server log shows a real inbound message accepted through Cloudflare routing and the message count rising from 153 to 155, with an empty outbound queue.
 - After the UI and notification deploy the owner signed in and the new dashboard worked; the delivery test mail arrived and its receipt was confirmed; a temporary mailbox was created, deleted, restored and deleted again; the owner reported everything works as expected (D-054, D-061 to D-063).
 
+## Done 2026-11-23 (D-070 to D-079)
+- Password-only operations (D-070), recovery path loop fixed (D-074), then direct deletion (D-078, D-079): the dashboard archives, removes and records a mailbox in one request with Maddy running, no queue, no worker, no recovery proof. Image `mail-admin:stage16`; rollbacks `/root/cutover-20261121/rollback-v13.sh`, `-v14.sh`, `-v15.sh`, `-v16.sh`.
+- Restoring a deleted mailbox: `sudo python3 -m host.restore_mailbox <record-id>` (RUNBOOK). Expiry: `mail-admin-recovery-expire.timer`, daily.
+- Checks on main: lint, typecheck, reads, unit 413, integration 93, all 29 real-Maddy modules and the runtime suite, `make browser` (`MAIL_ADMIN_CHROME=/usr/bin/google-chrome-stable`).
+
+## Next (PLAN-SIMPLE)
+Plan: [PLAN-SIMPLE](PLAN-SIMPLE.md). v3 backups without a Maddy stop and the backup-now and restore-backup commands; v4 forwarding off its 30-second timer and relay change without a restart; v5 one database and fewer units; v6 remove the dead job-queue code in `helper/recovery_records.py`; v7 new frontend from Figma ([FIGMA-BRIEF](FIGMA-BRIEF.md)). Leftover test mailbox `uitest-d@rsalehin24.me` exists again (live restore test); delete it again from the dashboard.
+
 ## Open (only things that depend on time)
 1. Tonight's 03:00 Dhaka backup is the first scheduled run on the new code, kernel and Docker: check it is `verified` with 9 accounts (the journal says why a run failed).
 2. Billing: look at Billing, then Reports, in a few days for any non-zero line; the $0.01 alert `zero-cost-guard` is set.

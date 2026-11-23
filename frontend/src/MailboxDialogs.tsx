@@ -27,7 +27,7 @@ export function PasswordDialog({ mode, mailbox, onClose, onChanged, notify, auth
       }) : await api<Outcome>(`/accounts/${encodeURIComponent(mailbox!.email)}/password`, { request_id: identifier, password });
       if (result.state !== 'complete') { setUncertain(true); setError(`${result.warning || 'Reconciliation required.'} Operation ${identifier}`); }
       else { notify(mode === 'create' ? 'Mailbox created. Authorize its sender in Brevo before sending.' : 'Password changed. Existing IMAP sessions may remain active.'); onChanged(); onClose(); }
-    } catch (failure) { if (failure instanceof ApiError && failure.code === 'recent_authentication_required') throw failure; setError((failure as Error).message); setUncertain(true); }
+    } catch (failure) { if (failure instanceof ApiError && ['recent_authentication_required', 'password_confirmation_required'].includes(failure.code)) throw failure; setError((failure as Error).message); setUncertain(true); }
     finally { setBusy(false); }
   }
   return <Dialog open fullScreen={fullScreen} fullWidth maxWidth="sm" onClose={busy ? undefined : onClose} aria-labelledby="mailbox-dialog-title">
@@ -78,7 +78,7 @@ export function DeleteDialog({ mailbox, cutoff, ...common }: Common & { mailbox:
           const outcome = await api<Outcome>(`/accounts/${encodeURIComponent(mailbox.email)}`, { request_id: identifier, confirmation, acknowledged, cutoff }, 'DELETE');
           if (outcome.state !== 'complete') setError(`${outcome.warning} Operation ${identifier}`);
           else { common.notify('Mailbox deleted'); common.onChanged(); common.onClose(); }
-        } catch (failure) { if (failure instanceof ApiError && failure.code === 'recent_authentication_required') { setAttempted(false); throw failure; } setError((failure as Error).message); }
+        } catch (failure) { if (failure instanceof ApiError && ['recent_authentication_required', 'password_confirmation_required'].includes(failure.code)) { setAttempted(false); throw failure; } setError((failure as Error).message); }
         finally { setBusy(false); }
       })}>Delete permanently</Button></DialogActions>
   </Dialog>;

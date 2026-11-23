@@ -1,14 +1,28 @@
 """Explicit synthetic recovery policy for application/browser permission fixtures."""
 
 import dataclasses
-import hashlib
 import os
-from pathlib import Path
 
 from helper.backup_control import BackupControl
-from helper.recovery import QUALIFIED_FILES, RecoveryControl
+from helper.recovery import RecoveryControl
 from helper.recovery_records import RecoveryRecords
 from shared.files import atomic_json
+
+
+class RecordingDeletion:
+    """Stands in for the real DirectDeletion: records the request, keeps the idempotency rule."""
+
+    def __init__(self, records):
+        self.records, self.requests = records, []
+
+    def delete(self, request, policy, now):
+        self.records.begin(request.identifier, request.email, policy, request.retention, now,
+                           '', '')
+        with self.records.transaction() as connection:
+            connection.execute("UPDATE recovery_records SET state='deleted' WHERE id=?",
+                               (request.identifier,))
+        self.requests.append(request)
+        return {'request_id': request.identifier, 'state': 'complete', 'error': ''}
 
 
 def configure_recovery(fixture):
@@ -19,18 +33,8 @@ def configure_recovery(fixture):
               'permanent_deletion_enabled': False, 'default_retention': '7_days',
               'protected': {'mail@rsalehin24.me': 'Administrator verification emails'}}
     atomic_json(root / 'recovery-policy.json', policy)
-    qualify_fixture(root)
-    control = RecoveryControl(root, records, os.getuid())
+    control = RecoveryControl(root, records, os.getuid(), deletion=RecordingDeletion(records))
     fixture.host.helper.dependencies = dataclasses.replace(
         fixture.host.helper.dependencies, recovery=control, backups=BackupControl(root),
     )
     return control
-
-
-def qualify_fixture(directory):
-    root = Path(__file__).resolve().parents[1]
-    atomic_json(directory / 'recovery-qualified.json', {
-        'schema_version': 1, 'qualified': True, 'scope': 'synthetic isolated tests only',
-        'files': {name: hashlib.sha256((root / name).read_bytes()).hexdigest()
-                  for name in QUALIFIED_FILES},
-    })

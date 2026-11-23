@@ -9,7 +9,7 @@ import { AuthView } from './AuthView';
 import { Dashboard } from './Dashboard';
 import { Overview } from './Overview';
 import { SettingsView } from './SettingsView';
-import { Reauthenticate, RecoveryCodes } from './components';
+import { ConfirmPassword, Reauthenticate, RecoveryCodes } from './components';
 import './styles.css';
 import { theme } from './theme';
 import { ThemeToggle } from './ThemeToggle';
@@ -31,6 +31,7 @@ export function App() {
   const notify = useCallback((text: string) => setToast(text ? { text, severity: 'success' } : null), []);
   const [codes, setCodes] = useState<string[]>([]);
   const [reauth, setReauth] = useState(false);
+  const [confirmation, setConfirmation] = useState(false);
   const [navigation, setNavigation] = useState(false);
   const pending = useRef<(() => Promise<void>) | null>(null);
   const checkSession = useCallback(async () => {
@@ -43,7 +44,7 @@ export function App() {
   }, []);
   useEffect(() => { void checkSession(); }, [checkSession]);
   useEffect(() => {
-    const expired = () => { setAuthenticated(false); setCodes([]); pending.current = null; setReauth(false); };
+    const expired = () => { setAuthenticated(false); setCodes([]); pending.current = null; setReauth(false); setConfirmation(false); };
     window.addEventListener('mail-admin-session-expired', expired);
     return () => { window.removeEventListener('mail-admin-session-expired', expired); };
   }, []);
@@ -56,6 +57,9 @@ export function App() {
     catch (failure) {
       if (failure instanceof ApiError && failure.code === 'recent_authentication_required') {
         pending.current = operation; setReauth(true); return;
+      }
+      if (failure instanceof ApiError && failure.code === 'password_confirmation_required') {
+        pending.current = operation; setConfirmation(true); return;
       }
       if (failure instanceof ApiError && failure.status === 401 && failure.code === 'authentication_required') setAuthenticated(false);
       setToast({ text: (failure as Error).message, severity: 'error' });
@@ -91,6 +95,9 @@ export function App() {
         {authenticated && <Box component="aside" className="rail"><NavigationList current={view}/></Box>}
         <Box className="page">{content}</Box>
       </Box>}
+    {confirmation && <ConfirmPassword onCancel={() => { pending.current = null; setConfirmation(false); }} onVerified={() => {
+      setConfirmation(false); const operation = pending.current; pending.current = null; if (operation) void execute(operation);
+    }}/>}
     {reauth && <Reauthenticate onCancel={() => { pending.current = null; setReauth(false); }} onVerified={() => {
       setReauth(false); const operation = pending.current; pending.current = null; if (operation) void execute(operation);
     }}/>}

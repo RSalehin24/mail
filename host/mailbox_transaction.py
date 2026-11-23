@@ -1,8 +1,9 @@
-"""Atomic mailbox state across storage, credentials, metadata, generation and ledger.
+"""Atomic state across credentials, metadata, generation and ledger.
 
-The mail writer must be stopped. Rollback journals and FULL synchronization are
-required for SQLite's attached-database super-journal commit protocol. File bodies
-are durably staged first; their operation-specific names are recorded before use.
+A WAL database (Maddy's mail store) cannot be part of this commit. Rollback journals and
+FULL synchronization are required for SQLite's attached-database super-journal commit
+protocol. File bodies are durably staged first; their operation-specific names are
+recorded before use.
 """
 
 import sqlite3
@@ -16,6 +17,15 @@ from shared.errors import ServiceError
 @contextmanager
 def mailbox_transaction(paths: dict[str, Path]) -> Iterator[sqlite3.Connection]:
     if set(paths) != {'main', 'credentials', 'dashboard', 'incarnations', 'ledger'}:
+        raise ServiceError('invalid_mailbox_transaction', 503)
+    with attached_transaction(paths) as connection:
+        yield connection
+
+
+@contextmanager
+def attached_transaction(paths: dict[str, Path]) -> Iterator[sqlite3.Connection]:
+    """One atomic commit across rollback-journal databases; 'main' is the opened one."""
+    if 'main' not in paths:
         raise ServiceError('invalid_mailbox_transaction', 503)
     for path in paths.values():
         if path.is_symlink() or not path.is_file():

@@ -3,8 +3,6 @@ import re
 import unittest
 from pathlib import Path
 
-from helper.recovery import QUALIFIED_FILES
-
 ROOT = Path(__file__).resolve().parents[2]
 ENTRY_MODULE = "backend.local_host"
 COPIED_PACKAGES = ("helper", "host", "shared")
@@ -61,8 +59,3 @@ class RuntimeImageFileTests(unittest.TestCase):
         self.assertGreater(len(names), 10)
         for name in names:
             self.assertIn(module_file(name).relative_to(ROOT), copied, name)
-
-    def test_runtime_image_holds_the_files_the_recovery_qualification_hashes(self):
-        copied = runtime_stage_copies()
-        for name in QUALIFIED_FILES:
-            self.assertIn(Path(name), copied, name)

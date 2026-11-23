@@ -5,7 +5,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, Request
 from pydantic import Field
 
-from backend.authorization import authenticated, peer, recent, services
+from backend.authorization import authenticated, confirmed, peer, recent, services
 from backend.requests import RequestModel
 from shared.errors import ServiceError
 from shared.validation import MAIL_HOST, OTP_SENDER, address
@@ -52,7 +52,7 @@ async def test(body: RelayTestRequest, request: Request) -> dict[str, Any]:
     )
 
 
-@router.post("/relay-tests/{test_id}/confirm", dependencies=[Depends(recent)])
+@router.post("/relay-tests/{test_id}/confirm", dependencies=[Depends(confirmed)])
 async def confirm(test_id: str, request: Request) -> dict[str, bool]:
     application = services(request)
     return await application.io.run(lambda: application.relay.confirm(test_id))
@@ -68,7 +68,7 @@ async def reveal(request: Request) -> dict[str, str]:
     }
 
 
-@router.post("/accounts/{email}/test-sender", dependencies=[Depends(recent)])
+@router.post("/accounts/{email}/test-sender", dependencies=[Depends(confirmed)])
 async def sender(email: str, request: Request) -> dict[str, Any]:
     application = services(request)
     normalized = await application.io.run(lambda: application.mailboxes.existing(email))

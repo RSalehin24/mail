@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 
-from backend.authorization import authenticated, recent, services
+from backend.authorization import authenticated, confirmed, services
 from backend.requests import CreateMailbox, DeleteMailbox, MailboxMetadata, ResetMailbox
 from shared.errors import ServiceError
 
@@ -31,14 +31,14 @@ async def create(body: CreateMailbox, request: Request) -> dict[str, Any]:
     return await application.io.run(lambda: application.mailboxes.create(body.model_dump()))
 
 
-@router.post("/accounts/{email}/password", dependencies=[Depends(recent)])
+@router.post("/accounts/{email}/password", dependencies=[Depends(confirmed)])
 async def reset(email: str, body: ResetMailbox, request: Request) -> dict[str, Any]:
     application = services(request)
     request.state.operation_id = body.request_id
     return await application.io.run(lambda: application.mailboxes.reset(email, body.model_dump()))
 
 
-@router.patch('/accounts/{email}/metadata', dependencies=[Depends(recent)])
+@router.patch('/accounts/{email}/metadata', dependencies=[Depends(confirmed)])
 async def metadata(email: str, body: MailboxMetadata, request: Request) -> dict[str, str]:
     application = services(request)
     return await application.io.run(
@@ -46,7 +46,7 @@ async def metadata(email: str, body: MailboxMetadata, request: Request) -> dict[
     )
 
 
-@router.delete("/accounts/{email}", dependencies=[Depends(recent)])
+@router.delete("/accounts/{email}", dependencies=[Depends(confirmed)])
 async def delete(email: str, body: DeleteMailbox, request: Request) -> dict[str, Any]:
     application = services(request)
     if not application.settings.permanent_deletion_enabled:

@@ -1,4 +1,4 @@
-"""Password challenges and opaque sessions; password verification alone grants nothing."""
+"""Password challenges and opaque sessions; a password alone unlocks operations, not settings."""
 
 import hmac
 import secrets
@@ -20,6 +20,8 @@ from shared.errors import ServiceError
 from shared.validation import ADMIN_EMAIL, master_password
 
 OTP_GENERATION_ATTEMPTS = 8
+CONFIRMATION_PURPOSE = "confirmation"
+GRANT_SECONDS = 300
 
 
 @dataclass(frozen=True)
@@ -60,14 +62,18 @@ class Authentication:
         self.budgets.reserve(BudgetReservation("auth", peer, now))
         return now
 
-    def password_challenge(self, credentials: Credentials, session: str | None = None) -> str:
-        now = self.reserve(credentials.peer)
+    def _verified_admin(self, credentials: Credentials) -> sqlite3.Row:
+        self.reserve(credentials.peer)
         master_password(credentials.password)
         with self.database.transaction() as connection:
             before = admin_state(connection)
         if not before["initialized"] or credentials.email != ADMIN_EMAIL:
             raise ServiceError("authentication_failed", 401)
         self._check_password(before["password_hash"], credentials.password)
+        return before
+
+    def password_challenge(self, credentials: Credentials, session: str | None = None) -> str:
+        before = self._verified_admin(credentials)
         now = self.dependencies.clock()
         with self.database.transaction() as connection:
             current = admin_state(connection)
@@ -75,6 +81,27 @@ class Authentication:
                 raise ServiceError("authentication_failed", 401)
             binding = self._session(connection, (session, now))["token_hash"] if session else None
             return self._new_challenge(connection, (current["revision"], binding, now))
+
+    def confirm_password(self, credentials: Credentials, session: str) -> None:
+        """Grant five minutes of password-only operations; settings still need the second factor."""
+        before = self._verified_admin(credentials)
+        now = self.dependencies.clock()
+        with self.database.transaction() as connection:
+            if admin_state(connection)["revision"] != before["revision"]:
+                raise ServiceError("authentication_failed", 401)
+            binding = self._session(connection, (session, now))["token_hash"]
+            connection.execute(
+                "INSERT INTO auth_challenges VALUES(?,?,?,?,?,?)",
+                (
+                    self.keys.digest(secrets.token_urlsafe(32), "challenge"),
+                    CONFIRMATION_PURPOSE,
+                    binding,
+                    before["revision"],
+                    now,
+                    now + GRANT_SECONDS,
+                ),
+            )
+            audit(connection, (now, "confirm", "verified"))
 
     def _check_password(self, password_hash: str, password: str) -> None:
         try:
@@ -180,6 +207,23 @@ class Authentication:
             row = self._session(connection, (token, now))
             if recent and (row["recent_auth"] is None or row["recent_auth"] + 300 <= now):
                 raise ServiceError("recent_authentication_required", 403)
+            connection.execute(
+                "UPDATE sessions SET last_activity=? WHERE token_hash=?", (now, row["token_hash"])
+            )
+            return str(row["token_hash"])
+
+    def require_confirmation(self, token: str | None) -> str:
+        """Operations accept a fresh password grant or a fresh full re-authentication."""
+        now = self.dependencies.clock()
+        with self.database.transaction() as connection:
+            row = self._session(connection, (token, now))
+            grant = connection.execute(
+                "SELECT 1 FROM auth_challenges WHERE purpose=? AND session_hash=? "
+                "AND revision=? AND expiry>?",
+                (CONFIRMATION_PURPOSE, row["token_hash"], row["revision"], now),
+            ).fetchone()
+            if grant is None and (row["recent_auth"] is None or row["recent_auth"] + 300 <= now):
+                raise ServiceError("password_confirmation_required", 403)
             connection.execute(
                 "UPDATE sessions SET last_activity=? WHERE token_hash=?", (now, row["token_hash"])
             )

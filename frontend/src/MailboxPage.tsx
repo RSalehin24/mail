@@ -61,7 +61,7 @@ export function MailboxPage({ encodedEmail, tab, authorize, notify }: {
         {tab === 'connections' && <ClientConfig mailbox={mailbox} {...common} embedded/>}
       </Paper>
       {dialog === 'password' && <PasswordDialog mailbox={mailbox} mode="reset" {...common}/>}
-      {dialog === 'delete' && <RecoveryAction email={mailbox.email} mode="delete" {...common} onChanged={() => navigate('/mailboxes')}/>}
+      {dialog === 'delete' && <RecoveryAction email={mailbox.email} {...common} onChanged={() => navigate('/mailboxes')}/>}
       {dialog === 'verify' && <SenderVerification emails={[mailbox.email]} mailboxes={[mailbox]} {...common} onChanged={load}/>}
     </>}
   </Stack>;

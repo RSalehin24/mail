@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Request
 from pydantic import Field
 
-from backend.authorization import authenticated, recent, services
+from backend.authorization import authenticated, confirmed, services
 from backend.requests import RequestModel
 
 router = APIRouter(prefix="/api/forwarding", dependencies=[Depends(authenticated)])
@@ -43,17 +43,17 @@ async def listing(request: Request) -> dict[str, Any]:
     return await call(request, "forwarding_list", {})
 
 
-@router.put("", dependencies=[Depends(recent)])
+@router.put("", dependencies=[Depends(confirmed)])
 async def save(body: ForwardingSave, request: Request) -> dict[str, Any]:
     return await call(request, "forwarding_save", body.model_dump())
 
 
-@router.post("/remove", dependencies=[Depends(recent)])
+@router.post("/remove", dependencies=[Depends(confirmed)])
 async def remove(body: ForwardingRemove, request: Request) -> dict[str, Any]:
     return await call(request, "forwarding_remove", body.model_dump())
 
 
-@router.post("/retry", dependencies=[Depends(recent)])
+@router.post("/retry", dependencies=[Depends(confirmed)])
 async def retry(body: ForwardingRetry, request: Request) -> dict[str, Any]:
     return await call(request, "forwarding_retry", body.model_dump())
 
@@ -62,11 +62,11 @@ class ForwardingVerification(RequestModel):
     email: str = Field(max_length=256)
 
 
-@router.post("/verify", dependencies=[Depends(recent)])
+@router.post("/verify", dependencies=[Depends(confirmed)])
 async def verify(body: ForwardingVerification, request: Request) -> dict[str, Any]:
     return await call(request, "forwarding_verify", body.model_dump())
 
 
-@router.post("/verify-local", dependencies=[Depends(recent)])
+@router.post("/verify-local", dependencies=[Depends(confirmed)])
 async def verify_local(body: ForwardingVerification, request: Request) -> dict[str, Any]:
     return await call(request, "forwarding_verify_local", body.model_dump())

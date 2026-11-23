@@ -11,7 +11,6 @@ import unittest
 
 from shared.files import atomic_json
 from tests.maddy_support import SERVICE_ID, UnprivilegedMaddyFixture
-from tests.recovery_support import qualify_fixture
 from tests.runtime_auth_support import RuntimeAuthentication
 from tests.runtime_support import RuntimeFixture
 
@@ -68,8 +67,6 @@ class RootWrittenFilesTests(unittest.TestCase):
         atomic_json(state / "recovery-policy.json", POLICY)
         # The dashboard edits the policy, so it belongs to the state owner like the rest.
         os.chown(state / "recovery-policy.json", SERVICE_ID, SERVICE_ID)
-        qualify_fixture(state)
-        RuntimeFixture.grant_dashboard(state / "recovery-qualified.json")
 
     def host_status(self):
         status, _, result = self.web.api("GET", "/api/diagnostics")

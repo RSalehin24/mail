@@ -33,27 +33,7 @@ class RecoveryControlApiTests(ApiTestCase):
         }
 
     async def test_session_and_recent_authentication_protect_every_recovery_mutation(self):
-        identifier = str(uuid.uuid4())
-        paths = [
-            ("/api/recovery/delete", self.deletion()),
-            (
-                f"/api/recovery/mailboxes/{identifier}/restore",
-                {
-                    "request_id": str(uuid.uuid4()),
-                    "confirmation": self.email,
-                    "acknowledged": True,
-                    "password": MAILBOX_PASSWORD,
-                },
-            ),
-            (
-                f"/api/recovery/mailboxes/{identifier}/remove",
-                {"request_id": str(uuid.uuid4()), "confirmation": self.email, "acknowledged": True},
-            ),
-            (
-                f"/api/recovery/mailboxes/{identifier}/reconcile",
-                {"request_id": str(uuid.uuid4()), "confirmation": self.email, "acknowledged": True},
-            ),
-        ]
+        paths = [("/api/recovery/delete", self.deletion())]
         for path, body in paths:
             self.assertEqual((await self.client.post(path, json=body)).status_code, 401)
         self.assertEqual((await self.client.get("/api/recovery/policy")).status_code, 401)
@@ -66,17 +46,13 @@ class RecoveryControlApiTests(ApiTestCase):
         body = self.deletion()
         result = await self.client.post("/api/recovery/delete", json=body)
         self.assertEqual(result.status_code, 200)
-        self.assertEqual(result.json()["state"], "queued")
+        self.assertEqual(result.json()["state"], "complete")
         self.assertEqual(
             (await self.client.post("/api/recovery/delete", json=body)).json(), result.json()
         )
-        with self.control.records.transaction() as connection:
-            self.assertEqual(
-                connection.execute("SELECT COUNT(*) FROM recovery_jobs").fetchone()[0], 1
-            )
-            self.assertEqual(
-                connection.execute("SELECT COUNT(*) FROM recovery_audit").fetchone()[0], 1
-            )
+        self.assertEqual(len(self.control.deletion.requests), 2)
+        self.assertEqual({r.identifier for r in self.control.deletion.requests},
+                         {body["request_id"]})
 
     async def test_root_policy_rejects_protected_permanent_and_stale_settings(self):
         token = self.fixture.login()
@@ -137,31 +113,6 @@ class RecoveryControlApiTests(ApiTestCase):
             200,
         )
 
-    async def test_drifted_qualification_cannot_enable_or_execute_deletion(self):
-        token = self.fixture.login()
-        self.fixture.reauth(token)
-        self.set_session(token)
-        policy = self.control.policy()
-        atomic_json(self.control.policy_path, {**policy, "enabled": False})
-        atomic_json(
-            self.control.directory / "recovery-qualified.json",
-            {
-                "schema_version": 1,
-                "qualified": False,
-                "files": {},
-            },
-        )
-        result = await self.client.put(
-            "/api/recovery/policy",
-            json={
-                "policy": policy,
-                "acknowledged": True,
-            },
-        )
-        self.assertEqual(result.status_code, 403)
-        self.assertEqual(result.json()["error"], "recovery_not_qualified")
-        self.assertFalse(self.control.policy()["enabled"])
-
     async def test_duplicate_delete_cannot_change_address_or_retention(self):
         token = self.fixture.login()
         self.fixture.reauth(token)
@@ -170,9 +121,12 @@ class RecoveryControlApiTests(ApiTestCase):
         self.assertEqual(
             (await self.client.post("/api/recovery/delete", json=payload)).status_code, 200
         )
-        for change in ({"retention": "forever"}, {"confirmation": "wrong@rsalehin24.me"}):
-            response = await self.client.post("/api/recovery/delete", json={**payload, **change})
-            self.assertEqual(response.status_code, 409)
+        changed = await self.client.post(
+            "/api/recovery/delete", json={**payload, "retention": "forever"})
+        self.assertEqual(changed.status_code, 409)
+        wrong = await self.client.post(
+            "/api/recovery/delete", json={**payload, "confirmation": "wrong@rsalehin24.me"})
+        self.assertEqual(wrong.status_code, 400)
 
     async def test_dont_retain_maps_to_permanent_and_cannot_bypass_root_policy(self):
         token = self.fixture.login()
@@ -188,8 +142,7 @@ class RecoveryControlApiTests(ApiTestCase):
         body = self.deletion(retention="none")
         accepted = await self.client.post("/api/recovery/delete", json=body)
         self.assertEqual(accepted.status_code, 200)
-        job = self.control.records.original_job(body["request_id"])
-        self.assertTrue(job["payload"]["permanent"])
+        self.assertTrue(self.control.deletion.requests[-1].permanent)
         repeated = await self.client.post("/api/recovery/delete", json=body)
         self.assertEqual(repeated.status_code, 200)
 

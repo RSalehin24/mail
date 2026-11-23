@@ -1,8 +1,0 @@
-[Unit]
-Description=Fallback sweep for queued mailbox recovery operations and expiry
-[Timer]
-OnBootSec=30sec
-OnUnitInactiveSec=5min
-Unit=mail-admin-recovery.service
-[Install]
-WantedBy=timers.target

@@ -8,6 +8,7 @@ const errorMessages: Record<string, string> = {
   invalid_verification_code: 'Invalid verification code.',
   authentication_required: 'Please sign in to continue.',
   recent_authentication_required: 'Please verify your identity to continue.',
+  password_confirmation_required: 'Please confirm your password to continue.',
   rate_limited: 'Too many attempts. Please try again later.',
   work_overloaded: 'The server is busy. Please try again shortly.',
   work_unavailable: 'The service is temporarily unavailable. Please try again shortly.',
@@ -105,7 +106,7 @@ async function request<T>(path: string, body?: unknown, method = 'POST', signal?
       if (result.error === 'recent_authentication_required') window.dispatchEvent(new Event('mail-admin-reauth-expired'));
       const code = result.error ?? 'request_failed';
       const authenticationMessage = code === 'authentication_failed'
-        ? errorMessage(path === '/login' || path === '/security/reauth' ? 'invalid_master_password' : 'invalid_verification_code')
+        ? errorMessage(path === '/login' || path === '/security/reauth' || path === '/security/confirm' ? 'invalid_master_password' : 'invalid_verification_code')
         : undefined;
       throw new ApiError(code, response.status, result.operation_id ?? result.request_id, authenticationMessage);
     }

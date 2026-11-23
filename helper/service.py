@@ -86,15 +86,15 @@ class HostHelper:
             if self.dependencies.recovery is None or request.recovery is None:
                 raise ServiceError("recovery_unavailable", 503)
             with HostLock(self.dependencies.lock, self.dependencies.lock_policy):
-                return {
-                    "protocol": HELPER_PROTOCOL,
-                    **self.dependencies.recovery.handle(
-                        request.operation,
-                        request.request_id,
-                        request.recovery,
-                        int(self.dependencies.clock()),
-                    ),
-                }
+                response = self.dependencies.recovery.handle(
+                    request.operation,
+                    request.request_id,
+                    request.recovery,
+                    int(self.dependencies.clock()),
+                )
+                # A direct delete changes the mailbox list; a cached list would bring it back.
+                self._inventory_cache = None
+                return {"protocol": HELPER_PROTOCOL, **response}
         if request.operation == "outcome":
             return {"protocol": HELPER_PROTOCOL, "outcome": self.journal.lookup(request.request_id)}
         if request.operation == "telemetry":

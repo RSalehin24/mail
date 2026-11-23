@@ -1,0 +1,18 @@
+[Unit]
+Description=Remove deleted-mailbox recovery archives whose retention has ended
+[Service]
+Type=oneshot
+WorkingDirectory=/usr/local/lib/mail-admin
+ExecStart=/usr/bin/python3 -m host.expire_recovery
+User=root
+UMask=0077
+MemoryMax=96M
+CPUQuota=25%
+TasksMax=32
+TimeoutStartSec=120
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/mail-admin-helper
+LogNamespace=mail-admin

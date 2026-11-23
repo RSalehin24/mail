@@ -187,18 +187,14 @@ async function mailboxFlows(connection, fixture) {
   await connection.click({ tag: 'button', name: 'Change incoming password' });
   await connection.fill('Mailbox password', '  replacement fixture password 42  ');
   await connection.click({ tag: 'button', name: 'Reset password' });
-  await connection.until(`document.querySelector('#reauth-title') !== null`);
+  await connection.until(`document.querySelector('#confirm-title') !== null`);
   await connection.fill('Master password', 'incorrect password');
-  await connection.click({ tag: 'button', name: 'Verify password' });
+  await connection.click({ tag: 'button', name: 'Confirm' });
   await connection.until(`[...document.querySelectorAll('[role=alert]')].some(element => element.textContent.includes('Invalid master password.'))`);
-  assert.equal(await connection.read(`document.querySelector('#reauth-title').closest('[role=dialog]').querySelector('[role=alert]').textContent`), 'Invalid master password.');
-  assert.equal(await connection.read(`document.querySelector('#reauth-title') !== null`), true);
+  assert.equal(await connection.read(`document.querySelector('#confirm-title').closest('[role=dialog]').querySelector('[role=alert]').textContent`), 'Invalid master password.');
+  assert.equal(await connection.read(`document.querySelector('#confirm-title') !== null`), true);
   await connection.fill('Master password', fixture.password);
-  await connection.click({ tag: 'button', name: 'Verify password' });
-  await connection.until(`[...document.querySelectorAll('button')].some(button => button.textContent === 'Recovery code')`);
-  await connection.click({ tag: 'button', name: 'Recovery code' });
-  await connection.fill('Recovery code', fixture.recovery_code);
-  await connection.click({ tag: 'button', name: 'Verify second factor' });
+  await connection.click({ tag: 'button', name: 'Confirm' });
   await connection.until(`document.querySelector('[role=dialog]') === null`);
   assert.equal(await connection.read(STORED_DATA), 0);
   await connection.fill('Display name', 'Updated mailbox');
@@ -237,11 +233,22 @@ async function mailboxFlows(connection, fixture) {
   await chooseTheme(connection, 'Light');
 }
 
-async function relayFlows(connection) {
+async function relayFlows(connection, fixture) {
   await connection.click({ tag: 'button', name: 'Outgoing mail provider' });
   await connection.fill('Brevo SMTP login', 'synthetic-browser-login');
   await connection.fill('Brevo SMTP key', 'synthetic-browser-key');
   await connection.click({ tag: 'button', name: 'Save relay' });
+  // Settings still need the password and a second factor (operations need only the password).
+  await connection.until(`document.querySelector('#reauth-title') !== null`);
+  await connection.fill('Master password', 'incorrect password');
+  await connection.click({ tag: 'button', name: 'Verify password' });
+  await connection.until(`[...document.querySelectorAll('[role=alert]')].some(element => element.textContent.includes('Invalid master password.'))`);
+  await connection.fill('Master password', fixture.password);
+  await connection.click({ tag: 'button', name: 'Verify password' });
+  await connection.until(`[...document.querySelectorAll('button')].some(button => button.textContent === 'Recovery code')`);
+  await connection.click({ tag: 'button', name: 'Recovery code' });
+  await connection.fill('Recovery code', fixture.recovery_code);
+  await connection.click({ tag: 'button', name: 'Verify second factor' });
   await connection.until(`document.body.textContent.includes('Saved revision 1')`);
   assert.equal(await connection.read(`document.querySelector('input[autocomplete="new-password"]').value`), '');
   await connection.click({ tag: 'button', name: 'Test connection' });
@@ -500,7 +507,7 @@ async function verify(connection, report) {
   await connection.until(`document.querySelector('[role=dialog]') === null`);
   await mailboxFlows(connection, fixture);
   await openSettings(connection);
-  await relayFlows(connection);
+  await relayFlows(connection, fixture);
   await verificationFlows(connection);
   await recoveryControls(connection);
   await settingsTabs(connection);

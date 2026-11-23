@@ -1,4 +1,4 @@
-"""Real HTTPS, in-process host, Maddy data and the root recovery worker; no production mutation."""
+"""Real HTTPS, in-process host and Maddy data: direct delete, then the owner's restore command."""
 
 import imaplib
 import os
@@ -6,71 +6,30 @@ import sqlite3
 import time
 import unittest
 import uuid
-from types import SimpleNamespace
 
-from host.locks import LockPolicy
-from host.mailbox_recovery import MailboxRecovery
+from host.restore_mailbox import MailboxRestore
 from shared.files import atomic_json
 from tests.helper_support import MAILBOX_PASSWORD
 from tests.maddy_support import SERVICE_ID, UnprivilegedMaddyFixture, imap_login
-from tests.recovery_support import qualify_fixture
-from tests.restore_support import FixtureWriters, bodies, deliver
+from tests.restore_support import bodies, deliver
 from tests.runtime_auth_support import RuntimeAuthentication
 from tests.runtime_support import RuntimeFixture
 
 
-class DashboardOwnedState:
-    """The Maddy fixture, but coordinating through the dashboard's own journal and lock."""
-
-    def __init__(self, mail, web):
-        self.mail = mail
-        self.helper = SimpleNamespace(
-            journal=web.journal(),
-            dependencies=SimpleNamespace(lock=web.lock, lock_policy=LockPolicy(5, SERVICE_ID)),
-        )
-
-    def __getattr__(self, name):
-        return getattr(self.mail, name)
-
-
 class RecoveryHttpsTests(unittest.TestCase):
-    def test_recoverable_delete_restore_and_retry_over_actual_https(self):
+    def test_direct_delete_then_owner_restore_over_actual_https(self):
         mail = UnprivilegedMaddyFixture()
         self.addCleanup(mail.close)
         mail.start()
         web = RuntimeFixture(mail)
         self.addCleanup(web.close)
-        # The dashboard process owns the queue; the root worker shares its state directory.
         root = web.state
         policy = {'schema_version': 1, 'revision': 1, 'enabled': True,
                   'permanent_deletion_enabled': False, 'default_retention': '7_days',
                   'protected': {'other@rsalehin24.me': 'Operational mailbox'}}
         atomic_json(root / 'recovery-policy.json', policy)
-        qualify_fixture(root)
-        # The dashboard edits the policy, so the service user owns it; root wrote the proof
-        # and shares it through the group, as the cutover sets them on the host.
         os.chown(root / 'recovery-policy.json', SERVICE_ID, SERVICE_ID)
-        RuntimeFixture.grant_dashboard(root / 'recovery-qualified.json')
         web.start()
-        shared = DashboardOwnedState(mail, web)
-        writers = FixtureWriters(shared)
-        os.chown(writers.renewal, SERVICE_ID, SERVICE_ID)
-        (root / 'recovery-worker.lock').touch(mode=0o600)
-        context = SimpleNamespace(
-            deployment={**mail.maddy.deployment, 'maddy_data_directory': str(mail.data),
-                        'state_owner_uid': SERVICE_ID,
-                        'maddy_message_paths': ['messages'],
-                        'backup_sources': {'dashboard': str(web.directories['data'])}},
-            docker=SimpleNamespace(inspect=lambda name: {}),
-            intents=SimpleNamespace(read=lambda: {'consumers': {'maddy': {}}}),
-            coordination=writers,
-        )
-        worker = MailboxRecovery(context, root)
-        worker.maddy, worker.writers = mail.maddy, writers
-        # The one-time grant: the store and its key are readable by the service group, and the
-        # worker then creates every new recovery point group-readable by itself.
-        RuntimeFixture.grant_dashboard(root / 'recovery-points')
-        RuntimeFixture.grant_dashboard(root / 'recovery.key')
         authentication = RuntimeAuthentication(self, web)
         authentication.enroll()
         authentication.login()
@@ -81,27 +40,21 @@ class RecoveryHttpsTests(unittest.TestCase):
                 'request_id': str(uuid.uuid4()), 'email': account, 'password': MAILBOX_PASSWORD,
             })
             self.assertEqual(status, 200)
-        status, _, original = web.api('GET', '/api/accounts/' + email)
-        self.assertEqual(status, 200)
+        original = web.api('GET', '/api/accounts/' + email)[2]
         generation = web.journal().incarnation(email)['generation']
         deliver(mail, email, 'https-recoverable-message')
         deliver(mail, 'other@rsalehin24.me', 'https-other-preserved')
-        identifier = str(uuid.uuid4())
-        payload = {'request_id': identifier, 'email': email, 'confirmation': email,
+        payload = {'request_id': str(uuid.uuid4()), 'email': email, 'confirmation': email,
                    'acknowledged': True, 'retention': '7_days', 'policy_revision': 1}
-        status, _, queued = web.api('POST', '/api/recovery/delete', payload)
-        self.assertEqual(status, 200)
-        self.assertEqual(queued['state'], 'queued')
-        self.assertEqual(web.api('POST', '/api/accounts/create', {
-            'request_id': str(uuid.uuid4()), 'email': 'blocked@rsalehin24.me',
-            'password': MAILBOX_PASSWORD,
-        })[0], 409)
         started = time.monotonic()
-        worker.run()
+        status, _, result = web.api('POST', '/api/recovery/delete', payload)
+        self.assertEqual((status, result['state']), (200, 'complete'))
         self.assertLess(time.monotonic() - started, 15)
-        self.assertEqual(web.api('GET', '/api/recovery/operations/' + identifier)[2]['state'],
-                         'complete')
         self.assertEqual(web.api('POST', '/api/recovery/delete', payload)[0], 200)
+        self.assertEqual(web.api('POST', '/api/accounts/create', {
+            'request_id': str(uuid.uuid4()), 'email': 'unblocked@rsalehin24.me',
+            'password': MAILBOX_PASSWORD,
+        })[0], 200)
         deleted = web.api('GET', '/api/recovery/mailboxes')[2]['mailboxes']
         self.assertEqual(deleted[0]['email'], email)
         self.assertTrue(deleted[0]['recovery_available'])
@@ -109,16 +62,11 @@ class RecoveryHttpsTests(unittest.TestCase):
         with sqlite3.connect(web.database.path) as connection:
             self.assertIsNone(connection.execute('SELECT 1 FROM mailboxes WHERE email=?',
                                                  (email,)).fetchone())
-        restore_id = str(uuid.uuid4())
         restored_password = 'HTTPS restored private password 2026'
-        restore = {'request_id': restore_id, 'confirmation': email, 'acknowledged': True,
-                   'password': restored_password}
-        endpoint = '/api/recovery/mailboxes/' + identifier + '/restore'
-        self.assertEqual(web.api('POST', endpoint, restore)[0], 200)
-        self.assertEqual(web.api('POST', endpoint, restore)[0], 200)
-        worker.run()
-        self.assertEqual(web.api('GET', '/api/recovery/operations/' + restore_id)[2]['state'],
-                         'complete')
+        deployment = {'maddy_data_directory': str(mail.data), 'state_owner_uid': SERVICE_ID,
+                      'backup_sources': {'dashboard': str(web.directories['data'])}}
+        MailboxRestore(deployment, root, mail.maddy).restore(
+            deleted[0]['id'], restored_password)
         result = web.api('GET', '/api/accounts/' + email)[2]
         self.assertEqual(result['created'], original['created'])
         self.assertNotEqual(web.journal().incarnation(email)['generation'], generation)
@@ -128,8 +76,7 @@ class RecoveryHttpsTests(unittest.TestCase):
             imap_login(mail, email, MAILBOX_PASSWORD)
         with imap_login(mail, 'other@rsalehin24.me', MAILBOX_PASSWORD) as connection:
             self.assertIn(b'https-other-preserved', bodies(connection))
-        self.assertEqual(web.api('POST', '/api/recovery/mailboxes/' + identifier + '/remove', {
-            'request_id': str(uuid.uuid4()), 'confirmation': email, 'acknowledged': True,
-        })[0], 403)
+        self.assertEqual(web.api('POST', '/api/recovery/mailboxes/' + deleted[0]['id']
+                                 + '/restore', {})[0], 404)
         logs = web.command(('logs', web.identifier))
         self.assertNotIn(restored_password, logs.stdout + logs.stderr)

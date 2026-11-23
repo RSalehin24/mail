@@ -13,7 +13,6 @@ from typing import Any
 
 from helper.backup_control import BackupControl
 from helper.maddy import DockerMaddy
-from helper.recovery import require_qualified
 from helper.recovery_records import RecoveryRecords
 from host.backup_operations import BACKUP_LOCK, BackupOperations
 from host.context import HostContext
@@ -261,7 +260,6 @@ class BackupWorker:
         }
 
     def restore(self, job: dict[str, Any]) -> dict[str, Any]:
-        require_qualified(self.root, 0)
         prepared = self.control.job(job["payload"]["previous"])
         if prepared["state"] != "complete" or prepared["snapshot"] != job["snapshot"]:
             raise ServiceError("backup_preflight_required", 409)
@@ -525,9 +523,11 @@ class BackupWorker:
         return {"operation": original["id"], "committed": committed, "mutation_replayed": False}
 
 
-def main() -> None:
-    from host.mailbox_recovery import interrupted
+def interrupted(_signal: int, _frame: Any) -> None:
+    raise ServiceError("backup_worker_interrupted", 503)
 
+
+def main() -> None:
     signal.signal(signal.SIGTERM, interrupted)
     signal.signal(signal.SIGALRM, interrupted)
     BackupWorker(HostContext.load()).run()
