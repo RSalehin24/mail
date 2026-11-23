@@ -59,7 +59,7 @@ class LocalHostFlowTests(MailFlowFixture):
         self.create_mailbox("owner-check@rsalehin24.me", "owner check fixture password")
         paths = (
             self.web.state,
-            self.web.state / "journal.db",
+            self.web.state / "state.db",
             self.web.lock,
             self.maddy.data / "credentials.db",
             self.maddy.data / "imapsql.db",

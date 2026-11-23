@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from helper.state_database import STATE_FILE, prepare_state
 from shared.errors import ServiceError
 from shared.files import protected_json
 from shared.validation import address, request_id
@@ -62,32 +63,8 @@ class ForwardingControl:
         self.root, self.data = root, data
         # The Cloudflare worker runs as root whoever owns the state directory.
         self.worker_owner = worker_owner
-        self.path = root / "forwarding.db"
-        if self.path.is_symlink() or (
-            self.path.exists()
-            and (self.path.stat().st_uid != root.stat().st_uid or self.path.stat().st_mode & 0o077)
-        ):
-            raise ServiceError("unsafe_forwarding_state", 503)
-        with self.connect() as db:
-            db.executescript("""
-              CREATE TABLE IF NOT EXISTS metadata (
-                id INTEGER PRIMARY KEY,revision INTEGER NOT NULL);
-              INSERT OR IGNORE INTO metadata VALUES(1,0);
-              CREATE TABLE IF NOT EXISTS rules (email TEXT PRIMARY KEY,destination TEXT NOT NULL,
-                enabled INTEGER NOT NULL,created REAL NOT NULL,updated REAL NOT NULL);
-              CREATE TABLE IF NOT EXISTS messages (email TEXT NOT NULL,body_key TEXT NOT NULL,
-                destination TEXT NOT NULL,state TEXT NOT NULL,
-                created REAL NOT NULL,updated REAL NOT NULL,
-                attempts INTEGER NOT NULL DEFAULT 0,error TEXT NOT NULL DEFAULT '',body BLOB,
-                PRIMARY KEY(email,body_key,destination));
-              CREATE TABLE IF NOT EXISTS requests (
-                id TEXT PRIMARY KEY,payload TEXT NOT NULL,result TEXT NOT NULL);
-              CREATE TABLE IF NOT EXISTS verifications (
-                destination TEXT PRIMARY KEY,state TEXT NOT NULL);
-              CREATE TABLE IF NOT EXISTS audit (created REAL NOT NULL,action TEXT NOT NULL,
-                email TEXT NOT NULL,request_id TEXT NOT NULL);
-            """)
-        self.path.chmod(0o600)
+        self.path = root / STATE_FILE
+        prepare_state(self.path)
 
     @contextmanager
     def connect(self) -> Any:

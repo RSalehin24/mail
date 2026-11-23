@@ -15,6 +15,7 @@ from helper.maddy import LocalMaddy
 from helper.maddy_restart import local_relay_actions
 from helper.protocol import HelperRequest
 from helper.service import HostHelper
+from helper.state_database import STATE_FILE
 from helper.status import HostStatusPaths
 from host.preflight import provision_lock
 from shared.errors import ServiceError
@@ -30,7 +31,7 @@ APPLICATION_DATA = Path("/app/data")
 ETC_RECORDS = Path("/run/mail-admin-host/etc")
 BACKUP_MANIFEST = Path("/var/lib/mail-admin-backup/manifest.json")
 DEFAULT_CLI_VERSION = "0.9.5"
-# The recovery worker is started by a path unit watching this file. It must not watch recovery.db:
+# The recovery worker is started by a path unit watching this file. It must not watch state.db:
 # the worker opens that database on every run, so it would start itself again forever.
 RECOVERY_REQUEST = "recovery.request.json"
 
@@ -102,8 +103,8 @@ def create_local_host(timeout: float, locations: HostLocations = LOCAL_LOCATIONS
     )
     locations.state.mkdir(mode=0o700, exist_ok=True)
     provision_lock(locations.lock, locations.owner)
-    if not (locations.state / "journal.db").exists():
-        Journal.provision(locations.state / "journal.db")
+    if not (locations.state / STATE_FILE).exists():
+        Journal.provision(locations.state / STATE_FILE)
     relay = local_relay_actions(maddy, locations.state, locations.owner)
     return LocalHost(
         HostHelper(build_dependencies(deployment, maddy, replace(locations, relay=relay))),

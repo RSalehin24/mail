@@ -7,6 +7,7 @@ from typing import Any
 
 from helper.journal import Journal
 from helper.maddy import DockerMaddy
+from helper.state_database import STATE_FILE
 from host.alerts import Alerts, alert_transport
 from host.backup import FULL_STATE_SOURCES, BackupPaths, CaptureDependencies, SnapshotCapture
 from host.backup_service import BackupService, backup_service
@@ -35,7 +36,7 @@ class HostContext:
             LockPolicy(inputs["lock_wait_seconds"], owner),
         )
         coordination = Coordination(
-            locks, Journal(Path("/var/lib/mail-admin-helper/journal.db"), owner)
+            locks, Journal(Path("/var/lib/mail-admin-helper") / STATE_FILE, owner)
         )
         alerts = Alerts(
             Path("/var/lib/mail-admin-alerts/state.json"),

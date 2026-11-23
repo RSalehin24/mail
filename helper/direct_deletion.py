@@ -16,6 +16,7 @@ from helper.journal import Journal
 from helper.maddy import MaddyAccess
 from helper.recovery_records import RecoveryRecords
 from helper.retention import RecoveryPolicy
+from helper.state_database import shared_state_path
 from host.mailbox_archive import MailboxArchives
 from host.mailbox_store import body_path
 from host.mailbox_transaction import attached_transaction
@@ -192,21 +193,20 @@ class DirectDeletion:
         paths = {
             "main": self.storage.data / "credentials.db",
             "dashboard": self.storage.dashboard_database,
-            "incarnations": self.journal.path,
-            "ledger": self.records.path,
+            "state": shared_state_path(self.journal.path, self.records.path),
         }
         with attached_transaction(paths) as connection:
             connection.execute("DELETE FROM passwords WHERE key=?", (request.email,))
             connection.execute("DELETE FROM dashboard.mailboxes WHERE email=?", (request.email,))
             connection.execute(
-                "UPDATE incarnations.incarnations SET present=0 WHERE email=?", (request.email,))
+                "UPDATE state.incarnations SET present=0 WHERE email=?", (request.email,))
             connection.execute(
-                "UPDATE ledger.recovery_records SET state=?,updated_at=?,deleted_at=?,deadline=? "
+                "UPDATE state.recovery_records SET state=?,updated_at=?,deleted_at=?,deadline=? "
                 "WHERE id=?",
                 (final, now, now, policy.deadline(request.retention, now), request.identifier),
             )
             connection.execute(
-                "INSERT INTO ledger.recovery_audit(created,action,request_id,email,outcome) "
+                "INSERT INTO state.recovery_audit(created,action,request_id,email,outcome) "
                 "VALUES(?,?,?,?,?)",
                 (now, "recovery_delete", request.identifier, request.email, "complete"),
             )

@@ -1,10 +1,9 @@
-"""Root-owned recovery ledger, separate from the dashboard authentication database.
+"""Recovery ledger, separate from the dashboard authentication database.
 
 No record becomes restorable until an encrypted recovery point was verified.
 Interrupted mutations remain explicit and cannot be retried as new operations.
 """
 
-import os
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -12,53 +11,15 @@ from pathlib import Path
 from typing import Any
 
 from helper.retention import RecoveryPolicy
+from helper.state_database import prepare_state
 from shared.errors import ServiceError
 from shared.validation import address, request_id
 
-# Jobs waiting or running at once; keeps a runaway client from filling the ledger.
 
 class RecoveryRecords:
     def __init__(self, path: Path) -> None:
         self.path = path
-        if path.is_symlink():
-            raise ServiceError("recovery_storage_invalid", 503)
-        if not path.exists():
-            descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-            os.close(descriptor)
-        if not path.is_file() or path.stat().st_mode & 0o077:
-            raise ServiceError("recovery_storage_invalid", 503)
-        with self.transaction() as connection:
-            version = connection.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (0, 1, 2, 3):
-                raise ServiceError("recovery_schema_unsupported", 503)
-            if version == 3:
-                # Existing workers/helpers must not rewrite the ledger merely
-                # by starting while a whole-host backup copies the quiet state.
-                for table in ('recovery_records', 'recovery_jobs', 'recovery_audit',
-                              'recovery_checkpoints'):
-                    connection.execute(f'SELECT 1 FROM {table} LIMIT 1')  # noqa: S608 -- fixed tables
-                return
-            connection.execute("""CREATE TABLE IF NOT EXISTS recovery_records (
-                id TEXT PRIMARY KEY, email TEXT NOT NULL, state TEXT NOT NULL,
-                retention TEXT NOT NULL, deleted_at INTEGER NOT NULL,
-                deadline INTEGER, policy_revision INTEGER NOT NULL,
-                snapshot TEXT, display_name TEXT NOT NULL, notes TEXT NOT NULL,
-                updated_at INTEGER NOT NULL
-            )""")
-            connection.execute("""CREATE TABLE IF NOT EXISTS recovery_jobs (
-                id TEXT PRIMARY KEY, kind TEXT NOT NULL, record_id TEXT NOT NULL,
-                email TEXT NOT NULL, payload TEXT NOT NULL, state TEXT NOT NULL,
-                updated_at INTEGER NOT NULL, error TEXT NOT NULL DEFAULT ''
-            )""")
-            connection.execute("""CREATE TABLE IF NOT EXISTS recovery_audit (
-                id INTEGER PRIMARY KEY, created INTEGER NOT NULL, action TEXT NOT NULL,
-                request_id TEXT NOT NULL, email TEXT NOT NULL, outcome TEXT NOT NULL
-            )""")
-            connection.execute("""CREATE TABLE IF NOT EXISTS recovery_checkpoints (
-                job_id TEXT PRIMARY KEY, record_id TEXT NOT NULL, phase TEXT NOT NULL,
-                details TEXT NOT NULL, updated_at INTEGER NOT NULL
-            )""")
-            connection.execute("PRAGMA user_version=3")
+        prepare_state(path)
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:

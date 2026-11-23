@@ -82,7 +82,7 @@ class RestoredBoot:
         return json.loads(result.stdout)
 
     def mail_and_helper(self):
-        journal = Journal(Path('/var/lib/mail-admin-helper/journal.db'))
+        journal = Journal(Path('/var/lib/mail-admin-helper/state.db'))
         if journal.unresolved():
             raise RuntimeError('Unresolved restored requests block boot qualification')
         with journal.connection() as db:

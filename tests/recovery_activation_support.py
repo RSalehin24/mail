@@ -73,7 +73,7 @@ class RecoveryActivation:
             or observed['roles_installed'] != 18 or observed['application_started'] is not False):
             raise RuntimeError('Full-state installation must precede activation')
         self.target.installation().require_new_target()
-        if Journal(Path('/var/lib/mail-admin-helper/journal.db')).unresolved():
+        if Journal(Path('/var/lib/mail-admin-helper/state.db')).unresolved():
             raise RuntimeError('Unresolved restored operations block activation')
 
     def start_maddy(self):

@@ -58,7 +58,7 @@ class DirectDeletionTests(unittest.TestCase):
                     "VALUES(?,?,?,?,?,?)", (email, "Name", "Notes", 1000, 1000, "ready"))
         self.state = self.fixture.root / "state"
         self.state.mkdir(mode=0o700)
-        self.records = RecoveryRecords(self.state / "recovery.db")
+        self.records = RecoveryRecords(self.fixture.helper.journal.path)
         self.owner = os.geteuid()
 
     def deletion(self, archives=MailboxArchives):

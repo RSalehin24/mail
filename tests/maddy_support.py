@@ -205,7 +205,7 @@ class RealMaddyFixture:
             response = self.maddy.change(arguments)
             if response.code:
                 raise RuntimeError("Fixture database provisioning failed")
-        journal = Journal.provision(self.root / "journal.db")
+        journal = Journal.provision(self.root / "state.db")
         lock = self.root / "maddy.lock"
         lock.touch(mode=0o600)
         self.deletion = DeletePolicy()
