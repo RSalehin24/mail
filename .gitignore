@@ -4,7 +4,7 @@ __pycache__/
 *.py[cod]
 .mypy_cache/
 .ruff_cache/
-frontend/node_modules/
+frontend/node_modules
 frontend/dist/
 build/
 local-state/
