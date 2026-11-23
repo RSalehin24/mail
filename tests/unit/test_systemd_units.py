@@ -4,10 +4,6 @@ from pathlib import Path
 
 UNITS = Path(__file__).resolve().parents[2] / "host" / "systemd"
 HELPER_STATE = "/var/lib/mail-admin-helper"
-# Each worker is started by a request landing in its database; the timer is only a fallback.
-WORKERS = {
-    "mail-admin-backup-control": "backup-control.db",
-}
 
 
 def unit(name):
@@ -35,15 +31,23 @@ class MaddyRestartUnitTests(unittest.TestCase):
         self.assertEqual(service["Service"]["NoNewPrivileges"], "true")
 
 
-class WorkerActivationTests(unittest.TestCase):
-    def test_requests_start_the_worker_through_a_path_unit(self):
-        for worker, database in WORKERS.items():
-            with self.subTest(worker=worker):
-                path = unit(worker + ".path")
-                self.assertEqual(path["Path"]["PathChanged"], f"{HELPER_STATE}/{database}")
-                self.assertEqual(path["Path"]["Unit"], worker + ".service")
-                self.assertEqual(path["Install"]["WantedBy"], "paths.target")
+class BackupUnitTests(unittest.TestCase):
+    """Backing up is `systemctl start`; restoring is a command; nothing waits for a request."""
 
+    def test_the_backup_control_worker_is_gone(self):
+        for removed in ("path", "service", "timer"):
+            self.assertFalse((UNITS / f"mail-admin-backup-control.{removed}").exists(), removed)
+
+    def test_the_catalog_refresh_follows_every_backup_without_failing_it(self):
+        service = unit("mail-admin-backup.service")
+        self.assertEqual(service["Service"]["Type"], "oneshot")
+        self.assertEqual(service["Service"]["ExecStart"], "/usr/bin/python3 -m host.cli backup")
+        self.assertEqual(
+            service["Service"]["ExecStartPost"], "-/usr/bin/python3 -m host.backup_catalog"
+        )
+
+
+class WorkerActivationTests(unittest.TestCase):
     def test_recovery_has_no_worker_only_a_daily_expiry_timer(self):
         for removed in ("mail-admin-recovery.path", "mail-admin-recovery.timer"):
             self.assertFalse((UNITS / removed).exists(), removed)
@@ -55,15 +59,6 @@ class WorkerActivationTests(unittest.TestCase):
         self.assertEqual(
             service["Service"]["ExecStart"], "/usr/bin/python3 -m host.expire_recovery")
         self.assertEqual(service["Service"]["ReadWritePaths"], HELPER_STATE)
-
-    def test_workers_have_no_polling_fallback_timer(self):
-        for worker in WORKERS:
-            with self.subTest(worker=worker):
-                self.assertFalse((UNITS / (worker + ".timer")).exists())
-
-    def test_the_nightly_backup_refreshes_the_backup_list_afterwards(self):
-        service = unit("mail-admin-backup.service")["Service"]
-        self.assertEqual(service["ExecStartPost"], "-/usr/bin/python3 -m host.backup_control")
 
 
 class DnsUpdateUnitTests(unittest.TestCase):

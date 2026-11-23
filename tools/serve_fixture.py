@@ -52,9 +52,7 @@ def main() -> None:
         connection.execute('INSERT INTO observations VALUES(1,1700000200,?)', ('',))
     import uuid
     failed = str(uuid.uuid4())
-    values = {'kind': 'backup', 'snapshot': '', 'previous': '', 'confirmation': '',
-              'acknowledged': True, 'password_hashes': {}}
-    backups.handle('backup_submit', failed, values, 1700000000)
+    backups.begin((failed, 'backup', '', ''), 1700000000)
     backups.update(failed, 'failed', 'capture', 1700000001, 'synthetic_transfer_failure')
     from tests.telemetry_support import synthetic_resources
     fixture.host.helper.dependencies = dataclasses.replace(

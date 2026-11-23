@@ -7,7 +7,6 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from backend.database import Database
-from backend.routes_backups import hash_password
 from helper.backup_control import BackupControl
 from helper.protocol import HelperRequest
 from host.backup_control import BackupWorker
@@ -73,23 +72,19 @@ class BackupMergeTests(unittest.TestCase):
         control = BackupControl(root)
         prepared = str(uuid.uuid4())
         snapshot_id = "a" * 64
-        values = {
-            "kind": "preflight",
-            "snapshot": snapshot_id,
-            "previous": "",
-            "confirmation": snapshot_id,
-            "acknowledged": True,
-            "password_hashes": {},
-        }
         with control.connect() as connection:
             connection.execute("INSERT INTO snapshots VALUES(?,?,?)", (snapshot_id, 1000, 1000))
-        control.handle("backup_submit", prepared, values, 1000)
+        control.begin((prepared, "preflight", snapshot_id, ""), 1000)
         control.update(
             prepared,
             "complete",
             "complete",
             1001,
-            result={"mailboxes": [existing, missing], "missing": [missing]},
+            result={
+                "mailboxes": [existing, missing],
+                "missing": [missing],
+                "needs_login": [missing],
+            },
         )
         writers = FixtureWriters(fixture)
         worker = BackupWorker.__new__(BackupWorker)
@@ -105,12 +100,7 @@ class BackupMergeTests(unittest.TestCase):
         )
         new_password = "new missing mailbox password 2026"
         jobid = str(uuid.uuid4())
-        values.update(
-            kind="restore",
-            previous=prepared,
-            password_hashes={missing: hash_password(new_password)},
-        )
-        control.handle("backup_submit", jobid, values, 1002)
+        control.begin((jobid, "restore", snapshot_id, prepared), 1002)
         with (
             patch("host.backup_control.DockerMaddy", return_value=fixture.maddy),
             patch("host.backup_control.DockerSnapshots", return_value=writers),
@@ -120,6 +110,9 @@ class BackupMergeTests(unittest.TestCase):
             )
         self.assertEqual(result["messages_added"], 2)
         control.update(jobid, "complete", "complete", 1003)
+        # Maddy hashes the password itself; no hash or password passes through the job record.
+        with patch("host.backup_control.DockerMaddy", return_value=fixture.maddy):
+            worker.create_logins({missing: new_password})
         with imap_login(fixture, existing, MAILBOX_PASSWORD) as connection:
             text = bodies(connection)
             self.assertIn(b"newer-live-mail", text)
@@ -131,18 +124,16 @@ class BackupMergeTests(unittest.TestCase):
             self.assertIn(b"backup-mail-", bodies(connection))
         # A second independently confirmed restore must not duplicate messages.
         prepared2 = str(uuid.uuid4())
-        values.update(kind="preflight", previous="", password_hashes={})
-        control.handle("backup_submit", prepared2, values, 1004)
+        control.begin((prepared2, "preflight", snapshot_id, ""), 1004)
         control.update(
             prepared2,
             "complete",
             "complete",
             1005,
-            result={"mailboxes": [existing, missing], "missing": []},
+            result={"mailboxes": [existing, missing], "missing": [], "needs_login": []},
         )
         jobid2 = str(uuid.uuid4())
-        values.update(kind="restore", previous=prepared2)
-        control.handle("backup_submit", jobid2, values, 1006)
+        control.begin((jobid2, "restore", snapshot_id, prepared2), 1006)
         with (
             patch("host.backup_control.DockerMaddy", return_value=fixture.maddy),
             patch("host.backup_control.DockerSnapshots", return_value=writers),
@@ -157,12 +148,11 @@ class BackupMergeTests(unittest.TestCase):
         from shared.errors import ServiceError
 
         control_id = str(uuid.uuid4())
-        values.update(kind="restore", previous=prepared2)
-        control.handle("backup_submit", control_id, values, 1008)
+        control.begin((control_id, "restore", snapshot_id, prepared2), 1008)
 
         def interrupted_rows(connection, *args):
             merge_rows(connection, *args)
-            connection.execute("UPDATE credentials.passwords SET value='invalid-fixture-value'")
+            connection.execute("UPDATE dashboard.mailboxes SET notes='interrupted-fixture'")
             raise ServiceError("synthetic_import_interruption", 503)
 
         with (
@@ -174,6 +164,11 @@ class BackupMergeTests(unittest.TestCase):
                 worker.import_live(control.job(control_id, private=True), snapshot, {})
         with imap_login(fixture, existing, MAILBOX_PASSWORD) as connection:
             self.assertIn(b"newer-live-mail", bodies(connection))
+        with closing(sqlite3.connect(dashboard / "admin_data.db")) as connection:
+            self.assertNotIn(
+                "interrupted-fixture",
+                [row[0] for row in connection.execute("SELECT notes FROM mailboxes")],
+            )
         with control.connect() as connection:
             self.assertIsNone(
                 connection.execute(
@@ -188,12 +183,10 @@ class BackupMergeTests(unittest.TestCase):
         worker.repository = SimpleNamespace(process=SimpleNamespace(reconcile=lambda: None))
         backup_lock = fixture.root / "backup.lock"
         backup_lock.touch(mode=0o600)
-        (root / "recovery-worker.lock").touch(mode=0o600)
         unrelated = fixture.data / "messages" / "unrelated-unreferenced-file"
         unrelated.write_bytes(b"preserve me")
         reconcile_id = str(uuid.uuid4())
-        values.update(kind="reconcile", previous=control_id)
-        control.handle("backup_submit", reconcile_id, values, 1010)
+        control.begin((reconcile_id, "reconcile", "", control_id), 1010)
         with (
             patch("host.backup_control.BACKUP_LOCK", backup_lock),
             patch("host.backup_control.DockerMaddy", return_value=fixture.maddy),
@@ -215,8 +208,7 @@ class BackupMergeTests(unittest.TestCase):
         control.update(reconcile_id, "complete", "complete", 1011)
         # A response lost after COMMIT must reconcile as complete, without replay.
         committed_id = str(uuid.uuid4())
-        values.update(kind="restore", previous=prepared2)
-        control.handle("backup_submit", committed_id, values, 1012)
+        control.begin((committed_id, "restore", snapshot_id, prepared2), 1012)
         real_resume = writers.resume
 
         def interrupted_resume(names):
@@ -231,9 +223,8 @@ class BackupMergeTests(unittest.TestCase):
             with self.assertRaisesRegex(ServiceError, "synthetic_after_commit"):
                 worker.import_live(control.job(committed_id, private=True), snapshot, {})
         control.update(committed_id, "reconciliation_required", "resuming_mail", 1013)
-        values.update(kind="reconcile", previous=committed_id)
         reconcile_id2 = str(uuid.uuid4())
-        control.handle("backup_submit", reconcile_id2, values, 1014)
+        control.begin((reconcile_id2, "reconcile", "", committed_id), 1014)
         worker.context.backup = lambda: object()
         with (
             patch("host.backup_control.BACKUP_LOCK", backup_lock),

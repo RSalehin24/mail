@@ -1,4 +1,4 @@
-"""Record scheduled backup outcomes in the same durable catalog as manual operations."""
+"""Record each backup run, nightly or started by hand, in the catalog the dashboard lists."""
 
 import time
 import uuid
@@ -16,20 +16,9 @@ def tracked_backup(context: HostContext) -> None:
     provision_lock(root / "backup-worker.lock")
     with HostLock(root / "backup-worker.lock", LockPolicy(1)):
         control = BackupControl(root)
+        control.interrupt_running()
         identifier = str(uuid.uuid4())
-        control.handle(
-            "backup_submit",
-            identifier,
-            {
-                "kind": "backup",
-                "snapshot": "",
-                "previous": "",
-                "confirmation": "",
-                "acknowledged": True,
-                "password_hashes": {},
-            },
-            time.time(),
-        )
+        control.begin((identifier, "backup", "", ""), time.time())
         control.update(identifier, "running", "backup_capture", time.time())
         try:
             manifest = BackupOperations(context.backup(), context.deployment).run()

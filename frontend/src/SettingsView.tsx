@@ -25,7 +25,7 @@ export function SettingsView({ authorize, notify, onRevoked }: Props) {
     <Box role="tabpanel" id={`panel-${tab}`} aria-labelledby={`settings-${tab}`}>
       {tab === 'security' && <SecuritySettings authorize={authorize} onRevoked={onRevoked} onDeliverySettings={() => { setTab('outgoing'); const url = new URL(location.href); url.searchParams.set('tab', 'outgoing'); history.replaceState(null, '', url); }}/>}
       {tab === 'outgoing' && <OutgoingSettings authorize={authorize} notify={notify}/>}
-      {tab === 'backups' && <BackupSettings authorize={authorize} notify={notify}/>}
+      {tab === 'backups' && <BackupSettings notify={notify}/>}
     </Box>
   </Stack>;
 }
