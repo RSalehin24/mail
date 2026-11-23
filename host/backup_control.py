@@ -1,4 +1,8 @@
-"""Root worker for catalog refresh, backup retry and verified live mail-data recovery."""
+"""Verified live recovery of mail data from a backup, run inside the owner's VM command.
+
+Nothing here waits on a queue: `host.restore_backup` records a job, runs it in its own process
+and reports the outcome. The job records only make an interrupted run recoverable.
+"""
 
 import hashlib
 import json
@@ -8,19 +12,21 @@ import signal
 import sqlite3
 import time
 import uuid
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 from helper.backup_control import BackupControl
-from helper.maddy import DockerMaddy
+from helper.maddy import DockerMaddy, cli_succeeded
 from helper.recovery_records import RecoveryRecords
+from host.backup_catalog import ROOT, WORKER_LOCK, BackupCatalog
 from host.backup_operations import BACKUP_LOCK, BackupOperations
 from host.context import HostContext
-from host.daily_retention import RetentionLedger
 from host.docker import Docker, DockerSnapshots
 from host.locks import HostLock, LockPolicy
 from host.mailbox_store import body_path, connect, validate
-from host.mailbox_transaction import mailbox_transaction
+from host.mailbox_transaction import attached_transaction
 from host.preflight import provision_lock
 from host.restic_process import ResticProcess
 from host.restic_repository import ResticRepository
@@ -28,116 +34,74 @@ from shared.errors import ServiceError
 from shared.files import sync_directory
 from shared.validation import address
 
-# Jobs and the Refresh button update the catalog on demand; this is only the idle fallback.
-CATALOG_REFRESH_SECONDS = 3600
-
-ROOT = Path("/var/lib/mail-admin-helper")
 STAGING = Path("/var/lib/mail-admin-backup/restore-ui")
+WORKER_LOCK_WAIT_SECONDS = 5
+# After these phases the live data may already have changed, so a failure needs reconciling.
+UNCERTAIN_PHASES = {
+    "backup_capture",
+    "live_import",
+    "resuming_mail",
+    "creating_logins",
+    "post_restore_backup",
+}
+
+
+def login_plan(emails: set[str], inventory: dict[str, list[str]]) -> tuple[set[str], set[str]]:
+    """Return the backed-up mailboxes to import and those that need a new login password."""
+    storage, credentials = set(inventory["storage"]), set(inventory["credentials"])
+    if (storage ^ credentials) - emails:
+        raise ServiceError("partial_account_requires_operator_repair", 409)
+    return emails - storage, emails - credentials
 
 
 class BackupWorker:
     def __init__(self, context: HostContext, root: Path = ROOT, staging: Path = STAGING) -> None:
         self.context, self.root, self.staging = context, root, staging
         self.control = BackupControl(root)
-        provision_lock(root / "backup-worker.lock")
+        provision_lock(root / WORKER_LOCK)
         self.staging.mkdir(mode=0o700, exist_ok=True)
         if self.staging.is_symlink() or self.staging.stat().st_uid != 0:
             raise ServiceError("unsafe_restore_parent", 503)
         self.repository = ResticRepository(ResticProcess(context.deployment), time.time)
+        self.catalog = BackupCatalog(context, self.control, self.repository)
 
-    def catalog(self) -> None:
-        now = time.time()
-        try:
-            with HostLock(BACKUP_LOCK, self.context.coordination.locks.policy):
-                snapshots = self.repository.snapshots()
-            ledger = RetentionLedger(self.repository).record
-            with self.control.connect() as connection:
-                active_pins = set()
-                for job in connection.execute(
-                    "SELECT snapshot,result FROM jobs WHERE state IN "
-                    "('queued','running','reconciliation_required')"
-                ):
-                    active_pins.add(job["snapshot"])
-                    active_pins.add(json.loads(job["result"]).get("safety_repository_snapshot", ""))
-                connection.execute("DELETE FROM snapshot_details")
-                connection.executemany(
-                    "INSERT INTO snapshot_details VALUES(?,?)",
-                    [
-                        (
-                            row.identifier,
-                            json.dumps(
-                                {
-                                    "verification": ledger["verification"].get(row.identifier),
-                                    "temporary_pin": row.identifier in active_pins
-                                    or row.identifier
-                                    in ledger.get("cleanup", {}).get("temporary_pins", []),
-                                    "cleanup": ledger.get("cleanup", {}),
-                                }
-                            ),
-                        )
-                        for row in snapshots
-                    ],
-                )
-                connection.execute("DELETE FROM snapshots")
-                connection.executemany(
-                    "INSERT INTO snapshots VALUES(?,?,?)",
-                    [(row.identifier, row.cutoff, now) for row in snapshots],
-                )
-                connection.execute("INSERT OR REPLACE INTO observations VALUES(1,?,?)", (now, ""))
-        except (OSError, ServiceError) as error:
-            with self.control.connect() as connection:
-                connection.execute(
-                    "INSERT OR REPLACE INTO observations VALUES(1,?,?)",
-                    (
-                        now,
-                        error.code
-                        if isinstance(error, ServiceError)
-                        else "backup_catalog_unavailable",
-                    ),
-                )
-            raise
-
-    def run(self) -> None:
-        with HostLock(self.root / "backup-worker.lock", LockPolicy(0.1)):
+    @contextmanager
+    def exclusive(self) -> Iterator[None]:
+        """Hold the worker lock: no scheduled backup or second restore can run alongside."""
+        with HostLock(self.root / WORKER_LOCK, LockPolicy(WORKER_LOCK_WAIT_SECONDS)):
+            self.control.interrupt_running()
             self.cleanup_staging()
-            with self.control.connect() as connection:
-                # The exclusive worker lock proves previous owners have exited.
-                connection.execute(
-                    "UPDATE jobs SET state='reconciliation_required',error='worker_interrupted' "
-                    "WHERE state='running'"
-                )
-                row = connection.execute(
-                    "SELECT id FROM jobs WHERE state='queued' ORDER BY created,id LIMIT 1"
-                ).fetchone()
-                observation = connection.execute(
-                    "SELECT observed FROM observations WHERE id=1"
-                ).fetchone()
-            if row is None:
-                if observation is None or time.time() - observation[0] >= CATALOG_REFRESH_SECONDS:
-                    self.catalog()
-                return
-            job = self.control.job(row["id"], private=True)
-            self.control.update(job["id"], "running", "starting", time.time())
-            try:
-                result = self.perform(job)
-                self.control.update(job["id"], "complete", "complete", time.time(), result=result)
-                if job["kind"] == "restore":
-                    self.finish_retention(job, result)
-            except (OSError, ValueError, sqlite3.Error, ServiceError) as error:
-                current = self.control.job(job["id"])
-                uncertain = current["phase"] in {
-                    "backup_capture",
-                    "live_import",
-                    "resuming_mail",
-                    "post_restore_backup",
-                }
-                self.control.update(
-                    job["id"],
-                    "reconciliation_required" if uncertain else "failed",
-                    current["phase"],
-                    time.time(),
-                    error.code if isinstance(error, ServiceError) else "backup_operation_failed",
-                )
+            yield
+
+    def submit(self, kind: str, snapshot: str = "", previous: str = "") -> str:
+        identifier = str(uuid.uuid4())
+        self.control.begin((identifier, kind, snapshot, previous), time.time())
+        return identifier
+
+    def process(
+        self, identifier: str, passwords: Mapping[str, str] | None = None
+    ) -> dict[str, Any]:
+        """Run one recorded job to its end; the passwords stay in memory and are never stored."""
+        job = self.control.job(identifier, private=True)
+        try:
+            result = self.perform(job, passwords or {})
+        except (OSError, ValueError, sqlite3.Error, ServiceError) as error:
+            self.record_failure(job, error)
+            raise
+        self.control.update(identifier, "complete", "complete", time.time(), result=result)
+        if job["kind"] == "restore":
+            self.finish_retention(job, result)
+        return self.control.job(identifier)
+
+    def record_failure(self, job: dict[str, Any], error: Exception) -> None:
+        current = self.control.job(job["id"])
+        self.control.update(
+            job["id"],
+            "reconciliation_required" if current["phase"] in UNCERTAIN_PHASES else "failed",
+            current["phase"],
+            time.time(),
+            error.code if isinstance(error, ServiceError) else "backup_operation_failed",
+        )
 
     def finish_retention(self, job: dict[str, Any], result: dict[str, Any]) -> None:
         from host.repository_backup import RepositoryBackup
@@ -149,7 +113,7 @@ class BackupWorker:
             with HostLock(BACKUP_LOCK, self.context.coordination.locks.policy):
                 if isinstance(backup, RepositoryBackup):
                     backup.prune(operations._protected(protected_json(backup.paths.manifest)))
-            self.catalog()
+            self.catalog.refresh()
         except (OSError, ServiceError):
             result["cleanup"] = {"state": "failed", "error": "retention_cleanup_failed"}
             self.control.update(job["id"], "complete", "complete", time.time(), result=result)
@@ -186,37 +150,14 @@ class BackupWorker:
     def phase(self, job: dict[str, Any], name: str) -> None:
         self.control.update(job["id"], "running", name, time.time())
 
-    def perform(self, job: dict[str, Any]) -> dict[str, Any]:
+    def perform(self, job: dict[str, Any], passwords: Mapping[str, str]) -> dict[str, Any]:
         kind = job["kind"]
-        if kind == "refresh":
-            self.catalog()
-            return {"refreshed": True}
-        if kind == "backup":
-            self.phase(job, "backup_capture")
-            manifest = BackupOperations(self.context.backup(), self.context.deployment).run()
-            self.phase(job, "catalog_refresh")
-            try:
-                self.catalog()
-            except (OSError, ServiceError):
-                # Publication is already verified; an unavailable catalog must not
-                # turn successful creation into a failed backup or invite a retry.
-                manifest["cleanup"] = {
-                    "state": "failed",
-                    "error": "cleanup_or_catalog_requires_check",
-                }
-            return {
-                "reference": manifest["archive_reference"]
-                if "archive_reference" in manifest
-                else manifest.get("reference", ""),
-                "verified": True,
-                "cleanup": manifest.get("cleanup", {}),
-            }
         if kind == "preflight":
             return self.preflight(job)
         if kind == "reconcile":
             return self.reconcile(job)
         if kind == "restore":
-            return self.restore(job)
+            return self.restore(job, passwords)
         raise ServiceError("invalid_backup_operation", 400)
 
     def preflight(self, job: dict[str, Any]) -> dict[str, Any]:
@@ -247,22 +188,23 @@ class BackupWorker:
             raise ServiceError("restore_maintenance_budget_exceeded", 409)
         with self.context.coordination.consistent():
             inventory = DockerMaddy(self.context.deployment).inventories()
-            if set(inventory["credentials"]) != set(inventory["storage"]):
-                raise ServiceError("partial_account_requires_operator_repair", 409)
-        missing = sorted(set(emails) - set(inventory["storage"]))
+        missing, needs_login = login_plan(set(emails), inventory)
         return {
             "mailboxes": emails,
-            "missing": missing,
+            "missing": sorted(missing),
+            "needs_login": sorted(needs_login),
             "bytes": sizes,
             "verified": True,
             "mode": "merge",
             "snapshot": job["snapshot"],
         }
 
-    def restore(self, job: dict[str, Any]) -> dict[str, Any]:
+    def restore(self, job: dict[str, Any], passwords: Mapping[str, str]) -> dict[str, Any]:
         prepared = self.control.job(job["payload"]["previous"])
         if prepared["state"] != "complete" or prepared["snapshot"] != job["snapshot"]:
             raise ServiceError("backup_preflight_required", 409)
+        if set(passwords) != set(prepared["result"]["needs_login"]):
+            raise ServiceError("missing_mailbox_passwords_required", 400)
         target = self.staging / prepared["id"]
         self.phase(job, "rechecking_snapshot")
         self.repository.verify_restored(target)
@@ -281,16 +223,25 @@ class BackupWorker:
         )
         self.phase(job, "waiting_for_mail_lock")
         with HostLock(BACKUP_LOCK, self.context.coordination.locks.policy):
-            with HostLock(self.root / "recovery-worker.lock", LockPolicy(1)):
-                if RecoveryRecords(self.root / "recovery.db").busy():
-                    raise ServiceError("recovery_operation_in_progress", 409)
-                with self.context.coordination.consistent():
-                    result = self.import_live(job, target, safety)
+            if RecoveryRecords(self.root / "recovery.db").busy():
+                raise ServiceError("recovery_operation_in_progress", 409)
+            with self.context.coordination.consistent():
+                result = self.import_live(job, target, safety)
+        self.phase(job, "creating_logins")
+        self.create_logins(passwords)
         self.phase(job, "post_restore_backup")
         post = BackupOperations(self.context.backup(), self.context.deployment).run()
         result["post_restore_verified"] = True
         result["post_restore_snapshot"] = post["snapshot_id"]
         return result
+
+    def create_logins(self, passwords: Mapping[str, str]) -> None:
+        """Maddy hashes each password itself; a repeated run skips logins that already exist."""
+        maddy = DockerMaddy(self.context.deployment)
+        existing = set(maddy.inventories()["credentials"])
+        for email in sorted(set(passwords) - existing):
+            if not cli_succeeded(maddy.change(("creds", "create", email), passwords[email])):
+                raise ServiceError("credentials_create_failed", 503)
 
     def import_live(
         self, job: dict[str, Any], target: Path, safety: dict[str, Any]
@@ -302,12 +253,9 @@ class BackupWorker:
         maddy = DockerMaddy(self.context.deployment)
         maddy.validate()
         inventory = maddy.inventories()
-        missing = set(self.control.job(job["payload"]["previous"])["result"]["mailboxes"]) - set(
-            inventory["storage"]
-        )
-        if set(inventory["credentials"]) != set(inventory["storage"]) or missing != set(
-            job["payload"]["password_hashes"]
-        ):
+        prepared = self.control.job(job["payload"]["previous"])["result"]
+        missing, needs_login = login_plan(set(prepared["mailboxes"]), inventory)
+        if (missing, needs_login) != (set(prepared["missing"]), set(prepared["needs_login"])):
             raise ServiceError("mailbox_inventory_changed", 409)
         journal = self.context.coordination.journal
         journal.synchronize(inventory, time.time())
@@ -389,13 +337,12 @@ class BackupWorker:
             sync_directory(bodies)
             paths = {
                 "main": data / "imapsql.db",
-                "credentials": data / "credentials.db",
                 "dashboard": Path(self.context.deployment["backup_sources"]["dashboard"])
                 / "admin_data.db",
                 "incarnations": journal.path,
                 "ledger": self.control.path,
             }
-            with mailbox_transaction(paths) as connection:
+            with attached_transaction(paths) as connection:
                 count = merge_rows(
                     connection, bodies, target / "maddy/imapsql.db", target / "maddy/messages", keys
                 )
@@ -410,10 +357,6 @@ class BackupWorker:
                         ).fetchone()
                         if row is None:
                             raise ServiceError("mailbox_metadata_missing", 409)
-                        connection.execute(
-                            "INSERT INTO credentials.passwords(key,value) VALUES(?,?)",
-                            (email, job["payload"]["password_hashes"][email]),
-                        )
                         connection.execute(
                             "INSERT INTO dashboard.mailboxes"
                             "(email,display_name,notes,created,updated,status) "
@@ -458,58 +401,57 @@ class BackupWorker:
         original = self.control.job(job["payload"]["previous"], private=True)
         with HostLock(BACKUP_LOCK, self.context.coordination.locks.policy):
             self.repository.process.reconcile()
-            with HostLock(self.root / "recovery-worker.lock", LockPolicy(1)):
-                with self.context.coordination.consistent():
-                    maddy = DockerMaddy(self.context.deployment)
-                    writers = DockerSnapshots(
-                        (Docker(timeout=30), maddy, self.context.intents), startup_timeout=30
+            with self.context.coordination.consistent():
+                maddy = DockerMaddy(self.context.deployment)
+                writers = DockerSnapshots(
+                    (Docker(timeout=30), maddy, self.context.intents), startup_timeout=30
+                )
+                state = self.context.intents.read()
+                for name, consumer in state["consumers"].items():
+                    if consumer.get("reason") == "backup_capture":
+                        if name == "maddy":
+                            observed = self.context.docker.inspect(name)
+                            if (
+                                observed["Image"]
+                                != self.context.deployment["inputs"]["maddy_image_id"]
+                            ):
+                                raise ServiceError("maddy_identity_mismatch", 503)
+                            mounts = {
+                                entry["Destination"]: entry["Source"]
+                                for entry in observed["Mounts"]
+                            }
+                            if mounts != maddy.expected_mounts():
+                                raise ServiceError("maddy_mount_mismatch", 503)
+                        writers._start_existing(name)
+                        writers._verify_resumed(name, consumer["served_sha256"])
+                        consumer.update(intent="expected_running", state="active")
+                        consumer.pop("reason", None)
+                self.context.intents.write(state)
+                with self.control.connect() as connection:
+                    committed = (
+                        connection.execute(
+                            "SELECT 1 FROM backup_imports WHERE id=?", (original["id"],)
+                        ).fetchone()
+                        is not None
                     )
-                    state = self.context.intents.read()
-                    for name, consumer in state["consumers"].items():
-                        if consumer.get("reason") == "backup_capture":
-                            if name == "maddy":
-                                observed = self.context.docker.inspect(name)
-                                if (
-                                    observed["Image"]
-                                    != self.context.deployment["inputs"]["maddy_image_id"]
-                                ):
-                                    raise ServiceError("maddy_identity_mismatch", 503)
-                                mounts = {
-                                    entry["Destination"]: entry["Source"]
-                                    for entry in observed["Mounts"]
-                                }
-                                if mounts != maddy.expected_mounts():
-                                    raise ServiceError("maddy_mount_mismatch", 503)
-                            writers._start_existing(name)
-                            writers._verify_resumed(name, consumer["served_sha256"])
-                            consumer.update(intent="expected_running", state="active")
-                            consumer.pop("reason", None)
-                    self.context.intents.write(state)
-                    with self.control.connect() as connection:
-                        committed = (
-                            connection.execute(
-                                "SELECT 1 FROM backup_imports WHERE id=?", (original["id"],)
-                            ).fetchone()
-                            is not None
-                        )
-                    if original["kind"] == "restore" and not committed:
-                        data = Path(self.context.deployment["maddy_data_directory"])
-                        with self.control.connect() as ledger:
-                            plan = ledger.execute(
-                                "SELECT keys FROM backup_plans WHERE id=?", (original["id"],)
-                            ).fetchone()
-                        keys = json.loads(plan[0]) if plan else []
-                        with connect(data / "imapsql.db") as live:
-                            for key in keys:
-                                if live.execute(
-                                    "SELECT 1 FROM extKeys WHERE id=?", (key,)
-                                ).fetchone():
-                                    raise ServiceError("backup_restore_checkpoint_conflict", 409)
-                                path = data / "messages" / key
-                                if path.is_symlink():
-                                    raise ServiceError("mailbox_import_body_conflict", 409)
-                                path.unlink(missing_ok=True)
-                        sync_directory(data / "messages")
+                if original["kind"] == "restore" and not committed:
+                    data = Path(self.context.deployment["maddy_data_directory"])
+                    with self.control.connect() as ledger:
+                        plan = ledger.execute(
+                            "SELECT keys FROM backup_plans WHERE id=?", (original["id"],)
+                        ).fetchone()
+                    keys = json.loads(plan[0]) if plan else []
+                    with connect(data / "imapsql.db") as live:
+                        for key in keys:
+                            if live.execute(
+                                "SELECT 1 FROM extKeys WHERE id=?", (key,)
+                            ).fetchone():
+                                raise ServiceError("backup_restore_checkpoint_conflict", 409)
+                            path = data / "messages" / key
+                            if path.is_symlink():
+                                raise ServiceError("mailbox_import_body_conflict", 409)
+                            path.unlink(missing_ok=True)
+                    sync_directory(data / "messages")
         if committed:
             self.phase(job, "post_restore_backup")
             BackupOperations(self.context.backup(), self.context.deployment).run()
@@ -525,13 +467,3 @@ class BackupWorker:
 
 def interrupted(_signal: int, _frame: Any) -> None:
     raise ServiceError("backup_worker_interrupted", 503)
-
-
-def main() -> None:
-    signal.signal(signal.SIGTERM, interrupted)
-    signal.signal(signal.SIGALRM, interrupted)
-    BackupWorker(HostContext.load()).run()
-
-
-if __name__ == "__main__":
-    main()

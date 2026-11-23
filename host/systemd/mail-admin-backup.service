@@ -7,6 +7,8 @@ Requires=docker.service mail-admin-paths.service
 Type=oneshot
 WorkingDirectory=/usr/local/lib/mail-admin
 ExecStart=/usr/bin/python3 -m host.cli backup
+# A failed refresh must not fail a verified backup; the dashboard shows the last check time.
+ExecStartPost=-/usr/bin/python3 -m host.backup_catalog
 UMask=0077
 MemoryMax=@BACKUP_MEMORY_LIMIT@
 CPUQuota=@BACKUP_CPU_PERCENT@%

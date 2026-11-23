@@ -1,6 +1,4 @@
-import json
 import tempfile
-import time
 import unittest
 import uuid
 from pathlib import Path
@@ -9,40 +7,63 @@ from helper.backup_control import BackupControl, validate_backup
 from helper.protocol import HelperRequest
 from shared.errors import ServiceError
 
+SNAPSHOT = "a" * 64
+
 
 class BackupControlTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.control = BackupControl(Path(self.directory.name))
+        with self.control.connect() as connection:
+            connection.execute("INSERT INTO snapshots VALUES(?,?,?)", (SNAPSHOT, 1, 1))
 
-    def values(self, **changes):
-        return {
-            "kind": "backup",
-            "snapshot": "",
-            "previous": "",
-            "confirmation": "",
-            "acknowledged": True,
-            "password_hashes": {},
-            **changes,
-        }
-
-    def submit(self, values, identifier=None):
-        return self.control.handle("backup_submit", identifier or str(uuid.uuid4()), values, 1000)
-
-    def test_durable_idempotence_and_failure_retry(self):
+    def begin(self, kind="backup", snapshot="", previous=""):
         identifier = str(uuid.uuid4())
-        self.assertEqual(self.submit(self.values(), identifier)["state"], "queued")
-        self.assertEqual(self.submit(self.values(), identifier)["state"], "queued")
-        with self.assertRaisesRegex(ServiceError, "request_id_conflict"):
-            self.submit(self.values(kind="refresh"), identifier)
+        self.control.begin((identifier, kind, snapshot, previous), 1000)
+        return identifier
+
+    def test_one_unfinished_operation_blocks_the_next_until_it_is_settled(self):
+        first = self.begin()
         with self.assertRaisesRegex(ServiceError, "backup_operation_in_progress"):
-            self.submit(self.values())
-        self.control.update(identifier, "failed", "capture", 1001, "disk_full")
-        restarted = BackupControl(Path(self.directory.name))
-        self.assertEqual(restarted.job(identifier)["error"], "disk_full")
-        retry = self.submit(self.values(previous=identifier))
-        self.assertNotEqual(retry["id"], identifier)
+            self.begin()
+        self.control.update(first, "failed", "capture", 1001, "disk_full")
+        self.assertEqual(BackupControl(Path(self.directory.name)).job(first)["error"], "disk_full")
+        self.assertTrue(self.begin())
+
+    def test_interrupted_operation_requires_reconciliation_before_anything_else(self):
+        original = self.begin()
+        self.control.interrupt_running()
+        self.assertEqual(self.control.job(original)["state"], "reconciliation_required")
+        with self.assertRaisesRegex(ServiceError, "backup_operation_in_progress"):
+            self.begin()
+        reconcile = self.begin("reconcile", previous=original)
+        self.assertEqual(self.control.job(reconcile)["state"], "running")
+        with self.assertRaisesRegex(ServiceError, "backup_operation_in_progress"):
+            self.begin("reconcile", previous=original)
+
+    def test_reconcile_only_applies_to_an_operation_that_needs_it(self):
+        original = self.begin()
+        self.control.update(original, "complete", "complete", 1001)
+        with self.assertRaisesRegex(ServiceError, "backup_reconciliation_not_required"):
+            self.begin("reconcile", previous=original)
+
+    def test_restore_needs_a_known_snapshot_and_its_completed_preflight(self):
+        with self.assertRaisesRegex(ServiceError, "backup_snapshot_unavailable"):
+            self.begin("preflight", "b" * 64)
+        prepared = self.begin("preflight", SNAPSHOT)
+        with self.assertRaisesRegex(ServiceError, "backup_operation_in_progress"):
+            self.begin("restore", SNAPSHOT, prepared)
+        self.control.update(prepared, "failed", "verifying_snapshot", 1001)
+        with self.assertRaisesRegex(ServiceError, "backup_preflight_required"):
+            self.begin("restore", SNAPSHOT, prepared)
+        self.control.update(prepared, "complete", "complete", 1002)
+        restore = self.begin("restore", SNAPSHOT, prepared)
+        self.assertEqual(self.control.job(restore, private=True)["payload"], {"previous": prepared})
+
+    def test_unknown_kind_is_refused(self):
+        with self.assertRaisesRegex(ServiceError, "invalid_backup_operation"):
+            self.begin("refresh")
 
     def test_catalog_numbered_pages_clamp_and_preserve_observation(self):
         with self.control.connect() as connection:
@@ -50,16 +71,11 @@ class BackupControlTests(unittest.TestCase):
                 "INSERT INTO snapshots VALUES(?,?,?)", [(f"{i:064x}", i, 100) for i in range(125)]
             )
             connection.execute("INSERT INTO observations VALUES(1,100,?)", ("",))
-        result = self.control.handle(
-            "backup_list",
-            str(uuid.uuid4()),
-            {"kind": "snapshots", "page": 99, "page_size": 10},
-            9999,
-        )
-        self.assertEqual((result["page"], result["total"], len(result["items"])), (13, 125, 5))
+        result = self.control.listing({"kind": "snapshots", "page": 99, "page_size": 10})
+        self.assertEqual((result["page"], result["total"], len(result["items"])), (13, 126, 6))
         self.assertEqual(result["observation"]["observed"], 100)
 
-    def test_closed_protocol_refuses_paths_invalid_pages_and_passwords(self):
+    def test_closed_protocol_is_read_only_and_refuses_paths_and_invalid_pages(self):
         payload = {
             "protocol": 1,
             "operation": "backup_list",
@@ -72,111 +88,6 @@ class BackupControlTests(unittest.TestCase):
         for changes in ({"page": True}, {"page_size": 1000}, {"destination": "/etc"}):
             with self.assertRaises(ServiceError):
                 validate_backup({**payload, **changes})
-        with self.assertRaises(ServiceError):
-            validate_backup(
-                {
-                    "protocol": 1,
-                    "operation": "backup_submit",
-                    "request_id": str(uuid.uuid4()),
-                    **self.values(password_hashes={"cloud@rsalehin24.me": "plaintext"}),
-                }
-            )
-
-    def test_restore_requires_matching_verified_preflight_and_exact_missing_passwords(self):
-        snapshot = "a" * 64
-        with self.control.connect() as connection:
-            connection.execute("INSERT INTO snapshots VALUES(?,?,?)", (snapshot, 1, 1))
-        prepared = self.submit(
-            self.values(kind="preflight", snapshot=snapshot, confirmation=snapshot)
-        )
-        self.control.update(
-            prepared["id"],
-            "complete",
-            "complete",
-            1002,
-            result={"missing": ["missing@rsalehin24.me"]},
-        )
-        with self.assertRaisesRegex(ServiceError, "missing_mailbox_passwords_required"):
-            self.submit(
-                self.values(
-                    kind="restore",
-                    snapshot=snapshot,
-                    confirmation=snapshot,
-                    previous=prepared["id"],
-                )
-            )
-        self.assertNotIn("payload", self.control.job(prepared["id"]))
-        with self.control.connect() as connection:
-            encoded = connection.execute(
-                "SELECT payload FROM jobs WHERE id=?", (prepared["id"],)
-            ).fetchone()[0]
-        self.assertIsInstance(json.loads(encoded), dict)
-
-    def test_uncertain_operation_requires_reconciliation_before_retry(self):
-        original = self.submit(self.values())
-        self.control.update(original["id"], "reconciliation_required", "backup_capture", 1001)
-        with self.assertRaisesRegex(ServiceError, "backup_operation_in_progress"):
-            self.submit(self.values(previous=original["id"]))
-        result = self.submit(self.values(kind="reconcile", previous=original["id"]))
-        self.assertEqual(result["state"], "queued")
-        with self.assertRaisesRegex(ServiceError, "backup_operation_in_progress"):
-            self.submit(self.values(kind="reconcile", previous=original["id"]))
-
-
-class BackupPublicationOutcomeTests(unittest.TestCase):
-    def test_catalog_failure_does_not_hide_verified_publication(self):
-        from types import SimpleNamespace
-        from unittest.mock import Mock, patch
-
-        from host.backup_control import BackupWorker
-
-        worker = BackupWorker.__new__(BackupWorker)
-        worker.context = SimpleNamespace(backup=lambda: object(), deployment={})
-        worker.phase = Mock()
-        worker.catalog = Mock(
-            side_effect=ServiceError("backup_command_reconciliation_required", 409)
-        )
-        with patch("host.backup_control.BackupOperations") as operations:
-            operations.return_value.run.return_value = {"reference": "verified-reference"}
-            result = worker.perform({"kind": "backup"})
-        self.assertTrue(result["verified"])
-        self.assertEqual(result["reference"], "verified-reference")
-        self.assertEqual(result["cleanup"]["state"], "failed")
-
-
-class BackupCatalogFallbackTests(unittest.TestCase):
-    def worker(self, observed_age):
-        from types import SimpleNamespace
-        from unittest.mock import Mock
-
-        from host.backup_control import BackupWorker
-
-        directory = tempfile.TemporaryDirectory()
-        self.addCleanup(directory.cleanup)
-        root = Path(directory.name)
-        worker = BackupWorker.__new__(BackupWorker)
-        worker.root, worker.control = root, BackupControl(root)
-        worker.context = SimpleNamespace(deployment={})
-        worker.cleanup_staging, worker.catalog = Mock(), Mock()
-        if observed_age is not None:
-            with worker.control.connect() as connection:
-                connection.execute(
-                    "INSERT INTO observations VALUES(1,?,?)", (time.time() - observed_age, "")
-                )
-        return worker
-
-    def test_idle_run_refreshes_only_a_missing_or_hour_old_catalog(self):
-        from unittest.mock import patch
-
-        from host.backup_control import CATALOG_REFRESH_SECONDS
-
-        for age, refreshed in (
-            (None, True),
-            (CATALOG_REFRESH_SECONDS - 60, False),
-            (CATALOG_REFRESH_SECONDS + 60, True),
-        ):
-            with self.subTest(age=age):
-                worker = self.worker(age)
-                with patch("host.backup_control.HostLock"):  # The lock needs root ownership.
-                    worker.run()
-                self.assertEqual(worker.catalog.called, refreshed)
+        for removed in ("backup_submit", "backup_outcome"):
+            with self.assertRaises(ServiceError):
+                validate_backup({**payload, "operation": removed})

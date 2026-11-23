@@ -9,34 +9,26 @@ class BackupApiTests(ApiTestCase):
         await super().asyncSetUp()
         configure_recovery(self.fixture)
 
-    async def test_authenticated_catalog_and_recent_authentication_on_every_mutation(self):
-        body = {"request_id": str(uuid.uuid4()), "kind": "backup", "acknowledged": True}
+    async def test_catalog_is_read_only_and_needs_a_session(self):
         self.assertEqual((await self.client.get("/api/backups")).status_code, 401)
-        self.assertEqual(
-            (await self.client.post("/api/backups/operations", json=body)).status_code, 401
-        )
         token = self.fixture.login()
         self.set_session(token)
         self.assertEqual((await self.client.get("/api/backups")).status_code, 200)
+        self.assertEqual((await self.client.get("/api/backups?kind=operations")).status_code, 200)
         self.assertEqual((await self.client.get("/api/backups?page_size=1000")).status_code, 400)
-        self.assertEqual(
-            (await self.client.post("/api/backups/operations", json=body)).status_code, 403
-        )
+
+    async def test_backing_up_and_restoring_are_not_dashboard_operations(self):
+        token = self.fixture.login()
+        self.set_session(token)
         self.fixture.reauth(token)
-        response = await self.client.post("/api/backups/operations", json=body)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["state"], "queued")
-        repeat = await self.client.post("/api/backups/operations", json=body)
-        self.assertEqual(repeat.json()["id"], response.json()["id"])
-        self.assertNotIn("payload", response.json())
-        self.assertEqual(
-            (
-                await self.client.post(
-                    "/api/backups/operations", json={**body, "acknowledged": False}
-                )
-            ).status_code,
-            409,
-        )
+        body = {"request_id": str(uuid.uuid4()), "kind": "backup", "acknowledged": True}
+        for method, path in (
+            ("post", "/api/backups/operations"),
+            ("get", f"/api/backups/operations/{uuid.uuid4()}"),
+        ):
+            options = {"json": body} if method == "post" else {}
+            response = await getattr(self.client, method)(path, **options)
+            self.assertIn(response.status_code, {404, 405}, path)
 
     async def test_history_pagination_includes_older_relay_revisions(self):
         token = self.fixture.login()

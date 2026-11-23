@@ -1,9 +1,0 @@
-[Unit]
-Description=Start the backup worker when a backup or restore request is written
-
-[Path]
-PathChanged=/var/lib/mail-admin-helper/backup-control.db
-Unit=mail-admin-backup-control.service
-
-[Install]
-WantedBy=paths.target

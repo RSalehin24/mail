@@ -75,12 +75,7 @@ class HostHelper:
             with HostLock(self.dependencies.lock, self.dependencies.lock_policy):
                 return {
                     "protocol": HELPER_PROTOCOL,
-                    **self.dependencies.backups.handle(
-                        request.operation,
-                        request.request_id,
-                        request.recovery,
-                        self.dependencies.clock(),
-                    ),
+                    **self.dependencies.backups.listing(request.recovery),
                 }
         if request.operation.startswith("recovery_"):
             if self.dependencies.recovery is None or request.recovery is None:

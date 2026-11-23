@@ -128,9 +128,11 @@ async function settingsTabs(connection) {
   await connection.until(`document.querySelector('[role=tab][aria-selected=true][id=backup-section-backups]') !== null`);
   await connection.until(`document.querySelector('.MuiPaginationItem-ellipsis') !== null`);
   assert.equal(await connection.read(`document.body.textContent.includes('3:00 AM · Asia/Dhaka · 7-day retention')`), true);
+  assert.equal(await connection.read(`document.body.textContent.includes('sudo systemctl start mail-admin-backup.service') && document.body.textContent.includes('host.restore_backup')`), true);
   assert.equal(await connection.read(`document.querySelector('.MuiTablePagination-root select') !== null`), true);
   await connection.click({ tag: 'button', name: 'Logs' });
-  await connection.until(`document.body.textContent.includes('Retry backup')`);
+  await connection.until(`document.body.textContent.includes('failed') && document.body.textContent.includes('capture')`);
+  assert.equal(await connection.read(`[...document.querySelectorAll('button')].some(button => /Back up now|Refresh backups|Restore mail data|Retry backup|Reconcile/.test(button.textContent))`), false);
   for (const dark of [false, true]) {
     if (dark) await chooseTheme(connection, 'Dark');
     for (const width of [360, 768, 1280]) {
