@@ -87,6 +87,10 @@ def validate(connection: sqlite3.Connection) -> None:
         raise ServiceError("mailbox_store_corrupt", 503)
 
 
+def linked_body_keys(connection: sqlite3.Connection) -> set[str]:
+    return {row[0] for row in connection.execute("SELECT id FROM extKeys")}
+
+
 def body_path(root: Path, key: str) -> Path:
     if not re.fullmatch(r"[A-Za-z0-9_.-]{1,255}", key) or key in {".", ".."}:
         raise ServiceError("mailbox_body_key_invalid", 503)

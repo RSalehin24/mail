@@ -1,8 +1,7 @@
-"""Quiesced immutable capture, then encrypted off-host transfer and verified publication."""
+"""Live consistent capture, then encrypted off-host transfer and verified publication."""
 
 import hashlib
 import os
-import shutil
 import tarfile
 import uuid
 from collections.abc import Callable
@@ -13,6 +12,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from helper.journal import Journal
+from host.live_copy import copy_source, match_ownership
 from host.locks import HostLock, LockPolicy
 from shared.errors import ServiceError
 from shared.files import atomic_json, protected_json, sync_directory
@@ -26,9 +26,6 @@ FULL_STATE_SOURCES = frozenset(
 
 
 class SnapshotServices(Protocol):
-    def running(self) -> list[str]: ...
-    def pause(self, names: list[str]) -> None: ...
-    def resume(self, names: list[str]) -> None: ...
     def inventories(self) -> dict[str, list[str]]: ...
 
 
@@ -104,34 +101,24 @@ class SnapshotCapture:
             journal = self.dependencies.coordination.journal
             if journal is not None:
                 journal.synchronize(inventory, self.dependencies.clock())
-            running = self.dependencies.services.running()
-            try:
-                self.dependencies.services.pause(running)
-                self._copy(snapshot)
-                cutoff = self.dependencies.clock()
-                atomic_json(
-                    snapshot / "snapshot.json",
-                    {
-                        "cutoff": cutoff,
-                        "inventory": inventory,
-                        "accounts": self._accounts(inventory, snapshot),
-                        "previously_running": running,
-                    },
-                )
-                sync_directory(snapshot)
-            finally:
-                self.dependencies.services.resume(running)
+            self._copy(snapshot)
+            atomic_json(
+                snapshot / "snapshot.json",
+                {
+                    "cutoff": self.dependencies.clock(),
+                    "inventory": inventory,
+                    "accounts": self._accounts(inventory, snapshot),
+                },
+            )
+            sync_directory(snapshot)
         return snapshot
 
     def _copy(self, snapshot: Path) -> None:
         self._validate_sources()
         for name, source in self.paths.sources.items():
             target = snapshot / name
-            if source.is_dir():
-                shutil.copytree(source, target, symlinks=True)
-            else:
-                shutil.copy2(source, target)
-            self._ownership(source, target)
+            copy_source(source, target)
+            match_ownership(source, target)
         for root, _directories, files in os.walk(snapshot):
             for name in files:
                 path = Path(root) / name
@@ -148,18 +135,6 @@ class SnapshotCapture:
             actual = source.resolve()
             if actual.is_relative_to(staging) or staging.is_relative_to(actual):
                 raise ServiceError("backup_source_overlaps_staging", 503)
-
-    @staticmethod
-    def _ownership(source: Path, target: Path) -> None:
-        metadata = source.lstat()
-        os.chown(target, metadata.st_uid, metadata.st_gid, follow_symlinks=False)
-        if source.is_dir():
-            for root, directories, files in os.walk(source, followlinks=False):
-                for name in directories + files:
-                    original = Path(root) / name
-                    metadata = original.lstat()
-                    copied = target / original.relative_to(source)
-                    os.chown(copied, metadata.st_uid, metadata.st_gid, follow_symlinks=False)
 
     def _accounts(self, inventory: dict[str, list[str]], snapshot: Path) -> dict[str, Any]:
         result = {}

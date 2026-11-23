@@ -23,7 +23,7 @@ class RecoveryTests(RecoveryCase):
         archive = RecoveryArchive(self.fixture, dashboard, b"selected-body-fixture-verified")
         started = time.monotonic()
         archive.capture()
-        self.assertEqual(archive.writers.events, ["locked", "stopped", "resumed", "unlocked"])
+        self.assertEqual(archive.writers.events, ["locked", "unlocked"])
         self.assertTrue(archive.manifest["verified"])
         self.assertFalse(archive.manifest["restore_passed"])
         self.verify_dashboard(archive, dashboard)
