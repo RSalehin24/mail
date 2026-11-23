@@ -16,6 +16,8 @@ from host.backup import BackupPaths, CaptureDependencies, SnapshotCapture
 from shared.errors import ServiceError
 
 SCHEMA = (
+    "CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT)",
+    "INSERT INTO users VALUES (1, 'a@rsalehin24.me')",
     "CREATE TABLE extKeys (id TEXT PRIMARY KEY, uid INTEGER, refs INTEGER)",
     "CREATE TABLE ledger (value INTEGER)",
 )
