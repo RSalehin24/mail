@@ -4,14 +4,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from host.mailbox_transaction import mailbox_transaction
+from host.mailbox_transaction import attached_transaction
 
 
 class MailboxAtomicityTests(unittest.TestCase):
     def test_killed_process_rolls_back_every_attached_database_and_commit_survives(self):
         with tempfile.TemporaryDirectory() as directory:
             paths = {name: Path(directory) / (name + '.db') for name in
-                     ('main', 'credentials', 'dashboard', 'incarnations', 'ledger')}
+                     ('main', 'credentials', 'dashboard', 'state')}
             for path in paths.values():
                 with sqlite3.connect(path) as connection:
                     connection.execute('CREATE TABLE state(value INTEGER)')
@@ -19,7 +19,7 @@ class MailboxAtomicityTests(unittest.TestCase):
             for commit in (False, True):
                 pid = os.fork()
                 if pid == 0:
-                    with mailbox_transaction(paths) as connection:
+                    with attached_transaction(paths) as connection:
                         for name in paths:
                             connection.execute(f'UPDATE {name}.state SET value=1')  # noqa: S608 -- fixed schemas
                         if not commit:

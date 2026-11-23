@@ -1,8 +1,6 @@
 """The dashboard runs the host operations itself, with the same code as the root helper."""
 
-import logging
 import os
-import time
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Protocol
@@ -19,7 +17,7 @@ from helper.state_database import STATE_FILE
 from helper.status import HostStatusPaths
 from host.preflight import provision_lock
 from shared.errors import ServiceError
-from shared.files import atomic_json, protected_json
+from shared.files import protected_json
 from shared.validation import HELPER_PROTOCOL
 
 # Container mount points; the compose file maps the host's Maddy and record files here.
@@ -61,33 +59,15 @@ class HelperAccess(Protocol):
 class LocalHost:
     """Same call interface as the socket client; there is no lost response to look up."""
 
-    def __init__(self, helper: HostHelper, state: Path | None = None) -> None:
+    def __init__(self, helper: HostHelper) -> None:
         self.helper = helper
-        self.recovery_request = state / RECOVERY_REQUEST if state else None
 
     def call(self, request: dict[str, Any]) -> dict[str, Any]:
         try:
-            response = self.helper.handle(
-                HelperRequest.parse({"protocol": HELPER_PROTOCOL, **request})
-            )
-            self._wake_recovery_worker(request, response)
-            return response
+            return self.helper.handle(HelperRequest.parse({"protocol": HELPER_PROTOCOL, **request}))
         except (OSError, ValueError, KeyError, TypeError, RecursionError) as error:
             # What the socket server used to turn into a safe 503: a host failure is never a 500.
             raise ServiceError("helper_unavailable", 503) from error
-
-
-    def _wake_recovery_worker(self, request: dict[str, Any], response: dict[str, Any]) -> None:
-        queued = str(request.get("operation", "")).startswith("recovery_") and (
-            response.get("state") == "queued"
-        )
-        if self.recovery_request is None or not queued:
-            return
-        try:
-            atomic_json(self.recovery_request, {"requested_at": time.time()})
-        except OSError:
-            # The job is already queued; the worker's fallback timer will still pick it up.
-            logging.getLogger(__name__).warning("recovery_worker_wake_failed")
 
 
 def create_local_host(timeout: float, locations: HostLocations = LOCAL_LOCATIONS) -> LocalHost:
@@ -107,6 +87,5 @@ def create_local_host(timeout: float, locations: HostLocations = LOCAL_LOCATIONS
         Journal.provision(locations.state / STATE_FILE)
     relay = local_relay_actions(maddy, locations.state, locations.owner)
     return LocalHost(
-        HostHelper(build_dependencies(deployment, maddy, replace(locations, relay=relay))),
-        locations.state,
+        HostHelper(build_dependencies(deployment, maddy, replace(locations, relay=relay)))
     )

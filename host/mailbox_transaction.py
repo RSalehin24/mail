@@ -15,14 +15,6 @@ from shared.errors import ServiceError
 
 
 @contextmanager
-def mailbox_transaction(paths: dict[str, Path]) -> Iterator[sqlite3.Connection]:
-    if set(paths) != {'main', 'credentials', 'dashboard', 'incarnations', 'ledger'}:
-        raise ServiceError('invalid_mailbox_transaction', 503)
-    with attached_transaction(paths) as connection:
-        yield connection
-
-
-@contextmanager
 def attached_transaction(paths: dict[str, Path]) -> Iterator[sqlite3.Connection]:
     """One atomic commit across rollback-journal databases; 'main' is the opened one."""
     if 'main' not in paths:
