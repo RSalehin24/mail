@@ -14,6 +14,7 @@ from typing import Any
 from helper.backup_control import BackupControl
 from helper.maddy import DockerMaddy
 from helper.recovery_records import RecoveryRecords
+from helper.state_database import STATE_FILE
 from host.backup_operations import BACKUP_LOCK, BackupOperations
 from host.context import HostContext
 from host.daily_retention import RetentionLedger
@@ -282,7 +283,7 @@ class BackupWorker:
         self.phase(job, "waiting_for_mail_lock")
         with HostLock(BACKUP_LOCK, self.context.coordination.locks.policy):
             with HostLock(self.root / "recovery-worker.lock", LockPolicy(1)):
-                if RecoveryRecords(self.root / "recovery.db").busy():
+                if RecoveryRecords(self.root / STATE_FILE).busy():
                     raise ServiceError("recovery_operation_in_progress", 409)
                 with self.context.coordination.consistent():
                     result = self.import_live(job, target, safety)

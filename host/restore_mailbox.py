@@ -17,6 +17,7 @@ from typing import Any
 from helper.journal import Journal
 from helper.maddy import DockerMaddy, MaddyAccess, cli_succeeded
 from helper.recovery_records import RecoveryRecords
+from helper.state_database import STATE_FILE, shared_state_path
 from host.mailbox_archive import MailboxArchives
 from host.mailbox_store import body_mapping, connect, import_rows, stage_bodies
 from host.mailbox_transaction import attached_transaction
@@ -35,8 +36,8 @@ class MailboxRestore:
         owner = self.owner = state_owner_uid(deployment)
         self.data = Path(deployment["maddy_data_directory"])
         self.dashboard = Path(deployment["backup_sources"]["dashboard"]) / "admin_data.db"
-        self.records = RecoveryRecords(state / "recovery.db")
-        self.journal = Journal(state / "journal.db", owner)
+        self.records = RecoveryRecords(state / STATE_FILE)
+        self.journal = Journal(state / STATE_FILE, owner)
         self.archives = MailboxArchives(state / "recovery-points", state / "recovery.key", owner)
         self.maddy = maddy
 
@@ -96,17 +97,16 @@ class MailboxRestore:
         paths = {
             "main": self.data / "credentials.db",
             "dashboard": self.dashboard,
-            "incarnations": self.journal.path,
-            "ledger": self.records.path,
+            "state": shared_state_path(self.journal.path, self.records.path),
         }
         with attached_transaction(paths) as connection:
             self._restore_rows(connection, email, metadata)
             connection.execute(
-                "UPDATE ledger.recovery_records SET state='restored',updated_at=? WHERE id=?",
+                "UPDATE state.recovery_records SET state='restored',updated_at=? WHERE id=?",
                 (now, record["id"]),
             )
             connection.execute(
-                "INSERT INTO ledger.recovery_audit(created,action,request_id,email,outcome) "
+                "INSERT INTO state.recovery_audit(created,action,request_id,email,outcome) "
                 "VALUES(?,?,?,?,?)",
                 (now, "recovery_restore", record["id"], email, "complete"),
             )
@@ -123,7 +123,7 @@ class MailboxRestore:
             (email, metadata["display_name"], metadata["notes"], metadata["created"], time.time()),
         )
         connection.execute(
-            "INSERT INTO incarnations.incarnations VALUES(?,?,?,1) "
+            "INSERT INTO state.incarnations VALUES(?,?,?,1) "
             "ON CONFLICT(email) DO UPDATE SET generation=excluded.generation,"
             "created=excluded.created,present=1",
             (email, str(uuid.uuid4()), time.time()),

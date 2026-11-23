@@ -1,4 +1,4 @@
-"""Root-owned durable records. In-flight steps are never replayed after a crash."""
+"""Durable operation records in the shared state database; steps are never replayed."""
 
 import json
 import os
@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from helper.protocol import HelperRequest
+from helper.state_database import prepare_state
 from shared.errors import ServiceError
 
 
@@ -21,24 +22,13 @@ class Journal:
         metadata = path.lstat()
         if metadata.st_uid != owner or stat.S_IMODE(metadata.st_mode) != 0o600:
             raise ServiceError("unsafe_journal_file", 503)
+        prepare_state(path)
         with self.connection() as connection:
             connection.execute("SELECT id FROM operations LIMIT 1")
 
     @classmethod
     def provision(cls, path: Path) -> Journal:
-        descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        os.close(descriptor)
-        with sqlite3.connect(path) as connection:
-            connection.execute(
-                "CREATE TABLE operations(id TEXT PRIMARY KEY, operation TEXT NOT NULL, "
-                "email TEXT NOT NULL, created REAL NOT NULL, updated REAL NOT NULL, "
-                "state TEXT NOT NULL, phase TEXT, steps TEXT NOT NULL, "
-                "preconditions TEXT NOT NULL, postconditions TEXT NOT NULL)"
-            )
-            connection.execute(
-                "CREATE TABLE incarnations(email TEXT PRIMARY KEY,generation TEXT NOT NULL, "
-                "created REAL NOT NULL,present INTEGER NOT NULL)"
-            )
+        prepare_state(path)
         return cls(path, os.geteuid())
 
     @contextmanager

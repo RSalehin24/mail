@@ -156,7 +156,7 @@ class RuntimeFixture:
         self.records[name].write_text(json.dumps(content))
 
     def journal(self):
-        return Journal(self.state / "journal.db", SERVICE_ID)
+        return Journal(self.state / "state.db", SERVICE_ID)
 
     def command(self, arguments):
         import subprocess

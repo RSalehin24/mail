@@ -48,10 +48,10 @@ class MailboxRestoreTests(unittest.TestCase):
         self.state = self.fixture.root / "state"
         self.state.mkdir(mode=0o700)
         self.owner = os.geteuid()
-        shutil.copy(self.fixture.helper.journal.path, self.state / "journal.db")
-        (self.state / "journal.db").chmod(0o600)
-        self.journal = Journal(self.state / "journal.db", self.owner)
-        self.records = RecoveryRecords(self.state / "recovery.db")
+        shutil.copy(self.fixture.helper.journal.path, self.state / "state.db")
+        (self.state / "state.db").chmod(0o600)
+        self.journal = Journal(self.state / "state.db", self.owner)
+        self.records = RecoveryRecords(self.state / "state.db")
         self.deployment = {
             "maddy_data_directory": str(self.fixture.data),
             "backup_sources": {"dashboard": str(dashboard)}, "state_owner_uid": self.owner,

@@ -15,6 +15,7 @@ from helper.maddy import MaddyAccess
 from helper.recovery import RecoveryControl
 from helper.recovery_records import RecoveryRecords
 from helper.service import HelperDependencies
+from helper.state_database import STATE_FILE
 from helper.status import HostStatusPaths, host_status
 from helper.submission import RelayActions, SubmissionControl
 from host.locks import HostLock, LockPolicy
@@ -42,7 +43,7 @@ class HostLocations:
 def recovery_control(
     deployment: dict[str, Any], services: tuple[MaddyAccess, Journal], locations: HostLocations
 ) -> RecoveryControl:
-    state, records = locations.state, RecoveryRecords(locations.state / "recovery.db")
+    state, records = locations.state, RecoveryRecords(locations.state / STATE_FILE)
     deletion = None
     if locations.direct_deletion:
         storage = DeletionStorage(
@@ -62,7 +63,7 @@ def build_dependencies(
     locations = locations or HostLocations()
     inputs, state = deployment["inputs"], locations.state
     data = Path(deployment["maddy_data_directory"])
-    journal = Journal(state / "journal.db", locations.owner)
+    journal = Journal(state / STATE_FILE, locations.owner)
     dependencies = HelperDependencies(
         maddy,
         journal,

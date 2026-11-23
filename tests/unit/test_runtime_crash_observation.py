@@ -14,7 +14,7 @@ from tests.runtime_crash_support import wait_for_complete
 class RuntimeCrashObservationTests(unittest.TestCase):
     def test_real_temporary_sqlite_write_lock_does_not_abort_completion_polling(self):
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / 'journal.db'
+            path = Path(directory) / 'state.db'
             journal = Journal.provision(path)
             request = HelperRequest('create', str(uuid.uuid4()), 'fixture@example.net', 'password')
             journal.begin(request, (1, {}))
@@ -39,7 +39,7 @@ class RuntimeCrashObservationTests(unittest.TestCase):
 
     def test_corrupt_journal_is_rejected_without_retrying_it_as_a_temporary_lock(self):
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / 'journal.db'
+            path = Path(directory) / 'state.db'
             journal = Journal.provision(path)
             path.write_bytes(b'corrupt database')
             with self.assertRaisesRegex(ServiceError, 'journal_unavailable'):

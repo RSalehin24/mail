@@ -57,7 +57,7 @@ class HelperFixture(StateFixture):
     def __init__(self):
         super().__init__()
         self.maddy = FakeMaddy()
-        self.journal = Journal.provision(self.root / "journal.db")
+        self.journal = Journal.provision(self.root / "state.db")
         self.lock = self.root / "maddy.lock"
         self.lock.touch(mode=0o600)
         self.deletion = DeletePolicy()

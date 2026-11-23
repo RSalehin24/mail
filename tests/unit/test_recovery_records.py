@@ -11,7 +11,7 @@ from shared.errors import ServiceError
 class RecoveryRecordsTests(unittest.TestCase):
     def test_verified_point_required_and_forever_excluded_from_expiry(self):
         with tempfile.TemporaryDirectory() as directory:
-            records = RecoveryRecords(Path(directory) / 'recovery.db')
+            records = RecoveryRecords(Path(directory) / 'state.db')
             policy = RecoveryPolicy(1, True, False, '7_days')
             for choice in ('7_days', '30_days', 'forever'):
                 identifier = str(uuid.uuid4())
@@ -32,7 +32,7 @@ class RecoveryRecordsTests(unittest.TestCase):
 
     def test_interrupted_mutations_block_new_operations(self):
         with tempfile.TemporaryDirectory() as directory:
-            records = RecoveryRecords(Path(directory) / 'recovery.db')
+            records = RecoveryRecords(Path(directory) / 'state.db')
             policy = RecoveryPolicy(1, True, False, '7_days')
             identifier = str(uuid.uuid4())
             records.begin(identifier, 'cloud@rsalehin24.me', policy,
@@ -51,7 +51,7 @@ class RecoveryRecordsTests(unittest.TestCase):
 
     def test_opening_current_ledger_does_not_rewrite_backup_state(self):
         with tempfile.TemporaryDirectory() as directory:
-            records = RecoveryRecords(Path(directory) / 'recovery.db')
+            records = RecoveryRecords(Path(directory) / 'state.db')
             before = records.path.stat().st_mtime_ns
             RecoveryRecords(records.path)
             self.assertEqual(records.path.stat().st_mtime_ns, before)

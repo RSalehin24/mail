@@ -48,7 +48,7 @@ class LocalHostTests(unittest.TestCase):
         state.mkdir(mode=0o700)
         lock = root / "maddy.lock"
         provision_lock(lock, os.getuid())
-        Journal.provision(state / "journal.db")
+        Journal.provision(state / "state.db")
         record = {
             "inputs": {
                 "lock_wait_seconds": LOCK_WAIT_SECONDS,

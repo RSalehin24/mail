@@ -28,7 +28,7 @@ class RecordingDeletion:
 def configure_recovery(fixture):
     root = fixture.root / 'recovery-control'
     root.mkdir(mode=0o700)
-    records = RecoveryRecords(root / 'recovery.db')
+    records = RecoveryRecords(root / 'state.db')
     policy = {'schema_version': 1, 'revision': 1, 'enabled': True,
               'permanent_deletion_enabled': False, 'default_retention': '7_days',
               'protected': {'mail@rsalehin24.me': 'Administrator verification emails'}}
