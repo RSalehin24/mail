@@ -3,7 +3,6 @@
 import json
 import re
 import sqlite3
-import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -147,9 +146,6 @@ class ForwardingControl:
             revision = db.execute("SELECT revision FROM metadata WHERE id=1").fetchone()[0]
             if cloudflare.get("configured") and cloudflare.get("revision") != revision:
                 cloudflare = {**cloudflare, "state": "pending"}
-            elif cloudflare.get("state") == "connected" and time.time() - float(
-                cloudflare.get("observed_at") or 0) > 300:
-                cloudflare = {**cloudflare, "state": "stale"}
             for item in rules:
                 state = cloudflare.get("mailboxes", {}).get(item["email"], {})
                 item["local_delivery_verified"] = bool(state.get("local_delivery_verified"))
@@ -167,11 +163,6 @@ class ForwardingControl:
                 "rules": rules,
                 "mode": "transparent",
                 "keep_local": True,
-                "worker": protected_json(
-                    self.root / "forwarding-worker-status.json", self.worker_owner
-                )
-                if (self.root / "forwarding-worker-status.json").exists()
-                else None,
             }
 
     def handle(

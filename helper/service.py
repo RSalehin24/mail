@@ -36,6 +36,15 @@ class HelperDependencies:
     forwarding: ForwardingControl | None = None
     submission: SubmissionControl | None = None
     read_lock_policy: LockPolicy | None = None
+    # Applies saved forwarding to Cloudflare; called after the mailbox lock is released.
+    forwarding_sync: Callable[[], None] | None = None
+
+
+# Operations after which Cloudflare must learn about the change.
+FORWARDING_CHANGES = frozenset({
+    "create", "delete", "recovery_delete", "forwarding_save", "forwarding_remove",
+    "forwarding_retry", "forwarding_verify", "forwarding_verify_local",
+})
 
 
 class HostHelper:
@@ -45,6 +54,12 @@ class HostHelper:
         self._inventory_cache: tuple[float, dict[str, list[str]]] | None = None
 
     def handle(self, request: HelperRequest) -> dict[str, Any]:
+        response = self._dispatch(request)
+        if self.dependencies.forwarding_sync and request.operation in FORWARDING_CHANGES:
+            self.dependencies.forwarding_sync()
+        return response
+
+    def _dispatch(self, request: HelperRequest) -> dict[str, Any]:
         if request.operation in {"submission_sync", "submission_reconcile"}:
             if self.dependencies.submission is None or request.recovery is None:
                 raise ServiceError("submission_unavailable", 503)

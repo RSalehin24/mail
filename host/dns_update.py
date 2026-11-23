@@ -15,7 +15,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from host.cloudflare_forwarding import Cloudflare
+from helper.cloudflare_forwarding import Cloudflare
 from shared.errors import ServiceError
 from shared.files import protected_bytes, protected_json
 

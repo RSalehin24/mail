@@ -7,6 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any, Protocol
 
+from helper.cloudflare_forwarding import ForwardingPaths
 from helper.deletion import DeletionPaths
 from helper.dependencies import HostLocations, build_dependencies
 from helper.journal import Journal
@@ -44,7 +45,11 @@ LOCAL_LOCATIONS = HostLocations(
     ),
     # The alert and certificate observations sit at their host paths; only these two differ.
     status=HostStatusPaths(maddy_data=MADDY_DATA, deployment=ETC_RECORDS / "deployment.json"),
-    direct_deletion=True,
+    in_process=True,
+    forwarding=ForwardingPaths(
+        ETC_RECORDS / "cloudflare-forwarding.json",
+        Path("/run/secrets/mail-admin/cloudflare-forwarding.token"),
+    ),
 )
 
 

@@ -4,7 +4,6 @@ No record becomes restorable until an encrypted recovery point was verified.
 Interrupted mutations remain explicit and cannot be retried as new operations.
 """
 
-import json
 import os
 import sqlite3
 from collections.abc import Iterator
@@ -17,8 +16,6 @@ from shared.errors import ServiceError
 from shared.validation import address, request_id
 
 # Jobs waiting or running at once; keeps a runaway client from filling the ledger.
-QUEUE_LIMIT = 20
-
 
 class RecoveryRecords:
     def __init__(self, path: Path) -> None:
@@ -203,157 +200,14 @@ class RecoveryRecords:
                 dict(row)
                 for row in connection.execute(
                     "SELECT * FROM recovery_records WHERE state NOT IN ('removed') "
-                    "OR id IN (SELECT record_id FROM recovery_jobs "
-                    "WHERE state IN ('queued','running','reconciliation_required')) "
                     "ORDER BY deleted_at DESC,id",
                 )
             ]
 
-    def enqueue(
-        self,
-        identifier: str,
-        kind: str,
-        record_id: str,
-        email: str,
-        payload: dict[str, Any],
-        now: int,
-    ) -> dict[str, Any]:
-        identifier, record_id, email = request_id(identifier), request_id(record_id), address(email)
-        value = json.dumps(payload, sort_keys=True)
-        with self.transaction() as connection:
-            existing = connection.execute(
-                "SELECT * FROM recovery_jobs WHERE id=?",
-                (identifier,),
-            ).fetchone()
-            if existing:
-                recorded = json.loads(existing['payload'])
-                compared = dict(payload)
-                if kind == 'recovery_restore':
-                    recorded.pop('password_hash', None)
-                    compared.pop('password_hash', None)
-                if (
-                    existing["kind"],
-                    existing["record_id"],
-                    existing["email"],
-                    recorded,
-                ) != (
-                    kind,
-                    record_id,
-                    email,
-                    compared,
-                ):
-                    raise ServiceError("request_id_conflict", 409)
-                return self._public_job(dict(existing))
-            self._admit(connection, email)
-            connection.execute(
-                "INSERT INTO recovery_jobs VALUES(?,?,?,?,?,?,?,?)",
-                (identifier, kind, record_id, email, value, "queued", now, ""),
-            )
-            connection.execute(
-                "INSERT INTO recovery_audit(created,action,request_id,email,outcome) "
-                "VALUES(?,?,?,?,?)",
-                (now, kind, identifier, email, "queued"),
-            )
-        return {"request_id": identifier, "state": "queued", "error": ""}
-
-    @staticmethod
-    def _admit(connection: sqlite3.Connection, email: str) -> None:
-        # Different mailboxes may wait in line, but one mailbox never has two jobs at once.
-        if connection.execute(
-            "SELECT 1 FROM recovery_jobs WHERE email=? AND state IN ('queued','running')",
-            (email,),
-        ).fetchone():
-            raise ServiceError("recovery_operation_in_progress", 409)
-        waiting = connection.execute(
-            "SELECT COUNT(*) FROM recovery_jobs WHERE state IN ('queued','running')"
-        ).fetchone()[0]
-        if waiting >= QUEUE_LIMIT:
-            raise ServiceError("recovery_queue_full", 409)
-
-    def _public_job(self, row: dict[str, Any]) -> dict[str, Any]:
-        return {"request_id": row["id"], "state": row["state"], "error": row["error"]}
-
-    def job(self, identifier: str) -> dict[str, Any]:
-        with self.transaction() as connection:
-            row = connection.execute(
-                "SELECT * FROM recovery_jobs WHERE id=?", (request_id(identifier),)
-            ).fetchone()
-            if row is None:
-                raise ServiceError("operation_not_found", 404)
-            return self._public_job(dict(row))
-
-    def claim(self, now: int) -> dict[str, Any] | None:
-        with self.transaction() as connection:
-            # A new worker process cannot assume an interrupted mutation completed.
-            connection.execute(
-                "UPDATE recovery_jobs SET state='reconciliation_required', "
-                "error='worker_interrupted',updated_at=? WHERE state='running'",
-                (now,),
-            )
-            row = connection.execute(
-                "SELECT * FROM recovery_jobs WHERE state='queued' ORDER BY updated_at,rowid LIMIT 1"
-            ).fetchone()
-            if row is None:
-                return None
-            connection.execute(
-                "UPDATE recovery_jobs SET state='running',updated_at=? WHERE id=?", (now, row["id"])
-            )
-            return {**dict(row), "payload": json.loads(row["payload"])}
-
-    def finish(self, identifier: str, state: str, now: int, error: str = "") -> None:
-        if state not in {"complete", "failed", "reconciliation_required"}:
-            raise ServiceError("invalid_recovery_state", 503)
-        with self.transaction() as connection:
-            row = connection.execute(
-                "SELECT * FROM recovery_jobs WHERE id=?", (identifier,)
-            ).fetchone()
-            if row is None or row["state"] != "running":
-                raise ServiceError("recovery_state_conflict", 409)
-            connection.execute(
-                "UPDATE recovery_jobs SET state=?,updated_at=?,error=? WHERE id=?",
-                (state, now, error, identifier),
-            )
-            connection.execute(
-                "INSERT INTO recovery_audit(created,action,request_id,email,outcome) "
-                "VALUES(?,?,?,?,?)",
-                (now, row["kind"], identifier, row["email"], state),
-            )
-
-
-    def checkpoint(self, job_id: str, record_id: str, phase: str,
-                   details: dict[str, Any], now: int) -> None:
-        with self.transaction() as connection:
-            connection.execute(
-                "INSERT INTO recovery_checkpoints VALUES(?,?,?,?,?) "
-                "ON CONFLICT(job_id) DO UPDATE SET phase=excluded.phase, "
-                "details=excluded.details,updated_at=excluded.updated_at",
-                (request_id(job_id), request_id(record_id), phase, json.dumps(details), now),
-            )
-
-    def checkpoint_for(self, identifier: str) -> dict[str, Any] | None:
-        with self.transaction() as connection:
-            row = connection.execute(
-                "SELECT * FROM recovery_checkpoints WHERE record_id=? "
-                "ORDER BY updated_at DESC,rowid DESC LIMIT 1", (request_id(identifier),),
-            ).fetchone()
-            if row is None:
-                return None
-            return {**dict(row), 'details': json.loads(row['details'])}
-
     def busy(self) -> bool:
+        """Whether a deletion or restore is part-way, so other changes should wait."""
         with self.transaction() as connection:
             return bool(connection.execute(
-                "SELECT 1 FROM recovery_jobs WHERE state IN "
-                "('queued','running','reconciliation_required') LIMIT 1",
-            ).fetchone() or connection.execute(
                 "SELECT 1 FROM recovery_records WHERE state IN "
                 "('capturing','deleting','restoring','removing','reconciliation_required') LIMIT 1",
             ).fetchone())
-
-    def original_job(self, identifier: str) -> dict[str, Any]:
-        with self.transaction() as connection:
-            row = connection.execute('SELECT * FROM recovery_jobs WHERE id=?',
-                                     (request_id(identifier),)).fetchone()
-            if row is None:
-                raise ServiceError('operation_not_found', 404)
-            return {**dict(row), 'payload': json.loads(row['payload'])}

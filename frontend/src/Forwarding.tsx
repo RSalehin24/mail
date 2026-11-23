@@ -7,7 +7,7 @@ import { usePagination } from './PaginationControls';
 import { formatDateTime } from './format';
 
 interface Rule { email: string; destination: string; enabled: boolean; keep_local: true; pending: number; attention: number; destination_verified?: boolean; local_delivery_verified?: boolean; synchronized?: boolean; verification_state?: string; last_result: {state: string; error: string; updated: number} | null }
-interface Listing { connection?: {configured: boolean; state: string; observed_at?: number; reason?: string; mailboxes?: Record<string, {local_delivery_verified: boolean}>; connected_mailboxes?: string[]}; rules: Rule[]; revision: number; mode: string; keep_local: true; worker?: { observed_at: number; outcome: string; error: string } | null }
+interface Listing { connection?: {configured: boolean; state: string; observed_at?: number; reason?: string; mailboxes?: Record<string, {local_delivery_verified: boolean}>; connected_mailboxes?: string[]}; rules: Rule[]; revision: number; mode: string; keep_local: true }
 
 export function Forwarding({ authorize, notify, mailbox }: { authorize: Authorize; notify: Notify; mailbox?: string }) {
   const [tab, setTab] = useState(() => new URLSearchParams(window.location.search).get('tab') === 'incoming' ? 'incoming' : 'rules');

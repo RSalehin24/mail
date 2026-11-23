@@ -23,7 +23,7 @@ Live host: GCP VM `rsalehin24-mail` (us-east1-c), SSH `deployer@mail.rsalehin24.
 | Unit | When | Does |
 |---|---|---|
 | `mail-admin-backup.timer` | 03:00 Asia/Dhaka | Backup to R2 (Restic), verified by a restore to scratch |
-| `mail-admin-backup-control` `.path` + `.timer` | on request file; 5 min fallback | Dashboard-requested backups and restores |
+| `mail-admin-backup-control` `.path` | on request file (no timer; the nightly backup refreshes the list afterwards) | Dashboard-requested backups and restores |
 | `mail-admin-recovery-expire` `.timer` | daily | Removes deleted-mailbox archives whose retention ended (`host.expire_recovery`) |
 | `mail-admin-maddy-restart.path` | on request file | Restart Maddy after a relay change |
 | `mail-admin-forwarding.timer` | 30 s | Sync forwarding with Cloudflare |
@@ -56,3 +56,7 @@ Stop the VM, `gcloud compute instances delete-access-config` then `add-access-co
 - Restore a deleted mailbox (rare, on the VM as root): `sudo python3 -m host.restore_mailbox <record-id>` (the id is shown on the dashboard's Deleted page; the command asks for the new mailbox password). Maddy keeps running.
 - Expiry: `mail-admin-recovery-expire.timer` runs daily. Run it by hand with `sudo python3 -m host.expire_recovery`.
 - The dashboard user must own `recovery-points/` and `recovery.key` (D-078): `sudo chown -R mail-admin:mail-admin /var/lib/mail-admin-helper/recovery-points /var/lib/mail-admin-helper/recovery.key`.
+
+## Forwarding (D-080)
+- The dashboard applies forwarding to Cloudflare itself after every mailbox create or delete and every forwarding change; there is no forwarding timer. If it ever shows `sync_failed`, fix the cause (for example the Cloudflare token) and run `sudo python3 -m host.sync_forwarding` on the VM; the restore command does this automatically.
+- `/etc/mail-admin/cloudflare-forwarding.json` and `/etc/mail-admin/secrets/cloudflare-forwarding.token` are `root:mail-admin` 0640; the record `/var/lib/mail-admin-helper/cloudflare-forwarding.json` belongs to the state owner.

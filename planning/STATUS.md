@@ -22,8 +22,13 @@ Updated 2026-11-21 (after the UI, notification mail, OS update and cleanup work)
 - Restoring a deleted mailbox: `sudo python3 -m host.restore_mailbox <record-id>` (RUNBOOK). Expiry: `mail-admin-recovery-expire.timer`, daily.
 - Checks on main: lint, typecheck, reads, unit 413, integration 93, all 29 real-Maddy modules and the runtime suite, `make browser` (`MAIL_ADMIN_CHROME=/usr/bin/google-chrome-stable`).
 
+## Also done 2026-11-23/24 (D-080 to D-082)
+- Forwarding is applied by the dashboard itself; the 30-second forwarding timer and the 5-minute backup-control timer are gone. Dead job-queue and legacy forwarding code removed. Image `mail-admin:stage18`.
+- Incident D-081: five mailboxes permanently deleted at 19:39 UTC, restored from the 2026-11-22 21:00 UTC backup; mail after that backup was lost. Owner still to set the deletion policy default to 7 days (Settings, Deleted, Configure; needs password and code).
+- Backup preflight orphan-key bug fixed (D-082).
+
 ## Next (PLAN-SIMPLE)
-Plan: [PLAN-SIMPLE](PLAN-SIMPLE.md). v3 backups without a Maddy stop and the backup-now and restore-backup commands; v4 forwarding off its 30-second timer and relay change without a restart; v5 one database and fewer units; v6 remove the dead job-queue code in `helper/recovery_records.py`; v7 new frontend from Figma ([FIGMA-BRIEF](FIGMA-BRIEF.md)). Leftover test mailbox `uitest-d@rsalehin24.me` exists again (live restore test); delete it again from the dashboard.
+[PLAN-SIMPLE](PLAN-SIMPLE.md): v3 backups without a Maddy stop (still about 20 s at 03:00), "Back up now" and "Restore backup" buttons to VM commands (D-076; not done, the backup-control worker still serves them), v5 one database and fewer units (deferred: risky, no user-visible gain), v7 frontend (the owner does it in a separate session). Leftover test mailbox `uitest-d@rsalehin24.me` was permanently removed by the owner's session during the incident window.
 
 ## Open (only things that depend on time)
 1. Tonight's 03:00 Dhaka backup is the first scheduled run on the new code, kernel and Docker: check it is `verified` with 9 accounts (the journal says why a run failed).

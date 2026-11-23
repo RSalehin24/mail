@@ -1,10 +1,11 @@
 """Native forwarding policy, verified destinations and preservation of existing routes."""
 
 import json
+import os
 import unittest
 import uuid
 
-from host.cloudflare_forwarding import CloudflareSync
+from helper.cloudflare_forwarding import CloudflareSync, ForwardingApplier, ForwardingPaths
 from shared.errors import ServiceError
 from tests.unit import test_forwarding
 
@@ -144,3 +145,40 @@ class CloudflareForwardingTests(unittest.TestCase):
         self.assertNotIn('new-mailbox@rsalehin24.me', result['connected_mailboxes'])
         self.assertFalse(any(path.endswith('/email/routing/rules')
                              for _, path, _ in self.api.mutations))
+
+
+class FakeMaddy:
+    def inventories(self):
+        return {'credentials': ['mail@rsalehin24.me', 'orphan@rsalehin24.me'],
+                'storage': ['mail@rsalehin24.me']}
+
+
+class ForwardingApplierTests(unittest.TestCase):
+    """The dashboard applies forwarding itself; a failure is recorded, never raised."""
+
+    def setUp(self):
+        self.base = test_forwarding.ForwardingTests()
+        self.base.setUp()
+        self.addCleanup(self.base.doCleanups)
+        self.control = self.base.control
+        self.directory = self.control.root / 'applier'
+        self.directory.mkdir()
+        self.paths = ForwardingPaths(self.directory / 'configuration.json',
+                                     self.directory / 'token', os.geteuid())
+
+    def applier(self):
+        return ForwardingApplier(self.control, FakeMaddy(), self.paths)
+
+    def observation(self):
+        return json.loads((self.control.root / 'cloudflare-forwarding.json').read_text())
+
+    def test_without_credentials_it_records_not_connected_and_does_nothing_else(self):
+        self.applier().apply()
+        self.assertEqual(self.observation()['state'], 'not_connected')
+
+    def test_a_failed_sync_is_recorded_and_does_not_raise(self):
+        self.paths.configuration.write_text('{"domain": "wrong"}')
+        self.paths.configuration.chmod(0o600)
+        self.applier().apply()
+        self.assertEqual(self.observation()['state'], 'sync_failed')
+        self.assertEqual(self.observation()['reason'], 'invalid_forwarding_configuration')

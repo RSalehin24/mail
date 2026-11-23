@@ -1,5 +1,4 @@
 import configparser
-import re
 import unittest
 from pathlib import Path
 
@@ -9,8 +8,6 @@ HELPER_STATE = "/var/lib/mail-admin-helper"
 WORKERS = {
     "mail-admin-backup-control": "backup-control.db",
 }
-MINIMUM_FALLBACK_SECONDS = 60
-SECONDS_PER_UNIT = {"s": 1, "sec": 1, "min": 60}
 
 
 def unit(name):
@@ -18,11 +15,6 @@ def unit(name):
     parser.optionxform = str
     parser.read(UNITS / name)
     return parser
-
-
-def seconds(value):
-    match = re.fullmatch(r"(\d+)(s|sec|min)", value)
-    return int(match[1]) * SECONDS_PER_UNIT[match[2]]
 
 
 class MaddyRestartUnitTests(unittest.TestCase):
@@ -64,11 +56,14 @@ class WorkerActivationTests(unittest.TestCase):
             service["Service"]["ExecStart"], "/usr/bin/python3 -m host.expire_recovery")
         self.assertEqual(service["Service"]["ReadWritePaths"], HELPER_STATE)
 
-    def test_fallback_timers_do_not_poll_every_few_seconds(self):
+    def test_workers_have_no_polling_fallback_timer(self):
         for worker in WORKERS:
             with self.subTest(worker=worker):
-                interval = seconds(unit(worker + ".timer")["Timer"]["OnUnitInactiveSec"])
-                self.assertGreaterEqual(interval, MINIMUM_FALLBACK_SECONDS)
+                self.assertFalse((UNITS / (worker + ".timer")).exists())
+
+    def test_the_nightly_backup_refreshes_the_backup_list_afterwards(self):
+        service = unit("mail-admin-backup.service")["Service"]
+        self.assertEqual(service["ExecStartPost"], "-/usr/bin/python3 -m host.backup_control")
 
 
 class DnsUpdateUnitTests(unittest.TestCase):

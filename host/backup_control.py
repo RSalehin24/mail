@@ -19,7 +19,7 @@ from host.context import HostContext
 from host.daily_retention import RetentionLedger
 from host.docker import Docker, DockerSnapshots
 from host.locks import HostLock, LockPolicy
-from host.mailbox_store import body_path, connect, validate
+from host.mailbox_store import body_path, connect, linked_body_keys, validate
 from host.mailbox_transaction import mailbox_transaction
 from host.preflight import provision_lock
 from host.restic_process import ResticProcess
@@ -237,7 +237,7 @@ class BackupWorker:
                 address(row[0])
                 for row in connection.execute("SELECT username FROM users ORDER BY username")
             ]
-            keys = [row[0] for row in connection.execute("SELECT id FROM extKeys")]
+            keys = linked_body_keys(connection)
             sizes = sum(body_path(target / "maddy/messages", key).stat().st_size for key in keys)
         if (
             len(emails) > 32
@@ -312,7 +312,7 @@ class BackupWorker:
         journal = self.context.coordination.journal
         journal.synchronize(inventory, time.time())
         with connect(target / "maddy/imapsql.db") as source:
-            original_keys = [row[0] for row in source.execute("SELECT id FROM extKeys")]
+            original_keys = linked_body_keys(source)
         keys = {key: str(uuid.uuid5(uuid.UUID(job["id"]), key)) for key in original_keys}
         size = sum(
             body_path(target / "maddy/messages", key).stat().st_size for key in original_keys
@@ -323,7 +323,7 @@ class BackupWorker:
             (Docker(timeout=30), maddy, self.context.intents), startup_timeout=30
         )
         with connect(data / "imapsql.db") as live:
-            live_keys = [row[0] for row in live.execute("SELECT id FROM extKeys")]
+            live_keys = linked_body_keys(live)
         live_size = sum(body_path(bodies, key).stat().st_size for key in live_keys)
         database_bytes = sum(
             path.stat().st_size

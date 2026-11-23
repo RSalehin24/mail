@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from helper.backup_control import BackupControl
+from helper.cloudflare_forwarding import ForwardingApplier, ForwardingPaths
 from helper.deletion import DeletionGuard, DeletionPaths
 from helper.direct_deletion import DeletionStorage, DirectDeletion
 from helper.forwarding import ForwardingControl
@@ -36,7 +37,8 @@ class HostLocations:
         Path("/var/lib/mail-admin-backup/manifest.json"),
     ))
     status: HostStatusPaths = field(default_factory=HostStatusPaths)
-    direct_deletion: bool = False  # The dashboard deletes mailboxes itself, in one request
+    in_process: bool = False  # The dashboard itself deletes mailboxes and syncs forwarding
+    forwarding: ForwardingPaths = field(default_factory=ForwardingPaths)
 
 
 def recovery_control(
@@ -44,7 +46,7 @@ def recovery_control(
 ) -> RecoveryControl:
     state, records = locations.state, RecoveryRecords(locations.state / "recovery.db")
     deletion = None
-    if locations.direct_deletion:
+    if locations.in_process:
         storage = DeletionStorage(
             Path(deployment["maddy_data_directory"]),
             Path(deployment["backup_sources"]["dashboard"]) / "admin_data.db",
@@ -63,6 +65,8 @@ def build_dependencies(
     inputs, state = deployment["inputs"], locations.state
     data = Path(deployment["maddy_data_directory"])
     journal = Journal(state / "journal.db", locations.owner)
+    # In process, the dashboard writes the Cloudflare observation, so it is the "worker" owner.
+    forwarding = ForwardingControl(state, data, locations.owner if locations.in_process else 0)
     dependencies = HelperDependencies(
         maddy,
         journal,
@@ -76,10 +80,12 @@ def build_dependencies(
         else None,
         BackupControl(state),
         # Root workers write the Cloudflare records the forwarding page reads.
-        ForwardingControl(state, data),
+        forwarding,
         read_lock_policy=LockPolicy(max(
             inputs["lock_wait_seconds"], inputs["operation_timeout_seconds"] * 0.75,
         ), locations.owner),
+        forwarding_sync=ForwardingApplier(
+            forwarding, maddy, locations.forwarding).apply if locations.in_process else None,
     )
     if (data / "submission-relay.conf").is_file():
         database = Path(deployment["backup_sources"]["dashboard"]) / "admin_data.db"

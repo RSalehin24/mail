@@ -1,28 +1,30 @@
-"""Root-only synchronization of native Cloudflare forwarding and local IMAP delivery."""
+"""Synchronization of native Cloudflare forwarding and local IMAP delivery, run in the dashboard."""
 
 import hashlib
 import json
-import os
+import logging
 import re
-import sqlite3
 import time
 import urllib.error
 import urllib.request
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from helper.forwarding import ForwardingControl, destination
+from helper.maddy import MaddyAccess
 from host.locks import HostLock, LockPolicy
 from host.preflight import provision_lock
 from shared.errors import ServiceError
-from shared.files import atomic_json, protected_bytes, protected_json
+from shared.files import atomic_owned_json, protected_bytes, protected_json
 from shared.validation import address
 
 CONFIGURATION = Path('/etc/mail-admin/cloudflare-forwarding.json')
 OBSERVATION = 'cloudflare-forwarding.json'
 MANAGED = 'Mail Admin local delivery: '
 PRESERVED = {'mail@rsalehin24.me', 'website@rsalehin24.me'}
+LOCK_WAIT_SECONDS = 10.0
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -186,7 +188,7 @@ class CloudflareSync:
         script = worker_script(routes)
         sha = hashlib.sha256(script.encode()).hexdigest()
         # The worker reads the record it wrote itself, as its own user.
-        previous = protected_json(self.observation, os.geteuid()) if (
+        previous = protected_json(self.observation, self.control.worker_owner) if (
             self.observation.exists()) else {}
         existing = self.api.listing(f'/zones/{self.api.zone}/email/routing/rules')
         replacements = []
@@ -230,47 +232,60 @@ class CloudflareSync:
                   'mailboxes': states, 'connected_mailboxes': connected,
                   'verified_destinations': sorted(verified & {
                       row['destination'] for row in desired['rules']})}
-        atomic_json(self.observation, result)
+        atomic_owned_json(self.observation, result, self.control.worker_owner)
         return result
 
 
-def main() -> None:
-    if os.geteuid() != 0:
-        raise ServiceError('root_required', 403)
-    from host.context import HostContext
+@dataclass(frozen=True)
+class ForwardingPaths:
+    configuration: Path = CONFIGURATION
+    token: Path = Path('/etc/mail-admin/secrets/cloudflare-forwarding.token')
+    owner: int = 0  # root writes the credentials; the dashboard reads them through its group
 
-    context = HostContext.load()
-    control = ForwardingControl(Path('/var/lib/mail-admin-helper'),
-                                Path(context.deployment['maddy_data_directory']))
-    provision_lock(control.root / 'forwarding-sync.lock')
-    with HostLock(control.root / 'forwarding-sync.lock', LockPolicy(0.1)):
-        if not CONFIGURATION.exists():
-            atomic_json(control.root / OBSERVATION, {'configured': False, 'state': 'not_connected',
-                        'reason': 'cloudflare_credentials_required', 'observed_at': time.time()})
-            return
-        configuration = protected_json(CONFIGURATION)
-        validate_configuration(configuration)
+
+class ForwardingApplier:
+    """Applies the saved forwarding rules to Cloudflare once, when something asks for it."""
+
+    def __init__(self, control: ForwardingControl, maddy: MaddyAccess, paths: ForwardingPaths,
+                 ) -> None:
+        self.control, self.maddy, self.paths = control, maddy, paths
+
+    def apply(self) -> None:
+        """Never raises: a failed sync is recorded for the dashboard, the caller's work stands."""
+        lock = self.control.root / 'forwarding-apply.lock'
+        owner = self.control.worker_owner
+        provision_lock(lock, owner)
         try:
-            token = protected_bytes(Path(configuration['token_reference'])).decode().strip()
-            api = Cloudflare(configuration['account_id'], configuration['zone_id'], token)
-            with context.coordination.consistent():
-                with sqlite3.connect(control.data.joinpath('imapsql.db').as_uri() + '?mode=ro',
-                                     uri=True) as db:
-                    mailboxes = [row[0] for row in db.execute('SELECT username FROM users')]
-                with sqlite3.connect(control.data.joinpath('credentials.db').as_uri() + '?mode=ro',
-                                     uri=True) as db:
-                    credentials = {row[0] for row in db.execute('SELECT key FROM passwords')}
-                mailboxes = [email for email in mailboxes if email in credentials]
-            CloudflareSync(control, api, configuration).run(mailboxes)
+            with HostLock(lock, LockPolicy(LOCK_WAIT_SECONDS, owner)):
+                self._apply()
         except (OSError, ServiceError) as error:
-            path = control.root / OBSERVATION
-            previous = protected_json(path) if path.exists() else {}
+            self._record_failure(error)
+            logging.getLogger(__name__).warning(
+                'forwarding_sync_failed code=%s',
+                error.code if isinstance(error, ServiceError) else type(error).__name__)
+
+    def _apply(self) -> None:
+        if not self.paths.configuration.exists():
+            atomic_owned_json(self.control.root / OBSERVATION, {
+                'configured': False, 'state': 'not_connected',
+                'reason': 'cloudflare_credentials_required', 'observed_at': time.time()},
+                self.control.worker_owner)
+            return
+        configuration = protected_json(self.paths.configuration, self.paths.owner)
+        validate_configuration(configuration)
+        token = protected_bytes(self.paths.token, self.paths.owner).decode().strip()
+        api = Cloudflare(configuration['account_id'], configuration['zone_id'], token)
+        inventory = self.maddy.inventories()
+        mailboxes = sorted(set(inventory['credentials']) & set(inventory['storage']))
+        CloudflareSync(self.control, api, configuration).run(mailboxes)
+
+    def _record_failure(self, error: Exception) -> None:
+        path = self.control.root / OBSERVATION
+        try:
+            previous = protected_json(path, self.control.worker_owner) if path.exists() else {}
             previous.update(state='sync_failed', observed_at=time.time(),
                             reason=error.code if isinstance(error, ServiceError)
                             else 'cloudflare_unavailable')
-            atomic_json(path, previous)
-            raise
-
-
-if __name__ == '__main__':
-    main()
+            atomic_owned_json(path, previous, self.control.worker_owner)
+        except (OSError, ServiceError):
+            logging.getLogger(__name__).warning('forwarding_observation_unwritable')

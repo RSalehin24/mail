@@ -2,6 +2,7 @@ import os
 import tempfile
 import unittest
 import uuid
+from dataclasses import replace
 from pathlib import Path
 
 from backend.local_host import RECOVERY_REQUEST, LocalHost
@@ -72,6 +73,16 @@ class LocalHostTests(unittest.TestCase):
         self.assertEqual(result["credentials"], ["a@rsalehin24.me"])
         self.assertEqual(result["storage"], ["a@rsalehin24.me"])
 
+    def test_changes_trigger_one_forwarding_sync_and_reads_do_not(self):
+        synced = []
+        self.host.helper.dependencies = replace(
+            self.host.helper.dependencies, forwarding_sync=lambda: synced.append(True))
+        self.host.call(self.request("inventory"))
+        self.assertEqual(synced, [])
+        self.host.call(self.request("create", email="new@rsalehin24.me",
+                                    password="Local-host-pass-1!"))
+        self.assertEqual(synced, [True])
+
     def test_create_then_lookup_by_request_id_uses_the_helpers_journal(self):
         request = self.request("create", email="new@rsalehin24.me", password="Local-host-pass-1!")
         self.assertEqual(self.host.call(request)["state"], "complete")
@@ -126,3 +137,4 @@ class RecoveryWakeTests(unittest.TestCase):
             missing = Path(directory) / "absent"
             result = self.call(self.host({"state": "queued"}, missing), "recovery_policy")
             self.assertEqual(result, {"state": "queued"})
+

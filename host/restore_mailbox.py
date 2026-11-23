@@ -20,6 +20,7 @@ from helper.recovery_records import RecoveryRecords
 from host.mailbox_archive import MailboxArchives
 from host.mailbox_store import body_mapping, connect, import_rows, stage_bodies
 from host.mailbox_transaction import attached_transaction
+from host.sync_forwarding import sync_forwarding
 from shared.errors import ServiceError
 from shared.files import protected_json, state_owner_uid
 from shared.validation import mailbox_password, request_id
@@ -141,6 +142,7 @@ def main(arguments: list[str]) -> int:
     deployment = protected_json(DEPLOYMENT)
     restore = MailboxRestore(deployment, STATE, DockerMaddy(deployment))
     print("Restored", restore.restore(options.record_id, mailbox_password(password)))
+    sync_forwarding()  # The mailbox needs its Cloudflare delivery route again.
     return 0
 
 

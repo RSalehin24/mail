@@ -59,11 +59,12 @@ class RootWrittenFilesTests(unittest.TestCase):
 
     def write_forwarding_and_recovery_records(self):
         state = self.web.state
-        self.root_write(state / "cloudflare-forwarding.json", self.observation(
+        # The dashboard itself writes the Cloudflare observation, so it owns the file.
+        atomic_json(state / "cloudflare-forwarding.json", self.observation(
             configured=True, state="connected", revision=0, mailboxes={},
             verified_destinations=[], connected_mailboxes=[],
         ))
-        self.root_write(state / "forwarding-worker-status.json", self.observation())
+        os.chown(state / "cloudflare-forwarding.json", SERVICE_ID, SERVICE_ID)
         atomic_json(state / "recovery-policy.json", POLICY)
         # The dashboard edits the policy, so it belongs to the state owner like the rest.
         os.chown(state / "recovery-policy.json", SERVICE_ID, SERVICE_ID)
@@ -97,11 +98,11 @@ class RootWrittenFilesTests(unittest.TestCase):
         atomic_json(self.web.records["manifest.json"], self.observation(verified=False))
         self.assertIs(self.host_status()["backup"]["verified"], False)
 
-    def test_forwarding_page_data_reads_the_root_written_records(self):
+    def test_forwarding_page_data_reads_the_dashboards_own_observation(self):
         status, _, page = self.web.api("GET", "/api/forwarding")
         self.assertEqual(status, 200)
         self.assertEqual(page["connection"]["state"], "connected")
-        self.assertEqual(page["worker"]["outcome"], "active")
+        self.assertNotIn("worker", page)
 
     def test_recovery_policy_proof_and_listing_work_for_the_service_user(self):
         status, _, result = self.web.api("GET", "/api/recovery/policy")
