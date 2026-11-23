@@ -38,12 +38,11 @@ class ForwardingBackupTests(unittest.TestCase):
             thread.start()
             self.assertTrue(ready.wait(1))
 
-            def pause(_):
+            def inventories():
                 self.assertTrue(committed.is_set())
+                return {'credentials': [], 'storage': []}
 
-            services = SimpleNamespace(
-                inventories=lambda: {'credentials': [], 'storage': []},
-                running=lambda: [], pause=pause, resume=lambda _: None)
+            services = SimpleNamespace(inventories=inventories)
             scope = SimpleNamespace(consistent=nullcontext, journal=None)
             capture = SnapshotCapture(BackupPaths(staging, root / 'manifest', {'helper': helper}),
                                       CaptureDependencies(scope, services, time.time))

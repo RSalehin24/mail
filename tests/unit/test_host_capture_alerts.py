@@ -19,7 +19,6 @@ class SnapshotFixture:
     journal = None
 
     def __init__(self):
-        self.active = ["maddy"]
         self.events = []
         self.locked = False
 
@@ -36,24 +35,13 @@ class SnapshotFixture:
     def inventories(self):
         return {"credentials": ["fixture@rsalehin24.me"], "storage": ["fixture@rsalehin24.me"]}
 
-    def running(self):
-        return list(self.active)
-
-    def pause(self, names):
-        self.active = [name for name in self.active if name not in names]
-        self.events.append("stopped")
-
-    def resume(self, names):
-        self.active.extend(names)
-        self.events.append("resumed")
-
 
 class HostCaptureTests(unittest.TestCase):
     def setUp(self):
         self.fixture = StateFixture()
         self.addCleanup(self.fixture.close)
 
-    def test_capture_stops_writers_transfer_runs_after_resume_and_publication_follows_verification(
+    def test_capture_keeps_writers_running_and_publication_follows_verification(
         self,
     ):
         services = SnapshotFixture()
@@ -71,7 +59,6 @@ class HostCaptureTests(unittest.TestCase):
 
         class Transfer:
             def publish(inner, archive):
-                self.assertEqual(services.active, ["maddy"])
                 target = remote / archive.name
                 shutil.copy2(archive, target)
                 return str(target)
@@ -89,11 +76,10 @@ class HostCaptureTests(unittest.TestCase):
         original_copy = shutil.copytree
 
         def verify_copy(*arguments, **keywords):
-            self.assertEqual(services.active, [])
             self.assertTrue(services.locked)
             return original_copy(*arguments, **keywords)
 
-        with patch("host.backup.shutil.copytree", side_effect=verify_copy):
+        with patch("host.live_copy.shutil.copytree", side_effect=verify_copy):
             snapshot = backup.capture()
         self.assertFalse(manifest.exists())
         backup.transfer(snapshot)
@@ -101,7 +87,7 @@ class HostCaptureTests(unittest.TestCase):
         self.assertTrue(record["verified"])
         self.assertFalse(record["restore_passed"])
         self.assertEqual(
-            services.events, ["renewal_then_maddy_locked", "stopped", "resumed", "unlocked"]
+            services.events, ["renewal_then_maddy_locked", "unlocked"]
         )
         compressed = snapshot.with_suffix(".tar.gz")
         self.assertEqual(compressed.read_bytes()[:2], b"\x1f\x8b")

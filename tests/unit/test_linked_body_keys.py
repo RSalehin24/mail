@@ -13,7 +13,7 @@ class LinkedBodyKeysTests(unittest.TestCase):
             "INSERT INTO users VALUES(1,'a@rsalehin24.me');"
             "INSERT INTO extKeys VALUES('kept',1,1),('orphan',99,1);"
         )
-        self.assertEqual(linked_body_keys(connection), ["kept"])
+        self.assertEqual(linked_body_keys(connection), {"kept"})
 
 
 if __name__ == "__main__":
