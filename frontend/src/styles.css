@@ -76,3 +76,4 @@ h1, h2, h3, h4, h5, h6, .MuiTab-root, .mailbox-table th, .stat-label { text-tran
 .keep-case { text-transform: none !important; }
 /* No info icon in info boxes (owner); warnings and errors keep theirs. */
 .MuiAlert-standardInfo .MuiAlert-icon { display: none; }
+.mailbox-menu-item { text-transform: capitalize; }

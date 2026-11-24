@@ -12,6 +12,8 @@ interface Snapshot { id: string; cutoff: number; observed: number; verification?
 interface Job { id: string; kind: string; snapshot: string; state: string; phase: string; created: number; updated: number; error: string; result: { cleanup?: { state?: string; error?: string } } }
 interface Listing<T> { busy: boolean; items: T[]; total: number; page: number; page_size: number; observation: { observed: number; error: string } | null }
 const date = formatDateTime;
+// The update time alone when it is the same day as the start; the full date and time otherwise.
+const sameDay = (first: number, second: number) => backupDay(first) === backupDay(second);
 const label = (value: string) => value.replaceAll('_', ' ').replace(/^./, letter => letter.toUpperCase());
 const backupDay = formatDate;
 const backupTime = formatTime;
@@ -79,7 +81,7 @@ export function BackupSettings({ notify }: { notify: Notify }) {
       backupDay(job.created), backupTime(job.created),
       <Tooltip key="operation" title={`ID ${job.id}`} placement="bottom"><Typography variant="body2" tabIndex={0} sx={{ textTransform: 'capitalize', cursor: 'help', width: 'fit-content', mx: 'auto' }}>{job.kind.replaceAll('_', ' ')}</Typography></Tooltip>,
       <Tooltip key="status" title={[job.error && errorMessage(job.error), job.result.cleanup?.error && `Cleanup failed: ${errorMessage(job.result.cleanup.error)}`].filter(Boolean).join(' ') || `Phase: ${label(job.phase)}`} placement="bottom"><Box tabIndex={0} sx={{ cursor: 'help', display: 'inline-block' }}><StatusBadge tone={job.state === 'complete' ? 'success' : job.state === 'failed' || job.state === 'reconciliation_required' ? 'error' : 'neutral'} label={label(job.state)}/></Box></Tooltip>,
-      date(job.updated),
+      sameDay(job.created, job.updated) ? backupTime(job.updated) : date(job.updated),
     ] }))}/>
     {jobs && <PaginationControls count={jobs.total} page={jobs.page - 1} size={operationSize} onPage={setOperationPage} onSize={value => { setOperationSize(value); setOperationPage(0); }}/>} 
     </Stack>}

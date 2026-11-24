@@ -47,8 +47,8 @@ export function PasswordDialog({ mode, mailbox, onClose, onChanged, notify, auth
       <TextField label="Mailbox password" type={visible ? 'text' : 'password'} autoComplete="new-password" value={password}
         disabled={busy || uncertain} onChange={event => setPassword(event.target.value)}
         helperText="At least 16 characters, at most 72 UTF-8 bytes. Spaces are preserved."/>
-      <Stack direction="row" spacing={1}><Button onClick={() => { setPassword(generatePassword()); setVisible(true); }} disabled={busy || uncertain}>Generate 24-character password</Button>
-        <Button startIcon={<ContentCopyOutlined/>} disabled={!password} onClick={async () => { await navigator.clipboard.writeText(password); notify('Password copied'); }}>Copy</Button></Stack>
+      <Stack direction="row" spacing={1}><Button variant="outlined" onClick={() => { setPassword(generatePassword()); setVisible(true); }} disabled={busy || uncertain}>Generate 24-character password</Button>
+        <Button variant="outlined" startIcon={<ContentCopyOutlined/>} disabled={!password} onClick={async () => { await navigator.clipboard.writeText(password); notify('Password copied'); }}>Copy</Button></Stack>
       <FormControlLabel control={<Checkbox checked={visible} onChange={event => setVisible(event.target.checked)}/>} label="Show password for this flow"/>
       {uncertain && <Typography variant="body2">Keep operation ID {identifier}. Reconcile the recorded outcome with the operator before trying another mutation.</Typography>}
     </Stack></DialogContent>

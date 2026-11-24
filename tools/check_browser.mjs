@@ -426,6 +426,9 @@ async function forwardingAndEmailSettings(connection) {
   await connection.click({tag:'button',name:'Forwarding'});
   await connection.until(`document.querySelector('h1')?.textContent === 'Forwarding' && document.querySelector('.desktop-table tbody')?.textContent.includes('second@example.com')`);
   await connection.click({tag:'button',name:'Actions for cloud@rsalehin24.me'});
+  await connection.until(`document.querySelector('[role=menu]') !== null`);
+  await delay(500);
+  await connection.screenshot('forwarding-menu');
   await connection.click({tag:'button',name:'Disable'});
   await connection.until(`document.querySelector('.desktop-table tbody')?.textContent.includes('Disabled')`);
   await connection.until(`document.querySelector('[role=menu]') === null`);
