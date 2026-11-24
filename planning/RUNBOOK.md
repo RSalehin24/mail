@@ -64,5 +64,8 @@ Stop the VM, `gcloud compute instances delete-access-config` then `add-access-co
 - `/var/lib/mail-admin-helper/state.db` holds the journal, recovery records and forwarding rules (it replaced `journal.db`, `recovery.db`, `forwarding.db`, kept as `*.migrated`). `backup-control.db` and the dashboard's `admin_data.db` are separate.
 - Rollback: `sudo /root/cutover-20261121/rollback-v20.sh` (stops the dashboard, moves `state.db` aside as `state.db.rolledback`, renames the `.migrated` files back, restores the previous library and units and starts image `stage18`; anything written to `state.db` after the upgrade is lost). Remove the `.migrated` copies by hand only after the new version has been stable for a while.
 
-## Relay changes and Maddy (D-087)
-- Saving the relay in the dashboard makes the root worker `mail-admin-maddy-restart` reload Maddy in place (`docker kill --signal USR2 maddy`); the container does not restart and mail keeps flowing. To reload by hand: `sudo docker kill --signal USR2 maddy`, then `docker logs --since 1m maddy | grep "old server stopped"`. SIGHUP stops Maddy: never use it for a reload.
+## Relay changes and Maddy (D-087, D-089)
+- Saving the relay in the dashboard replaces `/opt/maddy/data/submission-relay.conf`; the Maddy launcher's file watcher (`inotifyd`, moved-to events on `/data`) sends `kill -USR2 1` and Maddy reloads in place (container not restarted, mail keeps flowing). Check with `docker logs --since 1m maddy | grep -E "reloading server|old server stopped"`. There is no restart worker any more.
+- To reload by hand: `sudo docker kill --signal USR2 maddy`. SIGHUP stops Maddy: never use it for a reload.
+- `/usr/local/libexec/mail-admin-maddy` (the launcher) is a single-file bind mount: change it with `cat new > /usr/local/libexec/mail-admin-maddy` (same inode) and restart Maddy once with `docker restart maddy`. Exactly one `inotifyd` must run in the Maddy container (`docker exec maddy ps -o args | grep -c inotifyd`).
+- `python3 -m host.restore_backup` merges into the live mail store without pausing Maddy (D-088); after a crash run it with `--reconcile` first.
