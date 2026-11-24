@@ -39,33 +39,30 @@ export function AuthView({ onLogin, onCodes }: { onLogin: () => void; onCodes: (
   return <Box className="auth-stage"><Paper className="auth-card" elevation={0}>
     <Box className="auth-icon"><ShieldOutlined/></Box>
     <Typography variant="h4" component="h1">{setup ? 'Set up your dashboard' : challenge ? 'One more step' : 'Welcome back'}</Typography>
-    <Typography color="text.secondary" sx={{ mt: 1, mb: 3 }}>{setup ? 'Use the private token provided by your operator.' : ''}</Typography>
+    {setup ? <Typography color="text.secondary" sx={{ mt: 1 }}>Use the private token provided by your operator.</Typography> : null}
+    <Box sx={{ mb: 3 }}/>
     <Stack component="form" spacing={2.5} onSubmit={event => { event.preventDefault(); void submit(); }}>
       {error && <Alert severity="error">{error}</Alert>}
       {setup && !material && <TextField label="Private bootstrap token" type="password" autoComplete="off" value={token} onChange={event => setToken(event.target.value)}/>}
       {material && <EnrollmentMaterial material={material}/>}
-      {(!setup && !challenge) && <TextField label="Administrator" value={adminEmail} disabled/>}
       {((!setup && !challenge) || material) && <TextField label={setup ? 'New master password' : 'Master password'} type="password"
         autoComplete={setup ? 'new-password' : 'current-password'} value={password} onChange={event => setPassword(event.target.value)}
         helperText={setup ? 'At least 16 characters; spaces and Unicode are welcome.' : undefined}/>}
       {(challenge || material) && <>
-        <Typography variant="body2">{factor === 'recovery' ? 'Enter one unused recovery code.' : 'Enter your six-digit verification code.'}</Typography>
         {factor === 'recovery' && !setup ? <TextField label="Recovery code" autoComplete="off" value={code} onChange={event => setCode(event.target.value)}/>
           : <CodeInput value={code} onChange={setCode}/>}
       </>}
       <Button type="submit" variant="contained" size="large" disabled={busy}>{busy ? 'Verifying…' : setup ? material ? 'Finish setup' : 'Start protected setup' : challenge ? 'Verify and sign in' : 'Continue securely'}</Button>
       {challenge && <>
-        <Divider/>
-        <Button onClick={() => { setFactor(factor === 'recovery' ? 'totp' : 'recovery'); setCode(''); }}>{factor === 'recovery' ? 'Use authenticator' : 'Use a recovery code'}</Button>
-        <Button disabled={!otpAvailable || seconds > 0 || busy} onClick={async () => {
+        <Button variant="outlined" onClick={() => { setFactor(factor === 'recovery' ? 'totp' : 'recovery'); setCode(''); }}>{factor === 'recovery' ? 'Use authenticator' : 'Use a recovery code'}</Button>
+        {otpAvailable && <Button variant="outlined" sx={{ textTransform: 'none' }} disabled={seconds > 0 || busy} onClick={async () => {
           setBusy(true);
           try { await api('/2fa/send-otp', { challenge, purpose: 'login' }); setFactor('email'); setCode(''); setResendAt(Date.now() + 60000); setSeconds(60); }
           catch (failure) { setError((failure as Error).message); } finally { setBusy(false); }
-        }}>{seconds ? `Send again in ${seconds}s` : `Email a code to ${adminEmail}`}</Button>
-        {!otpAvailable && <Typography variant="caption" color="text.secondary">Email codes become available after the current relay has confirmed delivery. Use your authenticator or a recovery code.</Typography>}
+        }}>{seconds ? `Send again in ${seconds}s` : `Email a code to ${adminEmail}`}</Button>}
       </>}
     </Stack>
-    <Divider sx={{ my: 3 }}/><Button fullWidth onClick={() => { if (challenge) { clear(); return; } clear(); setSetup(!setup); }}>{setup ? 'Return to sign in' : challenge ? 'Start over' : 'First time? Protected setup'}</Button>
-    <Typography variant="caption" color="text.secondary" className="auth-footer">{adminEmail} · rsalehin24.me</Typography>
+    <Divider sx={{ my: 3 }}/><Button fullWidth variant={challenge ? 'text' : 'outlined'} onClick={() => { if (challenge) { clear(); return; } clear(); setSetup(!setup); }}>{setup ? 'Return to sign in' : challenge ? 'Start over' : 'First time? Protected setup'}</Button>
+    {!challenge && <Typography variant="caption" color="text.secondary" className="auth-footer">{adminEmail} · RSalehin24.ME</Typography>}
   </Paper></Box>;
 }

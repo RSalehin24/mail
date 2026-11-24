@@ -78,7 +78,7 @@ export function RecoverySettings({ authorize, notify, section = 'deletion' }: { 
         {editing && <Button disabled={busy} sx={{ whiteSpace: 'nowrap' }} onClick={resetForm}>Cancel edit</Button>}
       </Stack>
       <Box>
-        <AdminTable columns={['Mailbox', 'Reason', 'Actions']} empty="No mailboxes are protected." rows={protectedPages.rows.map(([address, explanation]) => ({ key: address, cells: [address, <Typography key="reason" variant="body2" color="text.secondary" title={explanation} noWrap sx={{ maxWidth: 360 }}>{explanation}</Typography>, <Stack key="actions" direction={{ xs: 'column', md: 'row' }} spacing={1} sx={{ justifyContent: 'center', alignItems: 'stretch' }}><Button variant="outlined" sx={{ whiteSpace: 'nowrap' }} disabled={busy} onClick={() => { setEmail(address); setReason(explanation); setEditing(true); form.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); reasonInput.current?.focus({ preventScroll: true }); }}>Edit reason</Button><Button variant="outlined" color="error" sx={{ whiteSpace: 'nowrap' }} disabled={busy} aria-label={`Remove protection from ${address}`} onClick={() => { setRemoving(address); setRemovalAcknowledged(false); setError(''); }}>Remove protection</Button></Stack>] }))}/>
+        <AdminTable columns={['Mailbox', 'Reason', 'Actions']} empty="No mailboxes are protected." rows={protectedPages.rows.map(([address, explanation]) => ({ key: address, cells: [address, <Typography key="reason" variant="body2" color="text.secondary" title={explanation} noWrap sx={{ maxWidth: 360, '@media(max-width:959px)': { whiteSpace: 'normal', overflow: 'visible', maxWidth: 'none' } }}>{explanation}</Typography>, <Stack key="actions" direction={{ xs: 'column', md: 'row' }} spacing={1} sx={{ justifyContent: 'center', alignItems: 'stretch' }}><Button variant="outlined" sx={{ whiteSpace: 'nowrap' }} disabled={busy} onClick={() => { setEmail(address); setReason(explanation); setEditing(true); form.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); reasonInput.current?.focus({ preventScroll: true }); }}>Edit reason</Button><Button variant="outlined" color="error" sx={{ whiteSpace: 'nowrap' }} disabled={busy} aria-label={`Remove protection from ${address}`} onClick={() => { setRemoving(address); setRemovalAcknowledged(false); setError(''); }}>Remove protection</Button></Stack>] }))}/>
         {protectedPages.controls}
         {!Object.keys(policy.protected).length && <Typography variant="body2" color="text.secondary">No mailboxes are protected.</Typography>}
       </Box>
@@ -86,7 +86,7 @@ export function RecoverySettings({ authorize, notify, section = 'deletion' }: { 
         <DialogTitle id="remove-protection-title">Remove mailbox protection?</DialogTitle>
         <DialogContent><Stack spacing={2} sx={{ pt: 1 }}>
           {error && <Alert severity="error">{error}</Alert>}
-          <Typography sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{removing}</Typography>
+          <Typography sx={{ fontWeight: 500, overflowWrap: 'anywhere' }}>{removing}</Typography>
           <Alert severity="warning">This removes only the deletion safeguard. The mailbox and its mail stay intact. The mailbox can then be deleted through its configuration.</Alert>
           <FormControlLabel control={<Checkbox checked={removalAcknowledged} disabled={busy} onChange={(_, checked) => setRemovalAcknowledged(checked)}/>} label="I understand the consequences of removing this protection."/>
         </Stack></DialogContent>

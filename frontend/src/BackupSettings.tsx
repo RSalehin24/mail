@@ -1,24 +1,26 @@
-import { formatDate, formatTime, formatDateTime } from './format';
-import CloudDoneOutlined from '@mui/icons-material/CloudDoneOutlined';
+import { formatAge, formatDate, formatTime, formatDateTime } from './format';
 import { LoadingState } from './PageState';
-import CheckCircleOutlineRounded from '@mui/icons-material/CheckCircleOutlineRounded';
 import ContentCopyRounded from '@mui/icons-material/ContentCopyRounded';
 import { AdminTable } from './AdminTable';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Box, Button, Chip, IconButton, Paper, Stack, Tab, Tabs, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, Button, IconButton, Link, Paper, Stack, Tab, Tabs, Tooltip, Typography } from '@mui/material';
 import { api, errorMessage, cached, type Notify } from './api';
 import { PaginationControls } from './PaginationControls';
+import { CommandBlock, Disclosure, InfoList, PageHeader, StatusBadge, StatusDot } from './ui';
 
 interface Snapshot { id: string; cutoff: number; observed: number; verification?: { verified_at?: number }; temporary_pin?: boolean; cleanup?: { state?: string; error?: string } }
 interface Job { id: string; kind: string; snapshot: string; state: string; phase: string; created: number; updated: number; error: string; result: { cleanup?: { state?: string; error?: string } } }
 interface Listing<T> { busy: boolean; items: T[]; total: number; page: number; page_size: number; observation: { observed: number; error: string } | null }
 const date = formatDateTime;
+const label = (value: string) => value.replaceAll('_', ' ').replace(/^./, letter => letter.toUpperCase());
 const backupDay = formatDate;
 const backupTime = formatTime;
 
+type View = 'overview' | 'backups' | 'logs';
+
 export function BackupSettings({ notify }: { notify: Notify }) {
-  const [view, setView] = useState<'backups' | 'logs'>(() => new URLSearchParams(location.search).get('backup_view') === 'logs' ? 'logs' : 'backups');
-  function selectView(value: 'backups' | 'logs') {
+  const [view, setView] = useState<View>(() => { const value = new URLSearchParams(location.search).get('backup_view'); return value === 'logs' || value === 'backups' ? value : 'overview'; });
+  function selectView(value: View) {
     setView(value); const url = new URL(location.href); url.searchParams.set('backup_view', value); history.replaceState(null, '', url);
   }
   const [page, setPage] = useState(0);
@@ -40,41 +42,44 @@ export function BackupSettings({ notify }: { notify: Notify }) {
   }, [page, size, operationPage, operationSize]);
   useEffect(() => { void load(); }, [load]);
   return <Stack spacing={3}>
-    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
-      <Box><Typography variant="h5" component="h2">Backup &amp; Recovery</Typography></Box>
-    </Stack>
-    <Tabs value={view} onChange={(_, value: 'backups' | 'logs') => selectView(value)} aria-label="Backup and recovery sections">
-      <Tab value="backups" label="Backups" id="backup-section-backups" aria-controls="backup-panel-backups"/>
+    <PageHeader title="Backups"/>
+    <Tabs value={view} onChange={(_, value: View) => selectView(value)} aria-label="Backup sections">
+      <Tab value="overview" label="Overview & Config" id="backup-section-overview" aria-controls="backup-panel-overview"/>
+      <Tab value="backups" label={<Tooltip placement="top" title={snapshots?.observation ? `Last checked ${formatAge(snapshots.observation.observed)}` : 'Not checked yet'}><span>Backups</span></Tooltip>} id="backup-section-backups" aria-controls="backup-panel-backups"/>
       <Tab value="logs" label="Logs" id="backup-section-logs" aria-controls="backup-panel-logs"/>
     </Tabs>
-    <Alert severity="info">Back up and restore on the server over SSH. Back up now: <code>sudo systemctl start mail-admin-backup.service</code>. Restore: <code>cd /usr/local/lib/mail-admin &amp;&amp; sudo python3 -m host.restore_backup --list</code>, then the same command with a snapshot id.</Alert>
     {error && <Alert severity="error" action={<Button onClick={() => { void load(); }}>Retry loading</Button>}>{error}</Alert>}
+    {view === 'overview' && <Stack spacing={2} role="tabpanel" id="backup-panel-overview" aria-labelledby="backup-section-overview">
+    <Paper variant="outlined" sx={{ p: 2 }}><InfoList centered items={[
+      { label: 'Schedule', value: 'Daily at 3:00 AM' }, { label: 'Time zone', value: 'Asia/Dhaka' },
+      { label: 'Retention', value: '7 days' }, { label: 'Encryption', value: 'Encrypted' },
+    ]}/></Paper>
+    <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, alignItems: 'start' }}>
+      <Disclosure title="Back up now">
+        <CommandBlock label="Back up now" showLabel={false} command="sudo systemctl start mail-admin-backup.service"/>
+      </Disclosure>
+      <Disclosure title="Restore a backup">
+        <CommandBlock label="List backups" command="cd /usr/local/lib/mail-admin && sudo python3 -m host.restore_backup --list"/>
+        <CommandBlock label="Restore" command="cd /usr/local/lib/mail-admin && sudo python3 -m host.restore_backup <snapshot-id>"/>
+        <Typography variant="caption" color="text.secondary">Copy a snapshot ID from the <Link component="button" type="button" onClick={() => selectView('backups')} sx={{ verticalAlign: 'baseline' }}>Backups tab</Link>.</Typography>
+      </Disclosure>
+    </Box>
+    </Stack>}
     {view === 'backups' && <Stack spacing={2} role="tabpanel" id="backup-panel-backups" aria-labelledby="backup-section-backups">
-    <Paper variant="outlined" sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 3, bgcolor: 'action.hover' }}>
-      <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
-        <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'background.paper', color: 'primary.main', display: { xs: 'none', sm: 'flex' } }}><CloudDoneOutlined/></Box>
-        <Box sx={{ minWidth: 0, flex: 1 }}><Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Daily encrypted backups</Typography>
-          <Typography variant="body2" color="text.secondary">3:00 AM · Asia/Dhaka · 7-day retention</Typography>
-        </Box>
-      </Stack>
-    </Paper>
-    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}>
-      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><Typography variant="h6" sx={{ fontSize: '1rem' }}>Available backups</Typography>{snapshots && <Chip size="small" variant="outlined" label={snapshots.total}/>}</Stack>
-      <Typography variant="caption" color="text.secondary">{snapshots?.observation ? `Last checked ${backupDay(snapshots.observation.observed)}, ${backupTime(snapshots.observation.observed)} Dhaka` : 'Waiting for the first repository check'}</Typography>
-    </Stack>
     {snapshots?.observation?.error && <Alert severity="warning">{errorMessage(snapshots.observation.error)} Previously observed backups may have changed.</Alert>}
     {!snapshots && !error && <LoadingState label="Loading backups…"/>}
-    <AdminTable columns={['Backup Date', 'Snapshot', 'Verification']} empty="No backups recorded." rows={(snapshots?.items ?? []).map(snapshot => ({ key: snapshot.id, cells: [
-      <Stack key="date" spacing={0.5}><Typography variant="body2" sx={{ fontWeight: 600 }}>{backupDay(snapshot.cutoff)}</Typography><Typography variant="caption" color="text.secondary">{backupTime(snapshot.cutoff)} · Dhaka</Typography></Stack>,
-      <Stack key="snapshot" direction="row" spacing={0.5} sx={{ alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'center' } }}><Tooltip title={snapshot.id}><Typography component="code" variant="body2" sx={{ fontFamily: 'monospace', bgcolor: 'action.hover', px: 1, py: 0.5, borderRadius: 1 }}>{snapshot.id.slice(0, 12)}…{snapshot.id.slice(-8)}</Typography></Tooltip><Tooltip title="Copy snapshot ID"><IconButton size="small" aria-label={`Copy snapshot ${snapshot.id}`} onClick={() => { void navigator.clipboard.writeText(snapshot.id).then(() => notify('Snapshot ID copied')).catch(() => notify('Could not copy snapshot ID')); }}><ContentCopyRounded sx={{ fontSize: 16 }}/></IconButton></Tooltip></Stack>,
-      <Stack key="verification" spacing={0.75} sx={{ alignItems: { xs: 'flex-start', md: 'center' } }}><Chip size="small" variant="outlined" color={snapshot.verification?.verified_at ? 'success' : 'default'} icon={snapshot.verification?.verified_at ? <CheckCircleOutlineRounded/> : undefined} label={snapshot.verification?.verified_at ? 'Verified' : 'Not yet verified'}/>{snapshot.verification?.verified_at && <Typography variant="caption" color="text.secondary">{backupDay(snapshot.verification.verified_at)}, {backupTime(snapshot.verification.verified_at)}</Typography>}{snapshot.temporary_pin && <Chip label="Temporarily pinned"/>}{snapshot.cleanup?.error && <Typography color="error">Cleanup: {errorMessage(snapshot.cleanup.error)}</Typography>}</Stack>,
-    ] }))} footer={snapshots && <PaginationControls count={snapshots.total} page={snapshots.page - 1} size={size} onPage={setPage} onSize={value => { setSize(value); setPage(0); }}/>}/> 
+    <AdminTable columns={['Date', 'Time', 'Snapshot', 'Verification']} empty="No backups recorded." rows={(snapshots?.items ?? []).map(snapshot => ({ key: snapshot.id, cells: [
+      backupDay(snapshot.cutoff), backupTime(snapshot.cutoff),
+      <Stack key="snapshot" direction="row" spacing={0.5} sx={{ alignItems: 'center' }}><Tooltip title={snapshot.id}><Typography component="code" variant="body2" sx={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{snapshot.id.slice(0, 8)}…{snapshot.id.slice(-6)}</Typography></Tooltip><Tooltip title="Copy snapshot ID"><IconButton size="small" aria-label={`Copy snapshot ${snapshot.id}`} onClick={() => { void navigator.clipboard.writeText(snapshot.id).then(() => notify('Snapshot ID copied')).catch(() => notify('Could not copy snapshot ID')); }}><ContentCopyRounded sx={{ fontSize: 16 }}/></IconButton></Tooltip></Stack>,
+      <Stack key="verification" spacing={0.25}><StatusDot tone={snapshot.verification?.verified_at ? 'success' : 'neutral'} label={snapshot.verification?.verified_at ? 'Verified' : 'Not verified'}/>{snapshot.verification?.verified_at && <Typography variant="caption" color="text.secondary">{date(snapshot.verification.verified_at)}</Typography>}{snapshot.temporary_pin && <Typography variant="caption" color="text.secondary">Temporarily pinned</Typography>}{snapshot.cleanup?.error && <Typography variant="caption" color="error">Cleanup: {errorMessage(snapshot.cleanup.error)}</Typography>}</Stack>,
+    ] }))} footer={snapshots && <PaginationControls count={snapshots.total} page={snapshots.page - 1} size={size} onPage={setPage} onSize={value => { setSize(value); setPage(0); }}/>}/>
     </Stack>}
     {view === 'logs' && <Stack spacing={2} role="tabpanel" id="backup-panel-logs" aria-labelledby="backup-section-logs">
-    <Typography variant="h6" component="h3">Backup and restore operations</Typography>
-    {jobs?.total === 0 && <Typography>No operations recorded.</Typography>}
-    <AdminTable columns={['Started', 'Operation', 'Status', 'Updated']} empty="No operations recorded." rows={(jobs?.items ?? []).map(job => ({ key: job.id, cells: [date(job.created), <Stack key="operation"><Typography sx={{ textTransform: 'capitalize' }}>{job.kind.replaceAll('_', ' ')}</Typography><Typography variant="caption">{job.id}</Typography></Stack>,
-      <Stack key="status"><Chip size="small" label={job.state.replaceAll('_', ' ')} color={job.state === 'complete' ? 'success' : job.state === 'failed' || job.state === 'reconciliation_required' ? 'error' : 'default'}/><Typography variant="caption">{job.phase.replaceAll('_', ' ')}</Typography>{job.error && <Typography color="error">{errorMessage(job.error)}</Typography>}{job.result.cleanup?.error && <Typography color="warning.main">Backup verified; cleanup failed: {errorMessage(job.result.cleanup.error)}</Typography>}</Stack>, date(job.updated),
+    <AdminTable columns={['Date', 'Time', 'Operation', 'Status', 'Last update']} empty="No operations recorded." rows={(jobs?.items ?? []).map(job => ({ key: job.id, cells: [
+      backupDay(job.created), backupTime(job.created),
+      <Tooltip key="operation" title={`ID ${job.id}`} placement="bottom"><Typography variant="body2" tabIndex={0} sx={{ textTransform: 'capitalize', cursor: 'help', width: 'fit-content', mx: 'auto' }}>{job.kind.replaceAll('_', ' ')}</Typography></Tooltip>,
+      <Tooltip key="status" title={[job.error && errorMessage(job.error), job.result.cleanup?.error && `Cleanup failed: ${errorMessage(job.result.cleanup.error)}`].filter(Boolean).join(' ') || `Phase: ${label(job.phase)}`} placement="bottom"><Box tabIndex={0} sx={{ cursor: 'help', display: 'inline-block' }}><StatusBadge tone={job.state === 'complete' ? 'success' : job.state === 'failed' || job.state === 'reconciliation_required' ? 'error' : 'neutral'} label={label(job.state)}/></Box></Tooltip>,
+      date(job.updated),
     ] }))}/>
     {jobs && <PaginationControls count={jobs.total} page={jobs.page - 1} size={operationSize} onPage={setOperationPage} onSize={value => { setOperationSize(value); setOperationPage(0); }}/>} 
     </Stack>}

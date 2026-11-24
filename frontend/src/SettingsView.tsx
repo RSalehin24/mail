@@ -3,29 +3,28 @@ import { useEffect, useState } from 'react';
 import { Alert, Box, Button, Paper, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
 import { api, cached, type Authorize, type Notify, type RelaySettings } from './api';
 import { SecuritySettings } from './SecuritySettings';
+import { InfoList, StatusDot } from './ui';
 
 interface Props { authorize: Authorize; notify: Notify; onRevoked: (codes: string[]) => void }
 
-import { BackupSettings } from './BackupSettings';
 import { useDeliveryHistory } from './DeliveryHistoryPagination';
 import { navigate } from './navigation';
 
 
 export function SettingsView({ authorize, notify, onRevoked }: Props) {
-  const names = ['security', 'outgoing', 'backups'];
+  const names = ['security', 'outgoing'];
   const [tab, setTab] = useState(() => { const value = new URLSearchParams(location.search).get('tab'); return value && names.includes(value) ? value : 'security'; });
-  useEffect(() => { const legacy = new URLSearchParams(location.search).get('tab'); if (legacy === 'deletion' || legacy === 'protected') navigate(`/deleted?tab=${legacy === 'deletion' ? 'configure' : 'protected'}`); }, []);
+  useEffect(() => { const legacy = new URLSearchParams(location.search).get('tab'); if (legacy === 'deletion' || legacy === 'protected') navigate(`/deleted?tab=${legacy === 'deletion' ? 'configure' : 'protected'}`);
+    if (legacy === 'backups') navigate('/backups'); }, []);
   return <Stack spacing={3}>
     <Typography variant="h4" component="h1">Settings</Typography>
     <Tabs value={tab} onChange={(_, value: string) => { setTab(value); const url = new URL(location.href); url.searchParams.set('tab', value); history.replaceState(null, '', url); }} variant="scrollable" scrollButtons="auto" aria-label="Settings tabs">
       <Tab value="security" label="Security" id="settings-security" aria-controls="panel-security"/>
       <Tab value="outgoing" label="Outgoing mail provider" id="settings-outgoing" aria-controls="panel-outgoing"/>
-      <Tab value="backups" label="Backup & Recovery" id="settings-backups" aria-controls="panel-backups"/>
     </Tabs>
     <Box role="tabpanel" id={`panel-${tab}`} aria-labelledby={`settings-${tab}`}>
       {tab === 'security' && <SecuritySettings authorize={authorize} onRevoked={onRevoked} onDeliverySettings={() => { setTab('outgoing'); const url = new URL(location.href); url.searchParams.set('tab', 'outgoing'); history.replaceState(null, '', url); }}/>}
       {tab === 'outgoing' && <OutgoingSettings authorize={authorize} notify={notify}/>}
-      {tab === 'backups' && <BackupSettings notify={notify}/>}
     </Box>
   </Stack>;
 }
@@ -48,16 +47,20 @@ function OutgoingSettings({ authorize, notify }: Pick<Props, 'authorize' | 'noti
   return <Stack spacing={3}>
     {error && <Alert severity="error">{error}</Alert>}
     {!relay && error && <Button onClick={() => { setError(''); void load(); }}>Retry relay settings</Button>}
-    <Paper component="fieldset" disabled={relay === null} variant="outlined" sx={{ m: 0, minWidth: 0, p: { xs: 2, md: 3 }, borderRadius: 3 }}><Stack spacing={2.5}>
-      <Box><Typography variant="h6">Outgoing mail provider</Typography><Typography variant="body2" color="text.secondary">{relay ? `${relay.otp_ready ? 'Administrator email delivery verified' : 'Administrator email delivery needs verification'}` : 'Loading saved relay settings…'}</Typography></Box>
-      <Typography variant="caption" color="text.secondary">{relay ? `Saved revision ${relay.revision}` : ''}</Typography>
-      <TextField label="SMTP host" value="smtp-relay.brevo.com" disabled/>
-      <TextField label="SMTP security" value="587 · STARTTLS" disabled/>
+    <Paper component="fieldset" disabled={relay === null} variant="outlined" sx={{ m: 0, minWidth: 0, p: { xs: 2, md: 3 }, borderRadius: 1.5 }}><Stack spacing={2.5}>
+      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+        <Typography variant="h6">Outgoing mail provider</Typography>
+        {relay ? <StatusDot tone={relay.otp_ready ? 'success' : 'warning'} label={relay.otp_ready ? 'Administrator email delivery verified' : 'Administrator email delivery needs verification'}/> : <Typography variant="body2" color="text.secondary">Loading saved relay settings…</Typography>}
+      </Stack>
+      <InfoList items={[
+        { label: 'Provider', value: 'Brevo' }, { label: 'SMTP host', value: 'smtp-relay.brevo.com' },
+        { label: 'Security', value: '587 · STARTTLS' }, { label: 'Saved revision', value: relay ? relay.revision : '—' },
+      ]}/>
       <TextField label="Brevo SMTP login" value={username} onChange={event => { setUsername(event.target.value); setDirty(true); }}/>
       <TextField label="Brevo SMTP key" type="password" autoComplete="new-password" value={credential} onChange={event => { setCredential(event.target.value); setDirty(true); }}/>
       <TextField label="Optional Brevo API key" type="password" autoComplete="new-password" value={apiKey} onChange={event => { setApiKey(event.target.value); setDirty(true); }} />
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}>
-        <Button disabled={dirty || !relay?.configured} onClick={async () => {
+        <Button variant="outlined" disabled={dirty || !relay?.configured} onClick={async () => {
           try { const result = await api<{ state: string; plans: { plan: string; credits: number; credits_type: string }[] }>('/settings/relay/quota');
             setQuota(result.state === 'not_configured' ? 'No API key configured' : result.plans.map(plan => `${plan.plan}: ${plan.credits} credits (${plan.credits_type})`).join(' · ') || 'Provider did not report an email credit count');
           } catch (failure) { setQuota((failure as Error).message); }
@@ -69,11 +72,11 @@ function OutgoingSettings({ authorize, notify }: Pick<Props, 'authorize' | 'noti
             ...(credential ? { credential } : {}), ...(apiKey ? { api_key: apiKey } : {}) });
           setCredential(''); setApiKey(''); setDirty(false); await load(); notify('Relay saved. Retest this revision before enabling email codes.');
         })}>Save relay</Button>
-        <Button disabled={dirty || !relay?.configured} onClick={() => authorize(async () => {
+        <Button variant="outlined" disabled={dirty || !relay?.configured} onClick={() => authorize(async () => {
           const result = await api<{ connection_ok: boolean }>('/settings/relay/test', { mode: 'connection' });
           notify(result.connection_ok ? 'Verified TLS and SMTP authentication passed; delivery remains unconfirmed.' : 'Relay connection or authentication failed.'); await load();
         })}>Test connection</Button>
-        <Button disabled={dirty || !relay?.configured} onClick={() => authorize(async () => {
+        <Button variant="outlined" disabled={dirty || !relay?.configured} onClick={() => authorize(async () => {
           const result = await api<{ smtp_accepted: boolean }>('/settings/relay/test', { mode: 'delivery' });
           notify(result.smtp_accepted ? 'Test accepted by SMTP. Confirm the matching message below after receipt.' : 'SMTP delivery test failed.'); await load();
         })}>Send explicit delivery test</Button>

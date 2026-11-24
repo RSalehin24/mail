@@ -36,27 +36,27 @@ export function SecuritySettings({ authorize, onRevoked, onDeliverySettings }: {
     { id: 'recovery' as const, title: 'Recovery codes', icon: <KeyOutlined/>, description: 'Create backup codes for signing in when your authenticator is unavailable.', action: 'Replace recovery codes' },
   ];
   return <Box component="section" aria-labelledby="security-heading">
-    <Typography variant="h5" component="h2" id="security-heading" sx={{ mb: .75, fontWeight: 700 }}>Security</Typography>
+    <Typography variant="h5" component="h2" id="security-heading" sx={{ mb: .75, fontWeight: 500 }}>Security</Typography>
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 2 }}>
-      {cards.map(card => <Paper variant="outlined" component="section" key={card.id} sx={{ p: 3, borderRadius: '16px', display: 'flex', flexDirection: 'column', alignItems: 'start' }}>
+      {cards.map(card => <Paper variant="outlined" component="section" key={card.id} sx={{ p: 3, borderRadius: 1.5, display: 'flex', flexDirection: 'column', alignItems: 'start' }}>
         <Avatar variant="rounded" sx={{ bgcolor: 'action.hover', color: 'primary.main', mb: 2 }}>{card.icon}</Avatar>
         <Typography component="h3" variant="h6" sx={{ mb: 1 }}>{card.title}</Typography>
         <Button variant="outlined" sx={{ mt: 'auto' }} onClick={() => { setError(''); setDialog(card.id); }}>{card.action}</Button>
       </Paper>)}
     </Box>
-    <Paper variant="outlined" sx={{ mt: 3, p: 3, borderRadius: 3 }}><Stack spacing={2}>
+    <Paper variant="outlined" sx={{ mt: 3, p: 3, borderRadius: 1.5 }}><Stack spacing={2}>
       <Typography variant="h6" component="h3">Email verification codes</Typography>
       {emailError && <Alert severity="error">{emailError}</Alert>}
       {!emailAuth && !emailError && <LoadingState label="Loading email authentication settings…"/>}
       {emailAuth && <>
-        <Alert severity={emailAuth.delivery_verified ? 'success' : 'info'}>{emailAuth.delivery_verified ? 'Email delivery verified' : 'Send an administrator delivery test and confirm its receipt before enabling email codes.'}</Alert>
-        <FormControlLabel label="Allow email verification codes" control={<Switch checked={emailAuth.enabled} disabled={busy || (!emailAuth.enabled && !emailAuth.delivery_verified)} onChange={(_, checked) => authorize(async () => {
+        <Alert severity={emailAuth.delivery_verified ? 'success' : 'info'}>{emailAuth.delivery_verified ? 'Email delivery verified' : 'Verify outgoing email first. Then a code sent to your email can be used instead of the authenticator app.'}</Alert>
+        <FormControlLabel label="Allow a code by email instead of the authenticator app" control={<Switch checked={emailAuth.enabled} disabled={busy || (!emailAuth.enabled && !emailAuth.delivery_verified)} onChange={(_, checked) => authorize(async () => {
           setBusy(true); setEmailError('');
           try { setEmailAuth(await api<NonNullable<typeof emailAuth>>('/security/email-authentication', { enabled: checked }, 'PUT')); }
           catch (failure) { if (failure instanceof ApiError && ['recent_authentication_required', 'authentication_required'].includes(failure.code)) throw failure; setEmailError((failure as Error).message); }
           finally { setBusy(false); }
         })}/>}/>
-        {emailAuth.enabled && !emailAuth.available && <Typography color="warning.main" variant="body2">Email codes are unavailable until delivery is verified again.</Typography>}
+        {emailAuth.enabled && !emailAuth.available && <Typography color="warning.main" variant="body2">Verify outgoing email again to use email codes.</Typography>}
       </>}
       <Button variant="outlined" sx={{ alignSelf: 'start' }} onClick={onDeliverySettings}>Verify administrator email delivery</Button>
     </Stack></Paper>
@@ -73,7 +73,7 @@ export function SecuritySettings({ authorize, onRevoked, onDeliverySettings }: {
           <Typography>First, verify your identity. Then scan a new setup code with your authenticator app.</Typography>
           <Alert severity="info">Your current authenticator stays active until you confirm the new code. Confirmation replaces your recovery codes and signs out all sessions.</Alert>
         </> : <>
-          <Typography variant="subtitle1" sx={{ fontWeight: 650 }}>Set up your new authenticator</Typography>
+          <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>Set up your new authenticator</Typography>
           <Typography color="text.secondary">Scan this code, then enter the six-digit code from the new app.</Typography>
           <EnrollmentMaterial material={material}/><CodeInput value={code} onChange={setCode}/>
           <Typography variant="caption" color="text.secondary">Setup expires in ten minutes. Wait for a new code if you just used an authenticator code to verify your identity.</Typography>

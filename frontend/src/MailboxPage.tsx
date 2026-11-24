@@ -1,14 +1,18 @@
 import { Forwarding } from './Forwarding';
 import { useCallback, useEffect, useState } from 'react';
 import { LoadingState } from './PageState';
-import { Alert, Box, Breadcrumbs, Button, Chip, Paper, Stack, Tab, Tabs, Typography } from '@mui/material';
+import { Alert, Breadcrumbs, Button, Paper, Stack, Tab, Tabs, Typography } from '@mui/material';
 import { api, cached, type Authorize, type Mailbox, type Notify } from './api';
 import { MailboxDetails } from './MailboxDetails';
 import { ClientConfig, PasswordDialog } from './MailboxDialogs';
 import { SenderVerification } from './SenderVerification';
 import { RecoveryAction } from './RecoveryActions';
 import { SendingHistory } from './SendingHistory';
+import { formatDate } from './format';
 import { mailboxPath, navigate } from './navigation';
+import { InfoList, PageHeader, Section, StatusDot } from './ui';
+
+const NOT_SET = <Typography component="span" variant="body2" color="text.secondary">Not set</Typography>;
 
 export function MailboxPage({ encodedEmail, tab, authorize, notify }: {
   encodedEmail: string; tab: string; authorize: Authorize; notify: Notify;
@@ -24,42 +28,35 @@ export function MailboxPage({ encodedEmail, tab, authorize, notify }: {
   }, [encodedEmail]);
   useEffect(() => { void load(); }, [load]);
   const common = { authorize, notify, onChanged: () => { void load(); }, onClose: () => setDialog('') };
+  const ready = mailbox?.status === 'ready';
   return <Stack spacing={3}>
-    <Breadcrumbs aria-label="Breadcrumb"><Button href="/mailboxes" onClick={event => { event.preventDefault(); navigate('/mailboxes'); }}>Mailboxes</Button><Typography>{mailbox?.email ?? 'Mailbox'}</Typography></Breadcrumbs>
+    <Breadcrumbs aria-label="Breadcrumb" sx={{ ml: -1 }}><Button href="/mailboxes" onClick={event => { event.preventDefault(); navigate('/mailboxes'); }}>Mailboxes</Button><Typography>{mailbox?.email ?? 'Mailbox'}</Typography></Breadcrumbs>
     {error && <Alert severity="error" action={<Button onClick={() => { void load(); }}>Retry</Button>}>{error}</Alert>}
     {!mailbox && !error && <LoadingState label="Loading mailbox…"/>}
     {mailbox && <>
-      <Box><Typography variant="h4" component="h1" sx={{ overflowWrap: 'anywhere' }}>{mailbox.email}</Typography><Typography color="text.secondary" sx={{ mt: 1 }}>{mailbox.display_name || 'No display name'}</Typography></Box>
+      <PageHeader title={mailbox.email} subtitle={mailbox.display_name || undefined} action={<StatusDot tone={ready ? 'success' : 'warning'} label={ready ? 'Ready' : 'Needs review'}/>}/>
       <Tabs value={tab} onChange={(_, value: string) => navigate(mailboxPath(mailbox.email, value))} variant="scrollable" allowScrollButtonsMobile aria-label="Mailbox pages">
         <Tab value="details" label="Details"/><Tab value="configuration" label="Configuration"/><Tab value="connections" label="Connection details"/>
       </Tabs>
-      <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
-        {tab === 'details' && <Stack spacing={3}>
-          <Box component="section" sx={{ p: { xs: 2, sm: 3 }, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-            <Stack spacing={2}><Typography variant="h6" component="h2" sx={{ fontWeight: 650 }}>Identity</Typography>
-              <Box><Typography variant="caption" color="text.secondary">Display name</Typography><Typography>{mailbox.display_name || 'Not set'}</Typography></Box>
-              <Box><Typography variant="caption" color="text.secondary">Notes</Typography><Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{mailbox.notes || 'Not set'}</Typography></Box>
-              <Button variant="outlined" sx={{ alignSelf: 'start' }} onClick={() => navigate(mailboxPath(mailbox.email, 'configuration'))}>Edit details</Button>
-            </Stack>
-          </Box>
-          <Box component="section" sx={{ p: { xs: 2, sm: 3 }, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-            <Stack spacing={2}><Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}><Typography variant="h6" component="h2" sx={{ fontWeight: 650 }}>Incoming mail</Typography><Chip variant="outlined" label={mailbox.status === 'ready' ? 'Ready' : 'Needs review'} color={mailbox.status === 'ready' ? 'success' : 'warning'}/></Stack>
-              <Typography variant="body2" color="text.secondary">{mailbox.status === 'ready' ? 'Incoming credentials and mailbox storage are present.' : 'Ask the operator to reconcile the recorded operation before making further changes.'}</Typography>
-              <Button sx={{ alignSelf: 'start' }} onClick={() => navigate(mailboxPath(mailbox.email, 'connections'))}>View connection details</Button>
-            </Stack>
-          </Box>
-          <Box component="section" sx={{ p: { xs: 2, sm: 3 }, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-            <SendingHistory mailbox={mailbox} authorize={authorize} notify={notify} onChanged={load} onSend={() => setDialog('verify')}/>
-          </Box>
-        </Stack>}
-        {tab === 'configuration' && <Stack spacing={3}>
-          <MailboxDetails key={mailbox.updated ?? mailbox.display_name + mailbox.notes} mailbox={mailbox} {...common} embedded/>
-          <Button variant="outlined" sx={{ alignSelf: 'start' }} onClick={() => setDialog('password')}>Change incoming password</Button>
-          <Forwarding mailbox={mailbox.email} authorize={authorize} notify={notify}/>
-          <Box component="section" sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 3 }}><Typography variant="h6" sx={{ mb: 2 }}>Delete Mailbox</Typography><Button color="error" variant="outlined" sx={{ alignSelf: 'start' }} onClick={() => setDialog('delete')}>Delete mailbox</Button></Box>
-        </Stack>}
-        {tab === 'connections' && <ClientConfig mailbox={mailbox} {...common} embedded/>}
-      </Paper>
+      {tab === 'details' && <Stack spacing={3}>
+        <Section title="Identity" action={<Button variant="outlined" size="small" onClick={() => navigate(mailboxPath(mailbox.email, 'configuration'))}>Edit</Button>}>
+          <InfoList items={[
+            { label: 'Display name', value: mailbox.display_name || NOT_SET },
+            { label: 'Created', value: mailbox.created ? formatDate(mailbox.created) : NOT_SET },
+            { label: 'Notes', value: mailbox.notes || NOT_SET },
+            { label: 'Incoming mail', value: <StatusDot tone={ready ? 'success' : 'warning'} label={ready ? 'Ready' : 'Needs review'}/> },
+          ]}/>
+          {!ready && <Alert severity="warning" sx={{ mt: 2 }}>Ask the operator to reconcile the recorded operation before making further changes.</Alert>}
+        </Section>
+        <SendingHistory mailbox={mailbox} authorize={authorize} notify={notify} onChanged={load} onSend={() => setDialog('verify')}/>
+      </Stack>}
+      {tab === 'configuration' && <Stack spacing={3}>
+        <MailboxDetails key={mailbox.updated ?? mailbox.display_name + mailbox.notes} mailbox={mailbox} {...common} embedded/>
+        <Section title="Password" action={<Button variant="outlined" onClick={() => setDialog('password')}>Change password</Button>}/>
+        <Paper variant="outlined" sx={{ p: { xs: 2, sm: 2.5 } }}><Forwarding mailbox={mailbox.email} authorize={authorize} notify={notify}/></Paper>
+        <Section title="Delete mailbox" danger action={<Button color="error" variant="outlined" onClick={() => setDialog('delete')}>Delete mailbox</Button>}/>
+      </Stack>}
+      {tab === 'connections' && <ClientConfig mailbox={mailbox} {...common} embedded/>}
       {dialog === 'password' && <PasswordDialog mailbox={mailbox} mode="reset" {...common}/>}
       {dialog === 'delete' && <RecoveryAction email={mailbox.email} {...common} onChanged={() => navigate('/mailboxes')}/>}
       {dialog === 'verify' && <SenderVerification emails={[mailbox.email]} mailboxes={[mailbox]} {...common} onChanged={load}/>}

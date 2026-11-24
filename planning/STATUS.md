@@ -45,3 +45,6 @@ Updated 2026-11-21 (after the UI, notification mail, OS update and cleanup work)
 - A real Docker restart, backup and IP change are proven in production only; the lost ACME fixtures are replaced by `tests/runtime/test_pause_resume.py`.
 - A brief Maddy restart (about 10 seconds) was seen at two deploys without a cause found; backups and the relay restart worker restart it on purpose.
 - From the workstation SSH needs `-o HostKeyAlias=35.211.79.14` (the known-hosts entry is keyed by the original IP).
+
+## Frontend redesign (D-091, D-092, in progress, not committed or deployed)
+- Figma file `Mail-Admin` is read through the remote Figma MCP server. Green primary and dark-green dark mode (D-093, D-094). Done: tokens, shell, History, Incoming and Backups pages, Forwarding dialog, Server and Settings provider layouts (D-095). All screens redesigned (D-113); T1 gate passes except integration tests not run. Next: owner approval, then a dashboard-only deploy with a rollback script to stage22 (RUNBOOK Deploy).

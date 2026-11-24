@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import sys
+import time
 from pathlib import Path
 
 import uvicorn
@@ -46,14 +47,16 @@ def main() -> None:
     from tests.forwarding_support import configure_forwarding
     backups = fixture.host.helper.dependencies.backups
     with backups.connect() as connection:
+        # Daily snapshots ending now, so the demo shows recent dates instead of 2023.
+        newest = int(time.time()) - 600
         connection.executemany('INSERT INTO snapshots VALUES(?,?,?)',
-                               [(f'{i + 1:064x}', 1700000000 + i, 1700000200)
+                               [(f'{i + 1:064x}', newest - (124 - i) * 86400, newest + 120)
                                 for i in range(125)])
-        connection.execute('INSERT INTO observations VALUES(1,1700000200,?)', ('',))
+        connection.execute('INSERT INTO observations VALUES(1,?,?)', (newest + 120, ''))
     import uuid
     failed = str(uuid.uuid4())
-    backups.begin((failed, 'backup', '', ''), 1700000000)
-    backups.update(failed, 'failed', 'capture', 1700000001, 'synthetic_transfer_failure')
+    backups.begin((failed, 'backup', '', ''), newest)
+    backups.update(failed, 'failed', 'capture', newest + 60, 'synthetic_transfer_failure')
     from tests.telemetry_support import synthetic_resources
     fixture.host.helper.dependencies = dataclasses.replace(
         fixture.host.helper.dependencies, status=synthetic_resources,

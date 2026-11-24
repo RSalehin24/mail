@@ -1,9 +1,9 @@
-import { formatDate, formatTime } from './format';
+import { formatAge, formatDate } from './format';
 import { EmptyState, LoadingState } from './PageState';
-import { PageHeader, StatCard, StatGrid, StatusDot } from './ui';
+import { PageHeader, StatusDot } from './ui';
 import { PaginationControls } from './PaginationControls';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Avatar, Box, Button, Card, Checkbox, Chip, Divider, IconButton, InputAdornment, Menu, MenuItem, Paper, Stack,
+import { Alert, Box, Button, Card, Checkbox, Chip, Divider, IconButton, InputAdornment, Menu, MenuItem, Paper, Stack,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip, Typography } from '@mui/material';
 import AddRounded from '@mui/icons-material/AddRounded';
 import RefreshRounded from '@mui/icons-material/RefreshRounded';
@@ -15,8 +15,20 @@ import SendOutlined from '@mui/icons-material/SendOutlined';
 import ArrowDownwardRounded from '@mui/icons-material/ArrowDownwardRounded';
 import { api, cached, type Authorize, type Diagnostics, type Mailbox, type Notify } from './api';
 import { PasswordDialog } from './MailboxDialogs';
+import { RecoveryAction } from './RecoveryActions';
+import { sendingState } from './sendingState';
+import KeyOutlined from '@mui/icons-material/KeyOutlined';
+import DeleteOutline from '@mui/icons-material/DeleteOutlined';
 import { SenderVerification } from './SenderVerification';
 import { navigate, mailboxPath } from './navigation';
+
+type SendingFilter = 'all' | 'verified' | 'awaiting' | 'untested';
+const FILTERS: { key: SendingFilter; label: string; matches: (readiness: string) => boolean }[] = [
+  { key: 'all', label: 'All', matches: () => true },
+  { key: 'verified', label: 'Verified', matches: readiness => readiness === 'confirmed' },
+  { key: 'awaiting', label: 'Awaiting', matches: readiness => readiness === 'awaiting receipt' },
+  { key: 'untested', label: 'Not Verified', matches: readiness => readiness !== 'confirmed' && readiness !== 'awaiting receipt' },
+];
 
 export function Dashboard({ authorize, notify }: { authorize: Authorize; notify: Notify }) {
   const [mailboxes, setMailboxes] = useState<Mailbox[]>(() => cached<Mailbox[]>('/accounts') ?? []);
@@ -30,7 +42,8 @@ export function Dashboard({ authorize, notify }: { authorize: Authorize; notify:
   const [selected, setSelected] = useState<string[]>([]);
   const [verification, setVerification] = useState<string[] | null>(null);
   const [menu, setMenu] = useState<{ anchor: HTMLElement; mailbox: Mailbox } | null>(null);
-  const [dialog, setDialog] = useState<{ mode: 'create' } | null>(null);
+  const [dialog, setDialog] = useState<{ mode: 'create' | 'reset' | 'delete'; mailbox?: Mailbox } | null>(null);
+  const [filter, setFilter] = useState<SendingFilter>('all');
   const load = useCallback(async () => {
     try {
       const accounts = await api<Mailbox[]>('/accounts');
@@ -39,7 +52,8 @@ export function Dashboard({ authorize, notify }: { authorize: Authorize; notify:
     finally { setLoading(false); }
   }, []);
   useEffect(() => { void api<Diagnostics>('/diagnostics').then(setDiagnostics).catch(() => {}); void load(); const timer = setInterval(() => { void load(); }, 15000); return () => clearInterval(timer); }, [load]);
-  const filtered = mailboxes.filter(mailbox => `${mailbox.email} ${mailbox.display_name} ${mailbox.notes}`.toLowerCase().includes(search.toLowerCase()))
+  const activeFilter = FILTERS.find(option => option.key === filter) ?? FILTERS[0];
+  const filtered = mailboxes.filter(mailbox => activeFilter.matches(mailbox.outbound_readiness)).filter(mailbox => `${mailbox.email} ${mailbox.display_name} ${mailbox.notes}`.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => ((b.created ?? 0) - (a.created ?? 0)) * (reverse ? -1 : 1) || a.email.localeCompare(b.email));
   const currentPage = Math.min(page, Math.max(0, Math.ceil(filtered.length / rowsPerPage) - 1));
   const rows = filtered.slice(currentPage * rowsPerPage, (currentPage + 1) * rowsPerPage);
@@ -53,10 +67,8 @@ export function Dashboard({ authorize, notify }: { authorize: Authorize; notify:
     return mailbox.created ? formatDate(mailbox.created) : 'Unavailable';
   }
   function sending(mailbox: Mailbox) {
-    const confirmed = mailbox.outbound_readiness === 'confirmed';
-    const waiting = mailbox.outbound_readiness === 'awaiting receipt';
-    return <Chip size="small" className="status-chip" color={confirmed ? 'success' : waiting ? 'warning' : 'default'} variant="outlined"
-      label={confirmed ? 'Verified' : waiting ? 'Awaiting receipt' : mailbox.outbound_readiness === 'failed' ? 'Test failed' : 'Not tested'} onClick={() => setVerification([mailbox.email])}/>;
+    const state = sendingState(mailbox.outbound_readiness);
+    return <Chip size="small" className="status-chip" color={state.color} variant="outlined" label={state.label} onClick={() => setVerification([mailbox.email])}/>;
   }
   function rowActions(mailbox: Mailbox) {
     return <Tooltip title="Mailbox actions"><IconButton aria-label={`Actions for ${mailbox.email}`} onClick={event => setMenu({ anchor: event.currentTarget, mailbox })}><MoreHorizRounded/></IconButton></Tooltip>;
@@ -65,20 +77,14 @@ export function Dashboard({ authorize, notify }: { authorize: Authorize; notify:
     if (menu) navigate(mailboxPath(menu.mailbox.email, mode === 'config' ? 'connections' : 'configuration')); setMenu(null);
   }
   return <>
-    <PageHeader title="Mailboxes" action={<Button variant="contained" startIcon={<AddRounded/>} onClick={() => setDialog({ mode: 'create' })}>New mailbox</Button>}/>
-    <StatGrid>
-      <StatCard label="Mailboxes" value={mailboxes.length}/>
-      <StatCard label="Inbox ready" value={mailboxes.filter(mailbox => mailbox.status === 'ready').length} tone={mailboxes.every(mailbox => mailbox.status === 'ready') ? 'success' : 'warning'}/>
-      <StatCard label="Sending verified" value={mailboxes.filter(mailbox => mailbox.outbound_readiness === 'confirmed').length}/>
-      <StatCard label="Awaiting receipt" value={pending.length} tone={pending.length ? 'warning' : 'neutral'}/>
-    </StatGrid>
+    <PageHeader title="Mailboxes" titleHint={diagnostics?.host.summary ? `Last checked ${formatAge(diagnostics.host.summary.observed_at)}` : 'Waiting for server status'} action={<Button variant="contained" startIcon={<AddRounded/>} onClick={() => setDialog({ mode: 'create' })}>New mailbox</Button>}/>
     {error && <Alert severity="warning" sx={{ mb: 2 }}>{error} Previously loaded accounts may be out of date.</Alert>}
     {!!diagnostics?.host.unresolved?.length && <Alert severity="warning" sx={{ mb: 2 }}>A mailbox operation needs administrator review before further changes.</Alert>}
     {pending.length > 0 && <Alert severity="info" className="receipt-notice" action={<Button color="inherit" size="small" onClick={() => setVerification(pending.map(mailbox => mailbox.email))}>Review receipts</Button>}>Test emails are waiting for confirmation for {pending.length} {pending.length === 1 ? 'mailbox' : 'mailboxes'}.</Alert>}
     <Paper variant="outlined" className="mailbox-surface" sx={{ mt: 2.5 }}>
       {loading && <Box sx={{ p: 3 }}><LoadingState label="Loading mailboxes"/></Box>}
       <Stack className="table-toolbar" direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}>
-        <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center' }}><Typography variant="h6" sx={{ fontSize: '1rem' }}>All mailboxes</Typography><Chip size="small" label={mailboxes.length}/></Stack>
+        <Stack direction="row" spacing={1} role="group" aria-label="Filter by sending state" sx={{ flexWrap: 'wrap', rowGap: 1 }}>{FILTERS.map(option => { const count = mailboxes.filter(mailbox => option.matches(mailbox.outbound_readiness)).length; return (option.key === 'all' || count > 0 || filter === option.key) && <Chip key={option.key} size="small" clickable color={filter === option.key ? 'primary' : 'default'} variant={filter === option.key ? 'filled' : 'outlined'} label={`${option.label} ${count}`} aria-pressed={filter === option.key} onClick={() => { setFilter(option.key); setPage(0); }}/>; })}</Stack>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           <TextField label="Search mailboxes" placeholder="Search name or address" size="small" value={search}
             onChange={event => { setSearch(event.target.value); setPage(0); }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded fontSize="small"/></InputAdornment> } }}/>
@@ -86,7 +92,7 @@ export function Dashboard({ authorize, notify }: { authorize: Authorize; notify:
         </Stack>
       </Stack>
       {selected.length > 0 && <Stack className="selection-toolbar" direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-        <Typography variant="body2" sx={{ fontWeight: 600 }}>{selected.length} selected</Typography>
+        <Typography variant="body2" sx={{ fontWeight: 500 }}>{selected.length} selected</Typography>
         <Button size="small" startIcon={<SendOutlined/>} onClick={() => setVerification(selected)}>Verify selected senders</Button>
         <Button size="small" color="inherit" onClick={() => setSelected([])}>Clear selection</Button>
       </Stack>}
@@ -95,39 +101,43 @@ export function Dashboard({ authorize, notify }: { authorize: Authorize; notify:
         <TableCell padding="checkbox" align="center"><Checkbox checked={rows.length > 0 && rows.every(mailbox => selected.includes(mailbox.email))}
           indeterminate={rows.some(mailbox => selected.includes(mailbox.email)) && !rows.every(mailbox => selected.includes(mailbox.email))}
           slotProps={{ input: { 'aria-label': 'Select visible mailboxes' } }} onChange={(_, checked) => selectVisible(checked)}/></TableCell>
-        <TableCell>Name</TableCell>
         <TableCell>Mailbox</TableCell>
         <TableCell sortDirection={reverse ? 'asc' : 'desc'}><Button color="inherit" className="column-sort" size="small" aria-label={reverse ? 'Creation Date, oldest first. Sort newest first' : 'Creation Date, newest first. Sort oldest first'} endIcon={<ArrowDownwardRounded sx={{ fontSize: '14px !important', transform: reverse ? 'rotate(180deg)' : undefined }}/>} onClick={() => { setReverse(!reverse); setPage(0); }}>Creation Date</Button></TableCell>
         <TableCell>Inbox</TableCell><TableCell>Sending</TableCell><TableCell align="center" sx={{ width: 88 }}>Actions</TableCell>
       </TableRow></TableHead><TableBody>{rows.map(mailbox => <TableRow hover selected={selected.includes(mailbox.email)} key={mailbox.email}>
         <TableCell padding="checkbox" align="center"><Checkbox checked={selected.includes(mailbox.email)} onChange={() => toggle(mailbox.email)} slotProps={{ input: { 'aria-label': `Select ${mailbox.email}` } }}/></TableCell>
-        <TableCell><Typography variant="body2" color={mailbox.display_name ? 'text.primary' : 'text.secondary'}>{mailbox.display_name || '—'}</Typography></TableCell>
-        <TableCell><Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}><Avatar className="mailbox-avatar">{mailbox.email[0].toUpperCase()}</Avatar><Box sx={{ minWidth: 0 }}><Typography component="a" href={mailboxPath(mailbox.email)} onClick={event => { event.preventDefault(); navigate(mailboxPath(mailbox.email)); }} variant="body2" sx={{ color: 'primary.main', fontWeight: 600, overflowWrap: 'anywhere' }}>{mailbox.email}</Typography>{mailbox.notes && <Typography variant="caption" color="text.secondary">{mailbox.notes}</Typography>}</Box></Stack></TableCell>
+        <TableCell><Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', justifyContent: 'center' }}><Box sx={{ minWidth: 0 }}><Typography component="a" href={mailboxPath(mailbox.email)} onClick={event => { event.preventDefault(); navigate(mailboxPath(mailbox.email)); }} variant="body2" sx={{ color: 'primary.main', fontWeight: 500, overflowWrap: 'anywhere' }}>{mailbox.email}</Typography>{(mailbox.display_name || mailbox.notes) && <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{[mailbox.display_name, mailbox.notes].filter(Boolean).join(' · ')}</Typography>}</Box></Stack></TableCell>
 
         <TableCell sx={{ whiteSpace: 'nowrap' }}><Typography variant="body2" component="time" dateTime={mailbox.created ? new Date(mailbox.created * 1000).toISOString() : undefined}>{creationDate(mailbox)}</Typography></TableCell>
         <TableCell><StatusDot tone={mailbox.status === 'ready' ? 'success' : 'warning'} label={mailbox.status === 'ready' ? 'Ready' : 'Needs review'}/></TableCell>
         <TableCell>{sending(mailbox)}</TableCell><TableCell>{rowActions(mailbox)}</TableCell>
       </TableRow>)}</TableBody></Table></TableContainer>
       <Box className="mailbox-cards">{rows.map(mailbox => <Card variant="outlined" className="mailbox-mobile-card" key={mailbox.email}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><Checkbox checked={selected.includes(mailbox.email)} onChange={() => toggle(mailbox.email)} slotProps={{ input: { 'aria-label': `Select ${mailbox.email}` } }}/><Box sx={{ minWidth: 0, flex: 1 }}><Button size="small" sx={{ display: 'block' }} onClick={() => navigate(mailboxPath(mailbox.email, 'configuration'))}>{mailbox.display_name || 'Add name'}</Button><Typography component="a" href={mailboxPath(mailbox.email)} onClick={event => { event.preventDefault(); navigate(mailboxPath(mailbox.email)); }} variant="body2" sx={{ color: 'primary.main', fontWeight: 650, overflowWrap: 'anywhere' }}>{mailbox.email}</Typography></Box>{rowActions(mailbox)}</Stack>
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>Creation Date: {creationDate(mailbox)}</Typography>
-        <Divider sx={{ my: 1.5 }}/><Stack direction="row" sx={{ justifyContent: 'space-between', gap: 2 }}>
-          <Box><Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.7 }}>Inbox</Typography><StatusDot tone={mailbox.status === 'ready' ? 'success' : 'warning'} label={mailbox.status === 'ready' ? 'Ready' : 'Needs review'}/></Box>
-          <Box sx={{ textAlign: 'right' }}><Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.7 }}>Sending</Typography>{sending(mailbox)}</Box>
-        </Stack>{mailbox.notes && <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>{mailbox.notes}</Typography>}
+        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+          <Checkbox checked={selected.includes(mailbox.email)} onChange={() => toggle(mailbox.email)} slotProps={{ input: { 'aria-label': `Select ${mailbox.email}` } }}/>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography component="a" href={mailboxPath(mailbox.email)} onClick={event => { event.preventDefault(); navigate(mailboxPath(mailbox.email)); }} sx={{ display: 'block', py: 1.5, fontWeight: 500, color: 'text.primary', textDecoration: 'none', overflowWrap: 'anywhere' }}>{mailbox.email}</Typography>
+            {mailbox.display_name && <Typography variant="caption" color="text.secondary">{mailbox.display_name}</Typography>}
+          </Box>
+          {rowActions(mailbox)}
+        </Stack>
+        <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1, mt: 1, pl: 6 }}>
+          <StatusDot tone={mailbox.status === 'ready' ? 'success' : 'warning'} label={mailbox.status === 'ready' ? 'Ready' : 'Needs review'}/>
+          {sending(mailbox)}
+          <Typography variant="caption" color="text.secondary">{creationDate(mailbox)}</Typography>
+        </Stack>
       </Card>)}</Box>
       {!loading && !error && !filtered.length && <EmptyState title={search ? 'No matching mailboxes' : 'No mailboxes'} hint={search ? 'Try another address or name.' : 'Create a mailbox.'}/>}
       <PaginationControls count={filtered.length} page={currentPage} size={rowsPerPage} onPage={setPage} onSize={value => { setRowsPerPage(value); setPage(0); }}/>
     </Paper>
-    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between', mt: 2, px: 0.5 }}>
-      <Typography variant="caption" color="text.secondary">{diagnostics?.host.summary ? `Last checked ${formatTime(diagnostics.host.summary.observed_at)}` : 'Waiting for server status'}</Typography>
-
-    </Stack>
     <Menu anchorEl={menu?.anchor} open={!!menu} onClose={() => setMenu(null)} slotProps={{ paper: { sx: { minWidth: 225, borderRadius: 2, mt: 0.5 } } }}>
       <MenuItem component="button" className="mailbox-menu-item" onClick={() => { if (menu) navigate(mailboxPath(menu.mailbox.email)); setMenu(null); }}><EditOutlined fontSize="small"/>Open mailbox</MenuItem>
       <MenuItem component="button" className="mailbox-menu-item" onClick={() => choose('config')}><SettingsOutlined fontSize="small"/>Mailbox settings</MenuItem>
+      <MenuItem component="button" className="mailbox-menu-item" onClick={() => { if (menu) setDialog({ mode: 'reset', mailbox: menu.mailbox }); setMenu(null); }}><KeyOutlined fontSize="small"/>Change password</MenuItem>
+      <MenuItem component="button" className="mailbox-menu-item" sx={{ color: 'error.main' }} onClick={() => { if (menu) setDialog({ mode: 'delete', mailbox: menu.mailbox }); setMenu(null); }}><DeleteOutline fontSize="small"/>Delete mailbox</MenuItem>
     </Menu>
-    {dialog && <PasswordDialog {...common} mode="create"/>}
+    {dialog && dialog.mode !== 'delete' && <PasswordDialog {...common} mode={dialog.mode} mailbox={dialog.mailbox}/>}
+    {dialog?.mode === 'delete' && dialog.mailbox && <RecoveryAction email={dialog.mailbox.email} {...common}/>}
     {verification && <SenderVerification emails={verification} mailboxes={mailboxes} authorize={authorize} notify={notify} onChanged={load} onClose={() => setVerification(null)}/>}
   </>;
 }

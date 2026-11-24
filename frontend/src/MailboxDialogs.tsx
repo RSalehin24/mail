@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Alert, Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControlLabel, Stack, Tab, Tabs, TextField, Tooltip, Typography, useMediaQuery } from '@mui/material';
+  FormControlLabel, Paper, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
 import ContentCopyOutlined from '@mui/icons-material/ContentCopyOutlined';
 import { ApiError, api, domain, generatePassword, validMailboxPassword, type Authorize, type Mailbox,
   type Notify, type Outcome } from './api';
+import AddCircleOutlineRounded from '@mui/icons-material/AddCircleOutlineRounded';
+import KeyRounded from '@mui/icons-material/KeyRounded';
+import LoginRounded from '@mui/icons-material/LoginRounded';
+import SendRounded from '@mui/icons-material/SendRounded';
+import { CopyRow, Disclosure, NoteList, Section } from './ui';
 
 interface Common { onClose: () => void; onChanged: () => void; notify: Notify; authorize: Authorize }
 
 export function PasswordDialog({ mode, mailbox, onClose, onChanged, notify, authorize }:
   Common & { mode: 'create' | 'reset'; mailbox?: Mailbox }) {
-  const fullScreen = useMediaQuery('(max-width:599px)');
   const [local, setLocal] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [notes, setNotes] = useState('');
@@ -30,7 +34,7 @@ export function PasswordDialog({ mode, mailbox, onClose, onChanged, notify, auth
     } catch (failure) { if (failure instanceof ApiError && ['recent_authentication_required', 'password_confirmation_required'].includes(failure.code)) throw failure; setError((failure as Error).message); setUncertain(true); }
     finally { setBusy(false); }
   }
-  return <Dialog open fullScreen={fullScreen} fullWidth maxWidth="sm" onClose={busy ? undefined : onClose} aria-labelledby="mailbox-dialog-title">
+  return <Dialog open fullWidth maxWidth="sm" onClose={busy ? undefined : onClose} aria-labelledby="mailbox-dialog-title">
     <DialogTitle id="mailbox-dialog-title">{mode === 'create' ? 'Create a mailbox' : 'Reset mailbox password'}</DialogTitle>
     <DialogContent><Stack spacing={2.5} sx={{ pt: 1 }}>
       {error && <Alert severity="warning">{error}</Alert>}
@@ -61,7 +65,7 @@ export function DeleteDialog({ mailbox, cutoff, ...common }: Common & { mailbox:
   const [error, setError] = useState('');
   const [identifier] = useState(() => crypto.randomUUID());
   const [attempted, setAttempted] = useState(false);
-  return <Dialog open fullScreen={useMediaQuery('(max-width:599px)')} fullWidth maxWidth="sm" onClose={busy ? undefined : common.onClose} aria-labelledby="delete-title">
+  return <Dialog open fullWidth maxWidth="sm" onClose={busy ? undefined : common.onClose} aria-labelledby="delete-title">
     <DialogTitle id="delete-title">Permanently delete {mailbox.email}</DialogTitle>
     <DialogContent><Stack spacing={2.5}>
       <Alert severity="warning">Stored messages and incoming credentials will be removed. Existing IMAP sessions may remain active if deletion fails. Brevo sender access and shared outgoing keys are managed separately.</Alert>
@@ -86,8 +90,16 @@ export function DeleteDialog({ mailbox, cutoff, ...common }: Common & { mailbox:
 
 type Connection = { host: string; port: number; security: string; username: string; password: string };
 const clients = ['Apple Mail', 'Gmail', 'Thunderbird / Outlook', 'Nextcloud', 'Raw details'];
+const FIELD_LABELS: Record<string, string> = { host: 'Server', port: 'Port', security: 'Security', username: 'Username' };
+const CLIENT_HINTS = [
+  'In Mail settings, add an Other Mail Account. Enter the incoming and outgoing settings separately.',
+  'Choose Other (IMAP) in the Gmail app. For Gmail web “Send As”, use the outgoing SMTP details and mailbox password. Gmail web saves its own sent copy in Gmail; use an IMAP client to save to this server’s Sent folder.',
+  'Choose manual setup, IMAP for incoming mail, and the outgoing SMTP settings below.',
+  'In Nextcloud Mail, use manual configuration and use the same mailbox credentials for IMAP and SMTP.',
+  'Use these values in any IMAP client with separate incoming and outgoing authentication.',
+];
 
-export function ClientConfig({ mailbox, onClose, notify, embedded = false }: Common & { mailbox: Mailbox; embedded?: boolean }) {
+export function ClientConfig({ mailbox, onClose, embedded = false }: Common & { mailbox: Mailbox; embedded?: boolean }) {
   const [configuration, setConfiguration] = useState<{ incoming: Connection; outgoing: Connection } | null>(null);
   const [tab, setTab] = useState(0);
   const [error, setError] = useState('');
@@ -98,25 +110,24 @@ export function ClientConfig({ mailbox, onClose, notify, embedded = false }: Com
       .catch(failure => { if (active) setError((failure as Error).message); });
     return () => { active = false; };
   }, [mailbox.email]);
-  const fullScreen = useMediaQuery('(max-width:599px)');
-  const content = <>
-    <DialogTitle id="client-title">Connect {mailbox.email}</DialogTitle>
-    <DialogContent>
-      {error && <Alert severity="error">{error}</Alert>}
-      <Typography sx={{ mb: 2 }}>Use {mailbox.email} and your mailbox password for both IMAP and SMTP. Your From address must match this mailbox.</Typography>
-      <Tabs value={tab} onChange={(_, value: number) => setTab(value)} variant="scrollable" scrollButtons="auto" aria-label="Mail client">{clients.map(client => <Tab label={client} key={client}/>)}</Tabs>
-      <Typography sx={{ mt: 2 }} variant="body2">{tab === 0 ? 'In Mail settings, add an Other Mail Account. Enter the incoming and outgoing settings separately.' : tab === 1 ? 'Choose Other (IMAP) in the Gmail app. For Gmail web “Send As”, use the outgoing SMTP details and mailbox password. Gmail web saves its own sent copy in Gmail; use an IMAP client to save to this server’s Sent folder.' : tab === 2 ? 'Choose manual setup, IMAP for incoming mail, and the outgoing SMTP settings below.' : tab === 3 ? 'In Nextcloud Mail, use manual configuration and use the same mailbox credentials for IMAP and SMTP.' : 'Use these values in any IMAP client with separate incoming and outgoing authentication.'}</Typography>
-      {configuration && <Box className="client-pair">{(['incoming', 'outgoing'] as const).map(direction => <Box key={direction}>
-        <Typography variant="h6">{direction === 'incoming' ? 'Incoming · IMAP' : 'Outgoing · SMTP'}</Typography>
-        {Object.entries(configuration[direction]).map(([key, value]) => <Box key={key} className="connection-field">
-          <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}><Box sx={{ minWidth: 0 }}>
-            <Typography variant="caption" color="text.secondary">{key === 'password' ? 'Mailbox password' : key}</Typography>
-            <Typography sx={{ overflowWrap: 'anywhere' }}>{String(value)}</Typography>
-          </Box>{key !== 'password' && <Tooltip title={`Copy ${direction} ${key}`}><Button size="small" aria-label={`Copy ${direction} ${key}`} onClick={async () => { await navigator.clipboard.writeText(String(value)); notify('Copied'); }}><ContentCopyOutlined fontSize="small"/></Button></Tooltip>}</Stack>
-        </Box>)}
-      </Box>)}</Box>}
-      <Alert severity="info" sx={{ mt: 3 }}>Use your known mailbox password or reset it; stored password hashes cannot be recovered. Enable saving sent messages to this account’s server IMAP Sent folder. Maddy does not create an automatic Sent copy. Sent means successful submission to Maddy’s queue, not confirmed recipient delivery. Clients that disable saving sent messages will not retain a sent copy.</Alert>
-    </DialogContent>{!embedded && <DialogActions><Button onClick={onClose}>Close</Button></DialogActions>}
-  </>;
-  return embedded ? content : <Dialog open fullScreen={fullScreen} fullWidth maxWidth="md" onClose={onClose} aria-labelledby="client-title">{content}</Dialog>;
+  const body = <Stack spacing={2.5}>
+        {error && <Alert severity="error">{error}</Alert>}
+        <Tabs value={tab} onChange={(_, value: number) => setTab(value)} variant="scrollable" scrollButtons="auto" aria-label="Mail client">{clients.map(client => <Tab label={client} key={client}/>)}</Tabs>
+        <Paper variant="outlined" sx={{ p: 2, bgcolor: 'var(--surface-low)' }}><NoteList notes={[{ icon: <AddCircleOutlineRounded fontSize="small"/>, label: 'Setup', text: CLIENT_HINTS[tab] }]}/></Paper>
+        {configuration && <Box className="client-pair">{(['incoming', 'outgoing'] as const).map(direction => <Section key={direction} title={direction === 'incoming' ? 'Incoming · IMAP' : 'Outgoing · SMTP'}>
+          {Object.entries(configuration[direction]).map(([key, value]) => key === 'password'
+            ? <CopyRow key={key} label="Password" value="Your mailbox password"/>
+            : <CopyRow key={key} label={FIELD_LABELS[key] ?? key} value={String(value)} copyLabel={`Copy ${direction} ${key}`}/>)}
+        </Section>)}</Box>}
+        <Disclosure title="Good to know">
+          <NoteList notes={[
+            { icon: <LoginRounded fontSize="small"/>, label: 'Sign in', text: `Use ${mailbox.email} and your mailbox password for both IMAP and SMTP. The From address must match this mailbox.` },
+            { icon: <KeyRounded fontSize="small"/>, label: 'Password', text: 'Stored password hashes cannot be recovered. Use your known password, or change it.' },
+            { icon: <SendRounded fontSize="small"/>, label: 'Sent mail', text: 'Turn on saving sent messages to the server IMAP Sent folder; Maddy does not create a copy itself. “Sent” means accepted into Maddy’s queue, not delivered.' },
+          ]}/>
+        </Disclosure>
+  </Stack>;
+  return embedded ? body : <Dialog open fullWidth maxWidth="md" onClose={onClose} aria-labelledby="client-title">
+    <DialogTitle id="client-title">Connect {mailbox.email}</DialogTitle><DialogContent>{body}</DialogContent><DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
+  </Dialog>;
 }

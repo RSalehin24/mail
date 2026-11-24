@@ -24,7 +24,7 @@ export function RecoveryAction({ email, authorize, notify, onClose, onChanged }:
   return <Dialog open fullWidth maxWidth="sm" onClose={busy ? undefined : onClose}>
     <DialogTitle>Delete Mailbox</DialogTitle>
     <DialogContent><Stack spacing={2.5} sx={{ pt: 1 }}>
-      <Typography sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{email}</Typography>
+      <Typography sx={{ fontWeight: 500, overflowWrap: 'anywhere' }}>{email}</Typography>
       {(error || policyError) && <Alert severity="error">{error || policyError}</Alert>}
       {protectedReason && <Alert severity="warning">Protected: {protectedReason}. Remove its protection in Settings before deleting it.</Alert>}
       {policy && !policy.enabled && <Alert severity="info">Mailbox deletion is disabled in Settings.</Alert>}

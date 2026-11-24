@@ -1,8 +1,11 @@
-import { formatDateTime } from './format';
 import { useRef, useState } from 'react';
-import { Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Stack, Typography } from '@mui/material';
-import CheckCircleOutlineRounded from '@mui/icons-material/CheckCircleOutlineRounded';
+import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Typography } from '@mui/material';
+import { AdminTable } from './AdminTable';
+import { sendingState } from './sendingState';
 import { api, ApiError, type Authorize, type Mailbox, type Notify } from './api';
+
+// Announces progress to screen readers; the visible feedback is each row's status chip.
+const SCREEN_READER_ONLY = { position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' } as const;
 
 export function SenderVerification({ emails, mailboxes, authorize, notify, onClose, onChanged }: {
   emails: string[]; mailboxes: Mailbox[]; authorize: Authorize; notify: Notify; onClose: () => void; onChanged: () => Promise<void>;
@@ -35,33 +38,24 @@ export function SenderVerification({ emails, mailboxes, authorize, notify, onClo
       } finally { setCurrentSender(''); setErrors(failures); setBusy(false); }
     });
   }
-  return <Dialog open fullWidth maxWidth="sm" onClose={busy ? undefined : onClose} aria-labelledby="sender-verification-title">
+  // A test can only be confirmed once it was sent, so the Actions column appears only when some row has one.
+  const pendingTests = (email: string) => mailboxes.find(value => value.email === email)?.sender_tests?.filter(test => test.accepted && !test.confirmed) ?? [];
+  const showActions = emails.some(email => pendingTests(email).length > 0);
+  return <Dialog open fullWidth maxWidth="md" onClose={busy ? undefined : onClose} aria-labelledby="sender-verification-title">
     <DialogTitle id="sender-verification-title" sx={{ pb: 1 }}>Verify outgoing email</DialogTitle>
     <DialogContent>
-      {currentSender && <Typography role="status" sx={{ mb: 2 }}>Sending test from {currentSender}…</Typography>}
-      <Stack spacing={2}>{emails.map(email => {
-        const mailbox = mailboxes.find(value => value.email === email);
-        const pending = mailbox?.sender_tests?.filter(test => test.accepted && !test.confirmed) ?? [];
-        const verified = mailbox?.outbound_readiness === 'confirmed';
-        return <Box key={email} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 2 }}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-            <Typography variant="body2" sx={{ fontWeight: 650, overflowWrap: 'anywhere' }}>{email}</Typography>
-            {verified && <Chip size="small" color="success" variant="outlined" icon={<CheckCircleOutlineRounded/>} label="Verified"/>}
-          </Stack>
-          {errors[email] && <Alert severity="error" sx={{ mt: 1 }}>{errors[email]}</Alert>}
-          {!pending.length && !verified && <Typography variant="body2" color="text.secondary">Ready to send a test email.</Typography>}
-          {pending.map(test => <Box key={test.id} sx={{ mt: 2 }}>
-            <Typography variant="caption" color="text.secondary">Sent {formatDateTime(test.created)}</Typography>
-            <Typography variant="body2" sx={{ fontFamily: 'monospace', overflowWrap: 'anywhere', mt: 0.5 }}>{test.id}</Typography>
-            <Button sx={{ mt: 1 }} variant="outlined" size="small" disabled={busy} onClick={() => authorize(async () => {
-              setBusy(true);
-              try { await api(`/relay-tests/${test.id}/confirm`, {}); await onChanged(); notify(`Sending verified for ${email}`); }
-              finally { setBusy(false); }
-            })}>I received this email</Button>
-          </Box>)}
-        </Box>;
-      })}</Stack>
-      <Divider sx={{ my: 2 }}/>
+      <Box role="status" sx={SCREEN_READER_ONLY}>{currentSender && `Sending test from ${currentSender}`}</Box>
+      <AdminTable wideFirst widths={showActions ? ['42%', '30%', '28%'] : ['60%', '40%']} columns={showActions ? ['Mailbox', 'Sending', 'Actions'] : ['Mailbox', 'Sending']} empty="No mailboxes." rows={emails.map(email => {
+        const state = errors[email] ? { color: 'error' as const, label: 'Test failed' } : email === currentSender ? { color: 'warning' as const, label: 'Sending…' } : sendingState(mailboxes.find(value => value.email === email)?.outbound_readiness ?? '');
+        const pending = pendingTests(email);
+        const cells = [email, <Stack key="state" spacing={0.5}><Chip size="small" variant="outlined" color={state.color} label={state.label}/>{errors[email] && <Typography variant="caption" color="error">{errors[email]}</Typography>}</Stack>];
+        if (showActions) cells.push(pending.length ? <Stack key="actions" spacing={1}>{pending.map(test => <Button key={test.id} variant="outlined" disabled={busy} onClick={() => authorize(async () => {
+          setBusy(true);
+          try { await api(`/relay-tests/${test.id}/confirm`, {}); await onChanged(); notify(`Sending verified for ${email}`); }
+          finally { setBusy(false); }
+        })}>I received this email</Button>)}</Stack> : <span key="actions"/>);
+        return { key: email, cells };
+      })}/>
     </DialogContent>
     <DialogActions sx={{ px: 3, pb: 2.5 }}><Button onClick={onClose} disabled={busy}>Done</Button>
       <Button variant="contained" onClick={send} disabled={busy || emails.every(email => sent.includes(email) || mailboxes.find(mailbox => mailbox.email === email)?.sender_tests?.some(test => test.accepted))}>

@@ -18,9 +18,8 @@ async function openMailboxes(connection) {
 }
 
 async function chooseTheme(connection, name) {
-  await connection.click({ tag: 'button', name: 'Theme' });
   await connection.click({ tag: 'button', name });
-  await connection.until(`document.querySelector('[role=menu]') === null`);
+  await connection.until(`document.querySelector('.theme-toggle [aria-pressed=true]')?.textContent === ${JSON.stringify(name)}`);
 }
 
 async function responsive(connection) {
@@ -55,21 +54,21 @@ async function recoveryControls(connection) {
   await connection.click({ tag: 'button', name: 'Cancel' });
   await connection.until(`document.querySelector('[role=dialog]') === null`);
   await connection.click({ tag: 'button', name: 'Deleted' });
-  await connection.until(`document.querySelector('h1')?.textContent === 'Deleted Mailboxes' && document.body.textContent.includes('No deleted mailboxes.')`);
+  await connection.until(`document.querySelector('h1')?.textContent === 'Deleted mailboxes' && document.body.textContent.includes('No deleted mailboxes.')`);
   await connection.call('Page.reload');
-  await connection.until(`document.querySelector('h1')?.textContent === 'Deleted Mailboxes'`);
-  await connection.click({ tag: 'button', name: 'Protected Mailboxes' });
+  await connection.until(`document.querySelector('h1')?.textContent === 'Deleted mailboxes'`);
+  await connection.click({ tag: 'button', name: 'Protected' });
   await connection.until(`document.querySelector('input')?.closest('section')?.textContent.includes('Protected Mailboxes')`);
   assert.equal(await connection.read(`document.querySelector('title').textContent`), 'RSalehin24 Mail');
 }
 
 async function settingsTabs(connection) {
   await connection.click({ tag: 'button', name: 'Settings' });
-  assert.deepEqual(await connection.read(`[...document.querySelectorAll('[role=tab]')].map(tab => tab.textContent)`), ['Security', 'Outgoing mail provider', 'Backup & Recovery']);
+  assert.deepEqual(await connection.read(`[...document.querySelectorAll('[role=tab]')].map(tab => tab.textContent)`), ['Security', 'Outgoing mail provider']);
   await connection.call('Page.navigate', { url: 'http://localhost:8765/settings?tab=protected' });
   await connection.until(`location.pathname === '/deleted'`);
-  assert.deepEqual(await connection.read(`[...document.querySelectorAll('[role=tab]')].map(tab => tab.textContent)`), ['Configure', 'Protected Mailboxes', 'Deleted Mailboxes']);
-  await connection.click({ tag: 'button', name: 'Protected Mailboxes' });
+  assert.deepEqual(await connection.read(`[...document.querySelectorAll('[role=tab]')].map(tab => tab.textContent)`), ['Deleted', 'Protected', 'Configure']);
+  await connection.click({ tag: 'button', name: 'Protected' });
   await connection.until(`document.querySelector('input')?.closest('section')?.textContent.includes('Protected Mailboxes')`);
   assert.equal(await connection.read(`document.querySelectorAll('[aria-label="Go to page 2"]').length > 0`), true);
   assert.equal(await connection.read(`document.body.textContent.includes('Enable mailbox deletion')`), false);
@@ -84,14 +83,14 @@ async function settingsTabs(connection) {
   assert.equal(await connection.read(`document.body.textContent.includes('Save protections')`), false);
 
   await connection.call('Page.reload');
-  await connection.until(`document.querySelector('[role=tab][aria-selected=true]')?.textContent === 'Protected Mailboxes'`);
+  await connection.until(`document.querySelector('[role=tab][aria-selected=true]')?.textContent === 'Protected'`);
   await connection.until(`document.querySelector('.desktop-table tbody tr')?.textContent.includes('Updated protection reason')`);
   await connection.fill('Mailbox to protect', 'single-action@rsalehin24.me');
   await connection.fill('Protection reason', 'Single action protection');
   await connection.click({tag: 'button', name: 'Add protection'});
   await connection.until(`document.body.textContent.includes('Mailbox protection added.')`);
   await connection.call('Page.reload');
-  await connection.until(`document.querySelector('h1')?.textContent === 'Deleted Mailboxes' && document.querySelector('[aria-label="Go to page 2"]') !== null`);
+  await connection.until(`document.querySelector('h1')?.textContent === 'Deleted mailboxes' && document.querySelector('[aria-label="Go to page 2"]') !== null`);
   await connection.click({tag: 'button', name: 'Go to page 2'});
   await connection.until(`document.querySelector('.desktop-table tbody')?.textContent.includes('single-action@')`);
   await connection.read(`[...document.querySelectorAll('.desktop-table tbody tr')].find(row => row.textContent.includes('single-action@')).querySelector('[aria-label^="Remove protection"]').click()`);
@@ -123,15 +122,27 @@ async function settingsTabs(connection) {
   await connection.click({ tag: 'button', name: 'Configure' });
   await connection.until(`document.body.textContent.includes('Enable mailbox deletion')`);
   assert.equal(await connection.read(`document.querySelector('input[aria-label^="Remove protection"]') !== null || document.body.textContent.includes('Mailbox to protect')`), false);
-  await connection.click({ tag: 'button', name: 'Settings' });
-  await connection.click({ tag: 'button', name: 'Backup & Recovery' });
-  await connection.until(`document.querySelector('[role=tab][aria-selected=true][id=backup-section-backups]') !== null`);
-  await connection.until(`document.querySelector('.MuiPaginationItem-ellipsis') !== null`);
-  assert.equal(await connection.read(`document.body.textContent.includes('3:00 AM · Asia/Dhaka · 7-day retention')`), true);
-  assert.equal(await connection.read(`document.body.textContent.includes('sudo systemctl start mail-admin-backup.service') && document.body.textContent.includes('host.restore_backup')`), true);
+  await connection.click({ tag: 'button', name: 'Backups' });
+  await connection.until(`location.pathname === '/backups' && document.querySelector('[role=tab][aria-selected=true][id=backup-section-overview]') !== null`);
+  assert.equal(await connection.read(`['Daily at 3:00 AM', 'Asia/Dhaka', '7 days'].every(text => document.body.textContent.includes(text))`), true);
+  assert.equal(await connection.read(`document.body.textContent.includes('mail-admin-backup.service') || document.body.textContent.includes('host.restore_backup')`), false);
+  assert.deepEqual(await connection.read(`[...document.querySelectorAll('section h2')].map(heading => heading.textContent).filter(text => ['Back up now', 'Restore a backup'].includes(text))`), ['Back up now', 'Restore a backup']);
+  await connection.click({ tag: 'button', name: 'Show Back up now' });
+  await connection.until(`document.body.textContent.includes('sudo systemctl start mail-admin-backup.service') && !document.body.textContent.includes('host.restore_backup')`);
+  await connection.click({ tag: 'button', name: 'Copy command: Back up now' });
+  await connection.click({ tag: 'button', name: 'Show Restore a backup' });
+  await connection.until(`document.body.textContent.includes('host.restore_backup --list') && document.body.textContent.includes('<snapshot-id>')`);
+  await connection.click({ tag: 'button', name: 'Hide Back up now' });
+  await connection.until(`!document.body.textContent.includes('sudo systemctl start mail-admin-backup.service')`);
+  await connection.click({ tag: 'button', name: 'Hide Restore a backup' });
+  await connection.until(`!document.body.textContent.includes('host.restore_backup')`);
+  assert.equal(await connection.read(`document.querySelector('.mailbox-table') === null`), true, 'The snapshot table lives on its own tab');
+  await connection.click({ tag: 'button', name: 'Show Restore a backup' });
+  await connection.click({ tag: 'button', name: 'Backups tab' });
+  await connection.until(`document.querySelector('[role=tab][aria-selected=true][id=backup-section-backups]') !== null && document.querySelector('.MuiPaginationItem-ellipsis') !== null`);
   assert.equal(await connection.read(`document.querySelector('.MuiTablePagination-root select') !== null`), true);
   await connection.click({ tag: 'button', name: 'Logs' });
-  await connection.until(`document.body.textContent.includes('failed') && document.body.textContent.includes('capture')`);
+  await connection.until(`document.body.textContent.includes('Failed') && document.querySelector('[aria-label*="Synthetic transfer failure"]') !== null`);
   assert.equal(await connection.read(`[...document.querySelectorAll('button')].some(button => /Back up now|Refresh backups|Restore mail data|Retry backup|Reconcile/.test(button.textContent))`), false);
   for (const dark of [false, true]) {
     if (dark) await chooseTheme(connection, 'Dark');
@@ -144,12 +155,12 @@ async function settingsTabs(connection) {
   await chooseTheme(connection, 'Light');
   await connection.call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 1000, deviceScaleFactor: 1, mobile: false });
   await connection.call('Page.reload');
-  await connection.until(`document.querySelector('[role=tab][aria-selected=true]')?.textContent === 'Backup & Recovery'`);
+  await connection.until(`document.querySelector('[role=tab][aria-selected=true]')?.textContent === 'Logs'`);
   await connection.call('Fetch.enable', {patterns: [{urlPattern: '*/api/backups?kind=operations*', requestStage: 'Request'}]});
   connection.events.set('Fetch.requestPaused', event => { void connection.call('Fetch.fulfillRequest', {requestId: event.requestId, responseCode: 200, responseHeaders: [{name: 'Content-Type', value: 'application/json'}], body: Buffer.from(JSON.stringify({items: [{id: 'complete-operation', kind: 'backup', snapshot: '', state: 'complete', phase: 'complete', created: 1700000000, updated: 1700000100, error: '', result: {}}], total: 1, page: 1, page_size: 10, busy: false, observation: null})).toString('base64')}); });
   await connection.call('Page.reload');
-  await connection.until(`document.querySelector('.desktop-table tbody')?.textContent.includes('complete-operation')`);
-  assert.deepEqual(await connection.read(`[...document.querySelectorAll('.desktop-table th')].map(cell => cell.textContent)`), ['Started', 'Operation', 'Status', 'Updated']);
+  await connection.until(`document.querySelector('.desktop-table tbody')?.textContent.includes('Complete')`);
+  assert.deepEqual(await connection.read(`[...document.querySelectorAll('.desktop-table th')].map(cell => cell.textContent)`), ['Date', 'Time', 'Operation', 'Status', 'Last update']);
   await connection.call('Fetch.disable');
   connection.events.delete('Fetch.requestPaused');
 
@@ -170,11 +181,12 @@ async function mailboxFlows(connection, fixture) {
   assert.equal(await connection.read(`Boolean(window.__mailFixtureInjected) || Boolean(document.querySelector('img[src=x]'))`), false);
   await connection.click({ tag: 'button', name: 'Actions for ui-fixture@rsalehin24.me' });
   await connection.click({ tag: 'button', name: 'Mailbox settings' });
-  await connection.until(`document.querySelector('#client-title') !== null`);
+  await connection.until(`document.body.textContent.includes('Incoming · IMAP')`);
   for (const name of ['Apple Mail', 'Gmail', 'Thunderbird / Outlook', 'Nextcloud', 'Raw details']) {
     await connection.click({ tag: 'button', name });
     assert.equal(await connection.read(`[...document.querySelectorAll('[role=tab][aria-selected=true]')].at(-1).textContent`), name);
   }
+  await connection.click({ tag: 'button', name: 'Show Good to know' });
   assert.equal(await connection.read(`document.body.textContent.includes('hashes')`), true);
   assert.equal(await connection.read('location.pathname'), '/mailboxes/ui-fixture%40rsalehin24.me/connections');
   await connection.until(`document.body.textContent.includes('Maddy’s queue')`);
@@ -185,8 +197,8 @@ async function mailboxFlows(connection, fixture) {
   assert.ok(!clientInstructions.includes('Reveal outgoing key'));
   assert.ok(!clientInstructions.includes('Copy outgoing key'));
   await connection.click({ tag: 'button', name: 'Configuration' });
-  await connection.until(`document.body.textContent.includes('Change incoming password')`);
-  await connection.click({ tag: 'button', name: 'Change incoming password' });
+  await connection.until(`document.body.textContent.includes('Change password')`);
+  await connection.click({ tag: 'button', name: 'Change password' });
   await connection.fill('Mailbox password', '  replacement fixture password 42  ');
   await connection.click({ tag: 'button', name: 'Reset password' });
   await connection.until(`document.querySelector('#confirm-title') !== null`);
@@ -214,12 +226,12 @@ async function mailboxFlows(connection, fixture) {
   await connection.until(`location.pathname.endsWith('/details')`);
   await openMailboxes(connection);
   await connection.until(`document.body.textContent.includes('Updated mailbox')`);
-  assert.equal(await connection.read(`getComputedStyle(document.querySelector('thead th:nth-child(3)')).textAlign`), 'left');
+  assert.equal(await connection.read(`getComputedStyle(document.querySelector('thead th:nth-child(3)')).textAlign`), 'center');
   assert.equal(await connection.read(`document.querySelector('.stat-row') === null`), true);
-  assert.deepEqual(await connection.read(`[...document.querySelectorAll('.desktop-table th')].map(cell => cell.textContent.trim()).filter(Boolean)`), ['Name', 'Mailbox', 'Creation Date', 'Inbox', 'Sending', 'Actions']);
+  assert.deepEqual(await connection.read(`[...document.querySelectorAll('.desktop-table th')].map(cell => cell.textContent.trim()).filter(Boolean)`), ['Mailbox', 'Creation Date', 'Inbox', 'Sending', 'Actions']);
   assert.equal(await connection.read(`Boolean(document.querySelector('.MuiPagination-root [aria-label="Go to first page"]')) && Boolean(document.querySelector('[aria-label="Go to last page"]'))`), true);
 
-  assert.match(await connection.read(`document.querySelector('.desktop-table tbody time').textContent`), /^[A-Z][a-z]{2} \d{1,2}, \d{4}$/);
+  assert.match(await connection.read(`document.querySelector('.desktop-table tbody time').textContent`), /^(Today|Yesterday|\d{1,2} [A-Z][a-z]{2} \d{4})$/);
 
   const favicon = await fetch('http://localhost:8765/favicon.svg');
   assert.equal(favicon.headers.get('content-type').includes('image/svg+xml'), true);
@@ -251,7 +263,7 @@ async function relayFlows(connection, fixture) {
   await connection.click({ tag: 'button', name: 'Recovery code' });
   await connection.fill('Recovery code', fixture.recovery_code);
   await connection.click({ tag: 'button', name: 'Verify second factor' });
-  await connection.until(`document.body.textContent.includes('Saved revision 1')`);
+  await connection.until(`[...document.querySelectorAll('dt')].some(term => term.textContent === 'Saved revision' && term.nextElementSibling?.textContent === '1')`);
   assert.equal(await connection.read(`document.querySelector('input[autocomplete="new-password"]').value`), '');
   await connection.click({ tag: 'button', name: 'Test connection' });
   await connection.until(`document.body.textContent.includes('Connection only · no email sent')`);
@@ -267,10 +279,11 @@ async function verificationFlows(connection) {
   await connection.click({ tag: 'input', name: 'Select cloud@rsalehin24.me' });
   await connection.click({ tag: 'input', name: 'Select mail@rsalehin24.me' });
   await connection.click({ tag: 'button', name: 'Verify selected senders' });
+  assert.equal(await connection.read(`[...document.querySelectorAll('.MuiDialog-paper')].every(paper => paper.scrollWidth <= paper.clientWidth)`), true, 'A dialog never scrolls sideways');
   await connection.click({ tag: 'button', name: 'Send 2 test emails' });
-  await connection.until(`document.querySelectorAll('[role=dialog] button').length > 0 && [...document.querySelectorAll('[role=dialog] button')].filter(button => button.textContent === 'I received this email').length === 2`);
-  await connection.read(`[...document.querySelectorAll('[role=dialog] button')].find(button => button.textContent === 'I received this email').click()`);
-  await connection.until(`[...document.querySelectorAll('[role=dialog] button')].filter(button => button.textContent === 'I received this email').length === 1`);
+  await connection.until(`document.querySelectorAll('[role=dialog] button').length > 0 && [...document.querySelectorAll('[role=dialog] button')].filter(button => button.textContent === 'I received this email' && button.offsetParent !== null).length === 2`);
+  await connection.read(`[...document.querySelectorAll('[role=dialog] button')].find(button => button.textContent === 'I received this email' && button.offsetParent !== null).click()`);
+  await connection.until(`[...document.querySelectorAll('[role=dialog] button')].filter(button => button.textContent === 'I received this email' && button.offsetParent !== null).length === 1`);
   await connection.click({ tag: 'button', name: 'Done' });
   await connection.until(`document.querySelector('[role=dialog]') === null`);
   await connection.click({ tag: 'button', name: 'Settings' });
@@ -279,6 +292,7 @@ async function verificationFlows(connection) {
 }
 
 async function securityAndServer(connection) {
+  await connection.click({ tag: 'button', name: 'Settings' });
   await connection.click({ tag: 'button', name: 'Security' });
   const headings = await connection.read(`[...document.querySelectorAll('#security-heading ~ div h3')].map(element => element.textContent)`);
   assert.deepEqual(headings, ['Master password', 'Authenticator app', 'Recovery codes', 'Email verification codes']);
@@ -312,6 +326,9 @@ async function securityAndServer(connection) {
       await connection.read('scrollTo(0,0)'); await delay(300);
       assert.equal(await connection.read('document.documentElement.scrollWidth <= innerWidth'), true);
       await connection.screenshot(`server-charts-${dark ? 'dark' : 'light'}-${width}`);
+      await connection.read(`[...document.querySelectorAll('h2')].find(heading => heading.textContent === 'Service observations').scrollIntoView({block: 'start'})`);
+      await connection.screenshot(`server-services-${dark ? 'dark' : 'light'}-${width}`);
+      await connection.read('window.scrollTo(0, 0)');
     }
   }
   await chooseTheme(connection, 'Light');
@@ -349,7 +366,7 @@ async function concurrentLoadingAndPagination(connection) {
   assert.equal(await connection.read(`document.querySelectorAll('.MuiPaginationItem-ellipsis').length`), 2);
   await connection.fill('Search mailboxes', 'fixture-119');
   await connection.until(`document.querySelectorAll('.desktop-table tbody tr').length === 1`);
-  assert.equal(await connection.read(`document.querySelector('.MuiPagination-root [aria-current=page]').textContent`), '1');
+  assert.equal(await connection.read(`document.querySelector('.MuiPagination-root') === null`), true);
   await connection.fill('Search mailboxes', '');
   await connection.until(`document.querySelectorAll('.desktop-table tbody tr').length === 10`);
   await connection.click({ tag: 'button', name: 'Server' });
@@ -386,27 +403,33 @@ async function forwardingAndEmailSettings(connection) {
   await connection.call('Emulation.setDeviceMetricsOverride', {width:1280,height:1000,deviceScaleFactor:1,mobile:false});
   await connection.click({tag:'button',name:'Forwarding'});
   await connection.until(`document.querySelector('h1')?.textContent === 'Forwarding'`);
-  await connection.until(`document.querySelector('[role=combobox]') !== null && !document.body.textContent.includes('Loading forwarding settings')`);
+  await connection.until(`!document.body.textContent.includes('Loading forwarding settings') && [...document.querySelectorAll('button')].some(button => button.textContent === 'Add forwarding' && !button.disabled)`);
+  await connection.click({tag:'button',name:'Add forwarding'});
+  await connection.until(`document.querySelector('[role=dialog] [role=combobox]') !== null`);
   await connection.read(`document.querySelector('[role=combobox]').dispatchEvent(new MouseEvent('mousedown', {bubbles:true,button:0}))`);
   await connection.until(`document.querySelector('[role=listbox]') !== null`);
   await connection.read(`[...document.querySelectorAll('[role=option]')].find(option => option.textContent === 'cloud@rsalehin24.me').click()`);
   await connection.until(`document.querySelector('[role=listbox]') === null`);
   await connection.fill('Forward to','first@example.com');
-  await connection.until(`[...document.querySelectorAll('button')].some(button => button.textContent === 'Add forwarding' && !button.disabled)`);
-  await connection.click({tag:'button',name:'Add forwarding'});
-  await connection.until(`document.querySelector('.desktop-table tbody')?.textContent.includes('first@example.com')`);
+  await connection.click({tag:'button',name:'Save forwarding'});
+  await connection.until(`document.querySelector('[role=dialog]') === null && document.querySelector('.desktop-table tbody')?.textContent.includes('first@example.com')`);
   await connection.call('Page.reload');
   await connection.until(`document.querySelector('.desktop-table tbody')?.textContent.includes('first@example.com')`);
   await connection.call('Page.navigate',{url:'http://localhost:8765/mailboxes/cloud%40rsalehin24.me/configuration'});
-  await connection.until(`document.querySelector('input[type=email]')?.value === 'first@example.com'`);
+  await connection.until(`[...document.querySelectorAll('button')].some(button => button.textContent === 'Edit forwarding' && !button.disabled)`);
+  await connection.click({tag:'button',name:'Edit forwarding'});
+  await connection.until(`document.querySelector('[role=dialog] input[type=email]')?.value === 'first@example.com'`);
   await connection.fill('Forward to','second@example.com');
   await connection.click({tag:'button',name:'Save forwarding'});
-  await connection.until(`document.querySelector('.desktop-table tbody')?.textContent.includes('second@example.com')`);
+  await connection.until(`document.querySelector('[role=dialog]') === null && document.querySelector('.desktop-table tbody')?.textContent.includes('second@example.com')`);
   await connection.click({tag:'button',name:'Forwarding'});
   await connection.until(`document.querySelector('h1')?.textContent === 'Forwarding' && document.querySelector('.desktop-table tbody')?.textContent.includes('second@example.com')`);
-  await connection.read(`[...document.querySelectorAll('.desktop-table tbody button')].find(button => button.textContent === 'Disable').click()`);
+  await connection.click({tag:'button',name:'Actions for cloud@rsalehin24.me'});
+  await connection.click({tag:'button',name:'Disable'});
   await connection.until(`document.querySelector('.desktop-table tbody')?.textContent.includes('Disabled')`);
-  await connection.read(`[...document.querySelectorAll('.desktop-table tbody button')].find(button => button.textContent === 'Remove').click()`);
+  await connection.until(`document.querySelector('[role=menu]') === null`);
+  await connection.click({tag:'button',name:'Actions for cloud@rsalehin24.me'});
+  await connection.click({tag:'button',name:'Remove'});
   await connection.until(`document.querySelector('[role=dialog]') !== null`);
   await connection.click({tag:'button',name:'Remove forwarding'});
   await connection.until(`document.body.textContent.includes('No forwarding configured.') && document.querySelector('[role=dialog]') === null`);
@@ -421,32 +444,30 @@ async function forwardingAndEmailSettings(connection) {
   await connection.read(`[...document.querySelectorAll('button')].find(button => button.textContent === 'I received this test').click()`);
   await connection.click({tag:'button',name:'Security'});
   await connection.until(`document.body.textContent.includes('Email delivery verified')`);
-  await connection.click({tag:'input',name:'Allow email verification codes'});
+  await connection.click({tag:'input',name:'Allow a code by email instead of the authenticator app'});
   await connection.until(`[...document.querySelectorAll('input')].find(input => input.type==='checkbox')?.checked === true`);
   await connection.call('Page.reload');
   await connection.until(`[...document.querySelectorAll('input')].find(input => input.type==='checkbox')?.checked === true`);
-  await connection.click({tag:'input',name:'Allow email verification codes'});
+  await connection.click({tag:'input',name:'Allow a code by email instead of the authenticator app'});
   await connection.until(`[...document.querySelectorAll('input')].find(input => input.type==='checkbox')?.checked === false`);
 }
 
 async function incomingDeliveryControls(connection) {
-  await connection.click({tag:'button',name:'Forwarding'});
-  await connection.until(`document.querySelector('#forwarding-incoming-tab') !== null`);
-  await connection.click({tag:'button',name:'Incoming Delivery'});
-  const panel = '#forwarding-incoming-panel';
+  await connection.click({tag:'button',name:'Incoming'});
+  await connection.until(`document.querySelector('h1')?.textContent === 'Incoming delivery'`);
+  const panel = 'main';
   await connection.until(`document.querySelector('${panel} .desktop-table tbody tr button') !== null`);
   assert.equal(await connection.read(`document.querySelector('${panel} .MuiChip-colorWarning') !== null`), true);
   await connection.read(`(() => {const select=document.querySelector('${panel} select'); select.value='5'; select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
   await connection.until(`document.querySelectorAll('${panel} .desktop-table tbody tr').length === 5`);
   await connection.read(`document.querySelector('${panel} .MuiPagination-root [aria-label="Go to next page"]').click()`);
   await connection.until(`document.querySelectorAll('${panel} .desktop-table tbody tr').length === 4`);
-  await connection.click({tag:'button',name:'Forwarding Rules'});
-  await connection.click({tag:'button',name:'Incoming Delivery'});
+  await connection.click({tag:'button',name:'Refresh delivery'});
   assert.equal(await connection.read(`document.querySelectorAll('${panel} .desktop-table tbody tr').length`),4);
   await connection.read(`document.querySelector('${panel} .desktop-table tbody tr button').click()`);
   await connection.until(`document.body.textContent.includes('Delivery verification check queued.')`);
   await connection.call('Page.reload');
-  await connection.until(`document.querySelector('#forwarding-incoming-tab')?.getAttribute('aria-selected') === 'true'`);
+  await connection.until(`document.querySelector('h1')?.textContent === 'Incoming delivery' && document.querySelector('main .desktop-table tbody tr') !== null`);
   const mailbox = 'cloud@rsalehin24.me';
   let state = 'connected';
   connection.events.set('Fetch.requestPaused', async event => {
@@ -468,7 +489,31 @@ async function incomingDeliveryControls(connection) {
   }
   await connection.call('Fetch.disable');
   connection.events.delete('Fetch.requestPaused');
-  await connection.click({tag:'button',name:'Forwarding Rules'});
+}
+
+// Table headers must stay readable in the dark theme (WCAG AA, 4.5:1) on every page that has a table.
+async function darkTableHeaders(connection) {
+  await chooseTheme(connection, 'Dark');
+  await connection.call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 1000, deviceScaleFactor: 1, mobile: false });
+  const contentLeft = new Set();
+  for (const page of ['Mailboxes', 'Deleted', 'Forwarding', 'Incoming', 'Outgoing', 'Backups']) {
+    await connection.click({ tag: 'button', name: page });
+    if (page === 'Backups') await connection.read(`document.getElementById('backup-section-backups').click()`);
+    await connection.until(`document.querySelector('.mailbox-table th') !== null`);
+    await connection.until(`getComputedStyle(document.querySelector('.mailbox-table thead')).backgroundColor !== 'rgba(0, 0, 0, 0)'`);
+    const ratio = await connection.read(`(() => {
+      const channel = value => { const c = value / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+      const luminance = color => { const [r, g, b] = color.match(/[\\d.]+/g).map(Number); return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b); };
+      const header = document.querySelector('.mailbox-table thead');
+      const background = luminance(getComputedStyle(header).backgroundColor), text = luminance(getComputedStyle(header.querySelector('th')).color);
+      return (Math.max(background, text) + 0.05) / (Math.min(background, text) + 0.05);
+    })()`);
+    const details = await connection.read(`JSON.stringify({scheme: document.documentElement.hasAttribute('data-dark'), variable: getComputedStyle(document.documentElement).getPropertyValue('--surface-low'), background: getComputedStyle(document.querySelector('.mailbox-table thead')).backgroundColor, text: getComputedStyle(document.querySelector('.mailbox-table th')).color})`);
+    assert.ok(ratio >= 4.5, `Dark table header contrast on ${page}: ${ratio.toFixed(2)} ${details}`);
+    await connection.screenshot(`table-header-dark-${page.toLowerCase()}`);
+    contentLeft.add(await connection.read(`document.querySelector('main.page').getBoundingClientRect().left`));
+  }
+  assert.equal(contentLeft.size, 1, `Page content must not shift sideways between pages: ${[...contentLeft]}`);
 }
 
 async function verify(connection, report) {
@@ -477,7 +522,7 @@ async function verify(connection, report) {
   report.frontend_image_id = fixture.frontend_image_id;
   await connection.call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 1000, deviceScaleFactor: 1, mobile: false });
   await connection.call('Page.enable');
-  await connection.call('Page.navigate', { url: 'http://localhost:8765' });
+  await connection.call('Page.navigate', { url: 'http://localhost:8765/backups' });
   await connection.until(`document.querySelector('h1')?.textContent === 'Welcome back'`);
   assert.equal(await connection.read(`document.querySelector('input[type=password]').type`), 'password');
   await connection.screenshot('login');
@@ -488,6 +533,8 @@ async function verify(connection, report) {
   await connection.fill('Digit 1 of 6', fixture.totp);
   await connection.click({ tag: 'button', name: 'Verify and sign in' });
   await connection.until(`document.querySelector('h1')?.textContent === 'Overview'`);
+  assert.equal(await connection.read('location.pathname'), '/', 'Signing in always opens the Overview, even from a deep link');
+  await connection.until(`document.body.textContent.includes('Healthy') && document.querySelector('a[href="/backups"]') !== null`);
   await connection.screenshot('overview');
   await openMailboxes(connection);
   assert.equal(await connection.read(`document.querySelectorAll('.desktop-table tbody tr').length`), 8);
@@ -508,6 +555,12 @@ async function verify(connection, report) {
   await connection.click({ tag: 'button', name: 'Close' });
   await connection.until(`document.querySelector('[role=dialog]') === null`);
   await mailboxFlows(connection, fixture);
+  await connection.click({ tag: 'button', name: 'Outgoing' });
+  await connection.until(`document.querySelector('h1')?.textContent === 'Outgoing delivery'`);
+  await connection.until(`document.querySelector('.mailbox-table') !== null && document.body.textContent.includes('Verify all')`);
+  assert.deepEqual(await connection.read(`[...document.querySelectorAll('.desktop-table th')].map(cell => cell.textContent.trim())`), ['Mailbox', 'Sending', 'Actions']);
+  assert.equal(await connection.read(`document.querySelectorAll('.desktop-table tbody tr .MuiChip-root').length === document.querySelectorAll('.desktop-table tbody tr').length`), true);
+  await connection.screenshot('outgoing');
   await openSettings(connection);
   await relayFlows(connection, fixture);
   await verificationFlows(connection);
@@ -520,6 +573,7 @@ async function verify(connection, report) {
   await connection.screenshot('settings');
   await chooseTheme(connection, 'Dark');
   await connection.screenshot('settings-dark');
+  await darkTableHeaders(connection);
   await connection.click({ tag: 'button', name: 'Sign out' });
   await connection.until(`document.querySelector('h1')?.textContent === 'Welcome back'`);
   assert.equal(await connection.read(`document.querySelectorAll('[role=dialog]').length`), 0);

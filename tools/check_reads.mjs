@@ -43,7 +43,17 @@ globalThis.fetch = async () => ({ok: false, status: 401, json: async () => ({err
 await assert.rejects(api('/security/reauth', {password: 'wrong'}), error => error.code === 'authentication_failed' && error.message === 'Invalid master password.' && error.requestId === diagnosticId);
 await assert.rejects(api('/security/reauth/verify', {code: 'wrong'}), error => error.message === 'Invalid verification code.');
 const formatCode = await readFile(new URL('../build/read-tests/format.js', import.meta.url), 'utf8');
-const { formatDate } = await import(`data:text/javascript;base64,${Buffer.from(formatCode).toString('base64')}`);
-assert.equal(formatDate('2026-08-10T03:00:00Z'), 'Aug 10, 2026');
-assert.equal(formatDate('2026-08-09T18:00:00Z'), 'Aug 10, 2026', 'Dates use the Dhaka calendar');
+const { formatDate, formatTime, formatClock, formatDateTime, formatAge } = await import(`data:text/javascript;base64,${Buffer.from(formatCode).toString('base64')}`);
+const now = new Date('2026-11-24T14:30:00Z');
+assert.equal(formatDate('2026-08-10T03:00:00Z', now), '10 Aug 2026');
+assert.equal(formatDate('2026-08-09T18:00:00Z', now), '10 Aug 2026', 'Dates use the Dhaka calendar');
+assert.equal(formatDate('2026-11-24T13:00:00Z', now), 'Today');
+assert.equal(formatDate('2026-11-23T10:00:00Z', now), 'Yesterday');
+assert.equal(formatTime('2026-11-24T14:18:00Z'), '8:18 PM', 'Times are 12-hour Dhaka time without a leading zero');
+assert.equal(formatClock('2026-11-24T14:07:05Z'), '8:07:05 PM');
+assert.equal(formatDateTime('2026-11-24T14:18:00Z', now), 'Today, 8:18 PM');
+assert.equal(formatDateTime('2026-08-10T03:00:00Z', now), '10 Aug 2026, 9:00 AM');
+assert.deepEqual(['2026-11-24T14:29:58Z', '2026-11-24T14:29:30Z', '2026-11-24T14:25:00Z', '2026-11-24T12:22:00Z', '2026-11-24T12:30:00Z'].map(value => formatAge(value, now)),
+  ['just now', '30 s ago', '5 min ago', '2 h 8 min ago', '2 h ago']);
+assert.equal(formatAge('2026-11-20T14:18:00Z', now), '20 Nov 2026, 8:18 PM', 'Ages older than a day show the date');
 console.log('PASS: friendly errors without visible diagnostic IDs, authentication context, consistent dates');
