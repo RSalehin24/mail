@@ -9,8 +9,8 @@ from helper.cloudflare_forwarding import ForwardingPaths
 from helper.deletion import DeletionPaths
 from helper.dependencies import HostLocations, build_dependencies
 from helper.journal import Journal
+from helper.local_relay import local_relay_actions
 from helper.maddy import LocalMaddy
-from helper.maddy_restart import local_relay_actions
 from helper.protocol import HelperRequest
 from helper.service import HostHelper
 from helper.state_database import STATE_FILE
@@ -85,7 +85,7 @@ def create_local_host(timeout: float, locations: HostLocations = LOCAL_LOCATIONS
     provision_lock(locations.lock, locations.owner)
     if not (locations.state / STATE_FILE).exists():
         Journal.provision(locations.state / STATE_FILE)
-    relay = local_relay_actions(maddy, locations.state, locations.owner)
+    relay = local_relay_actions(maddy)
     return LocalHost(
         HostHelper(build_dependencies(deployment, maddy, replace(locations, relay=relay)))
     )
