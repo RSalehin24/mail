@@ -28,9 +28,9 @@ Updated 2026-11-21 (after the UI, notification mail, OS update and cleanup work)
 - Remaining scheduled units: backup (daily), recovery expiry (daily), monitor, independent monitor, TLS observation. Nothing polls.
 
 ## Still open for the owner
-- Set the deletion policy default to 7 days (Settings, Deleted, Configure; needs password and code): the dialog still preselects permanent "Don't Retain" until then.
+- (Done 2026-11-24, D-086) Deletion policy default is 7 days.
 - Update mail clients with the five new passwords chosen during the restore.
-- Sign in once and look over the Mailboxes, Deleted, Forwarding and Settings > Backup & Recovery pages after the state-database migration.
+- (Done 2026-11-24) All dashboard pages checked after the state-database migration.
 - Frontend rewrite: owner, separate session (planning/FIGMA-BRIEF.md).
 
 ## Open (only things that depend on time)
