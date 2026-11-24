@@ -10,7 +10,7 @@ Live host: GCP VM `rsalehin24-mail` (us-east1-c), SSH `deployer@mail.rsalehin24.
 
 ## Restore
 - Latest snapshot check without touching mail: `ResticRepository(ResticProcess(HostContext.load().deployment), time.time).verify({"reference", "content_sha256"})` from the manifest, as root in `/usr/local/lib/mail-admin` (about 25 s; restores to a scratch folder and deletes it).
-- Mailbox recovery and additive restore: dashboard Backups and Recovery pages. Full-server rehearsal (done 2026-11-21): `ResticRepository.restore(reference, staging/rehearsal-restore)` as root, chown the `maddy/` folder to 10001, copy `maddy_configuration` to `maddy/maddy.conf`, run the pinned Maddy image offline (`--network none`, uid 10001, no capabilities, entrypoint `/usr/local/libexec/mail-admin-maddy`) with `creds list` and `imap-acct list`, compare message counts in `imapsql.db` with the live one, then delete the folder. The snapshot holds Maddy data, config, compose, certificates, dashboard database, helper state and operator files (about 200 MB).
+- Backup and restore are VM commands (D-084), not dashboard buttons. Back up now: `sudo systemctl start mail-admin-backup.service` (live capture, Maddy keeps running, D-083). Restore: `sudo bash -c 'cd /usr/local/lib/mail-admin && python3 -m host.restore_backup --list'`, then the same with the full snapshot id; it checks the snapshot, shows existing and missing mailboxes, asks twice for a new password per mailbox without a login, asks you to type the snapshot id, takes a safety backup, merges missing mail in (newer mail and passwords are never overwritten), sets passwords through Maddy, takes a post-restore backup and re-applies Cloudflare routes. If it was interrupted, run it with `--reconcile` first. Empty input cancels without changes. The dashboard lists backups and logs read-only; the nightly backup refreshes the list (`ExecStartPost=-python3 -m host.backup_catalog`). Full-server rehearsal (done 2026-11-21): `ResticRepository.restore(reference, staging/rehearsal-restore)` as root, chown the `maddy/` folder to 10001, copy `maddy_configuration` to `maddy/maddy.conf`, run the pinned Maddy image offline (`--network none`, uid 10001, no capabilities, entrypoint `/usr/local/libexec/mail-admin-maddy`) with `creds list` and `imap-acct list`, compare message counts in `imapsql.db` with the live one, then delete the folder. The snapshot holds Maddy data, config, compose, certificates, dashboard database, helper state and operator files (about 200 MB).
 - Roll back the last dashboard deploy: `/root/cutover-20261121/rollback-dashboard.sh` (as root; needs image `mail-admin:stage11`, which stays on the VM). Roll back the v13 deploy (password-only confirmation, queue code): `/root/cutover-20261121/rollback-v13.sh` (needs `mail-admin:stage12`). Undo the DNS update service: `/root/cutover-20261121/rollback-dns-update.sh`.
 
 ## Rotate secrets
@@ -23,7 +23,6 @@ Live host: GCP VM `rsalehin24-mail` (us-east1-c), SSH `deployer@mail.rsalehin24.
 | Unit | When | Does |
 |---|---|---|
 | `mail-admin-backup.timer` | 03:00 Asia/Dhaka | Backup to R2 (Restic), verified by a restore to scratch |
-| `mail-admin-backup-control` `.path` | on request file (no timer; the nightly backup refreshes the list afterwards) | Dashboard-requested backups and restores |
 | `mail-admin-recovery-expire` `.timer` | daily | Removes deleted-mailbox archives whose retention ended (`host.expire_recovery`) |
 | `mail-admin-maddy-restart.path` | on request file | Restart Maddy after a relay change |
 | `mail-admin-forwarding.timer` | 30 s | Sync forwarding with Cloudflare |
@@ -60,3 +59,7 @@ Stop the VM, `gcloud compute instances delete-access-config` then `add-access-co
 ## Forwarding (D-080)
 - The dashboard applies forwarding to Cloudflare itself after every mailbox create or delete and every forwarding change; there is no forwarding timer. If it ever shows `sync_failed`, fix the cause (for example the Cloudflare token) and run `sudo python3 -m host.sync_forwarding` on the VM; the restore command does this automatically.
 - `/etc/mail-admin/cloudflare-forwarding.json` and `/etc/mail-admin/secrets/cloudflare-forwarding.token` are `root:mail-admin` 0640; the record `/var/lib/mail-admin-helper/cloudflare-forwarding.json` belongs to the state owner.
+
+## One state database (D-085)
+- `/var/lib/mail-admin-helper/state.db` holds the journal, recovery records and forwarding rules (it replaced `journal.db`, `recovery.db`, `forwarding.db`, kept as `*.migrated`). `backup-control.db` and the dashboard's `admin_data.db` are separate.
+- Rollback: `sudo /root/cutover-20261121/rollback-v20.sh` (stops the dashboard, moves `state.db` aside as `state.db.rolledback`, renames the `.migrated` files back, restores the previous library and units and starts image `stage18`; anything written to `state.db` after the upgrade is lost). Remove the `.migrated` copies by hand only after the new version has been stable for a while.

@@ -13,6 +13,7 @@ import argparse
 import getpass
 import os
 import re
+import shutil
 import signal
 import sys
 from collections.abc import Callable
@@ -69,16 +70,25 @@ class RestoreCommand:
         prepared = self._preflight(snapshot)
         report = prepared["result"]
         self._report(report)
-        passwords = {email: self._new_password(email) for email in report["needs_login"]}
-        if self.console.ask("Type the snapshot id to restore it: ").strip() != snapshot:
-            self.console.say("The snapshot id does not match; nothing was changed.")
-            return 2
+        try:
+            passwords = {email: self._new_password(email) for email in report["needs_login"]}
+            typed = self.console.ask("Type the snapshot id to restore it: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return self._decline(prepared, "Cancelled; nothing was changed.")
+        if typed != snapshot:
+            return self._decline(prepared, "The snapshot id does not match; nothing was changed.")
         with self.worker.exclusive():
             identifier = self.worker.submit("restore", snapshot, prepared["id"])
             job = self.worker.process(identifier, passwords)
         self.console.say(f"Restored {job['result'].get('messages_added', 0)} messages.")
         self._sync_forwarding()
         return 0
+
+    def _decline(self, prepared: dict[str, Any], message: str) -> int:
+        # The checked copy is only needed to restore it; without a restore it is just 200 MB.
+        shutil.rmtree(self.worker.staging / prepared["id"], ignore_errors=True)
+        self.console.say(message)
+        return 2
 
     def reconcile(self) -> int:
         with self.worker.exclusive():

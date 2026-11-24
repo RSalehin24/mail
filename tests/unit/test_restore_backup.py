@@ -26,6 +26,8 @@ class ScriptedConsole:
         self.lines.append(text)
 
     def ask(self, prompt):
+        if not self.answers:
+            raise EOFError
         return self.answers.pop(0)
 
     def secret(self, prompt):
@@ -119,6 +121,14 @@ class RestoreWorkflowTests(unittest.TestCase):
         kinds = [job["kind"] for job in self.worker.control.listing(
             {"kind": "operations", "page": 1, "page_size": 10})["items"]]
         self.assertEqual(kinds, ["preflight"])
+
+    def test_empty_input_cancels_cleanly_and_removes_the_checked_copy(self):
+        console = ScriptedConsole(secrets=[PASSWORD, PASSWORD], answers=[])
+        with patch.object(BackupWorker, "perform", self.perform):
+            self.assertEqual(self.command(console).restore(SNAPSHOT), 2)
+        self.assertIn("Cancelled; nothing was changed.", console.lines)
+        self.assertEqual(list(self.worker.staging.iterdir()), [])
+        self.forwarded.assert_not_called()
 
     def test_a_failed_forwarding_sync_is_reported_not_hidden(self):
         self.forwarded.side_effect = ServiceError("cloudflare_unavailable", 503)
