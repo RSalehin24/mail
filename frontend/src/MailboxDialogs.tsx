@@ -66,7 +66,7 @@ export function DeleteDialog({ mailbox, cutoff, ...common }: Common & { mailbox:
   const [identifier] = useState(() => crypto.randomUUID());
   const [attempted, setAttempted] = useState(false);
   return <Dialog open fullWidth maxWidth="sm" onClose={busy ? undefined : common.onClose} aria-labelledby="delete-title">
-    <DialogTitle id="delete-title">Permanently delete {mailbox.email}</DialogTitle>
+    <DialogTitle id="delete-title" className="keep-case">Permanently Delete {mailbox.email}</DialogTitle>
     <DialogContent><Stack spacing={2.5}>
       <Alert severity="warning">Stored messages and incoming credentials will be removed. Existing IMAP sessions may remain active if deletion fails. Brevo sender access and shared outgoing keys are managed separately.</Alert>
       {error && <Alert severity="error">{error}</Alert>}
@@ -128,6 +128,6 @@ export function ClientConfig({ mailbox, onClose, embedded = false }: Common & { 
         </Disclosure>
   </Stack>;
   return embedded ? body : <Dialog open fullWidth maxWidth="md" onClose={onClose} aria-labelledby="client-title">
-    <DialogTitle id="client-title">Connect {mailbox.email}</DialogTitle><DialogContent>{body}</DialogContent><DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
+    <DialogTitle id="client-title" className="keep-case">Connect {mailbox.email}</DialogTitle><DialogContent>{body}</DialogContent><DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
   </Dialog>;
 }

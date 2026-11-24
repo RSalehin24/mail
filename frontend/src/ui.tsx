@@ -32,7 +32,7 @@ export function StatCard({ label, value, detail, tone = 'neutral', to, meter }: 
   const Severity = tone === 'warning' || tone === 'error' ? SEVERITY_ICON[tone] : undefined;
   return <Paper variant="outlined" {...link} sx={{ p: 2, minWidth: 0, display: 'block', color: 'inherit', textDecoration: 'none', borderLeft: Severity ? '4px solid' : undefined, borderLeftColor: Severity ? TONE_COLOR[tone] : undefined, ...(to && { '&:hover': { borderColor: 'primary.main' } }) }}>
     <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>{label}</Typography>
+      <Typography variant="caption" className="stat-label" color="text.secondary" sx={{ fontWeight: 500 }}>{label}</Typography>
       {Severity && <Severity fontSize="small" sx={{ color: TONE_COLOR[tone] }}/>}
     </Stack>
     <Typography variant="h5" component="p" sx={{ mt: 0.5, color: tone === 'neutral' ? 'text.primary' : TONE_COLOR[tone] }}>{value}</Typography>
@@ -47,8 +47,8 @@ export function StatGrid({ children, columns = 4 }: { children: ReactNode; colum
 
 export function PageHeader({ title, subtitle, action, badge, titleHint }: { title: string; subtitle?: string; action?: ReactNode; badge?: ReactNode; titleHint?: string }) {
   return <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', alignItems: { sm: 'flex-start' }, mb: 3 }}>
-    <Box>{titleHint ? <Tooltip title={titleHint} placement="right"><Typography variant="h4" component="h1" sx={{ overflowWrap: 'anywhere', display: 'inline-block', cursor: 'help' }}>{title}</Typography></Tooltip>
-      : <Typography variant="h4" component="h1" sx={{ overflowWrap: 'anywhere', position: 'relative', display: 'inline-block', pr: badge ? 2.5 : 0 }}>{title}{badge && <Box sx={{ position: 'absolute', top: 6, right: 0 }}>{badge}</Box>}</Typography>}
+    <Box>{titleHint ? <Tooltip title={titleHint} placement="right"><Typography variant="h4" component="h1" className={title.includes('@') ? 'keep-case' : undefined} sx={{ overflowWrap: 'anywhere', display: 'inline-block', cursor: 'help' }}>{title}</Typography></Tooltip>
+      : <Typography variant="h4" component="h1" className={title.includes('@') ? 'keep-case' : undefined} sx={{ overflowWrap: 'anywhere', position: 'relative', display: 'inline-block', pr: badge ? 2.5 : 0 }}>{title}{badge && <Box sx={{ position: 'absolute', top: 6, right: 0 }}>{badge}</Box>}</Typography>}
       {subtitle && <Typography color="text.secondary" sx={{ mt: 0.5 }}>{subtitle}</Typography>}</Box>
     {action}
   </Stack>;

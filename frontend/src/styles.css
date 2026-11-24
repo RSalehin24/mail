@@ -70,3 +70,9 @@ html { scrollbar-gutter: stable; }
 .mailbox-table th, .mailbox-table td { text-align: center; }
 .mailbox-table td > .MuiStack-root, .mailbox-table th > .MuiStack-root { align-items: center; justify-content: center; }
 .mailbox-table th .MuiButton-root { margin-inline: auto; }
+
+/* Titles are Title Case; a title that holds a mailbox address keeps the address as it is. */
+h1, h2, h3, h4, h5, h6, .MuiTab-root, .mailbox-table th, .stat-label { text-transform: capitalize !important; }
+.keep-case { text-transform: none !important; }
+/* No info icon in info boxes (owner); warnings and errors keep theirs. */
+.MuiAlert-standardInfo .MuiAlert-icon { display: none; }
