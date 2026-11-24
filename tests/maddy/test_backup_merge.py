@@ -261,7 +261,8 @@ class BackupMergeTests(unittest.TestCase):
         self.assertEqual(scene.control.job(jobid)["state"], "complete")
         for key in self.referenced(scene, keys):
             self.assertTrue((scene.fixture.data / "messages" / key).exists())
-        scene.worker.create_logins({MISSING: "new missing mailbox password 2026"})
+        with patch("host.backup_control.DockerMaddy", return_value=scene.fixture.maddy):
+            scene.worker.create_logins({MISSING: "new missing mailbox password 2026"})
         with imap_login(scene.fixture, MISSING, "new missing mailbox password 2026") as connection:
             self.assertIn(b"backup-mail-", bodies(connection))
 
