@@ -4,7 +4,7 @@ Updated 2026-11-21 (after the UI, notification mail, OS update and cleanup work)
 
 ## Current state (production, healthy)
 - One VM `rsalehin24-mail` (us-east1-c), STANDARD-tier ephemeral IP (now 35.211.40.80; the boot service `mail-admin-dns-update` fixes the `mail.rsalehin24.me` A record, proven by a real IP change). Firewall: 25, 587, 993, 443 and key-only SSH; $0.01 budget alert `zero-cost-guard`.
-- One compose project in `/opt/mail-admin`: `maddy` and `mail-admin` (image `mail-admin:stage24`, see D-118 and D-119; rollbacks `rollback-v24.sh` to stage23 and `rollback-v23.sh` to stage22), both uid 10001 with all capabilities dropped. The dashboard runs the host operations in-process; no root helper.
+- One compose project in `/opt/mail-admin`: `maddy` and `mail-admin` (image `mail-admin:stage26`, see D-118 to D-126; rollback `rollback-v26.sh` to stage25, `rollback-v25.sh` to stage24), both uid 10001 with all capabilities dropped. The dashboard runs the host operations in-process; no root helper.
 - Maddy issues and renews its own Let's Encrypt certificate (DNS-01 through Cloudflare, store `/opt/maddy/data/acme`, valid until 2027-02-19); the dashboard reads the same files and restarts when they change. Certbot is gone.
 - Root workers (systemd units, see RUNBOOK): backup 03:00 Asia/Dhaka (Restic to R2), backup-control, recovery, forwarding, monitors, Maddy restart, DNS update. The backup pause marker is `/var/lib/mail-admin-helper/consumers.json`.
 - Backups: latest verified 2026-11-21T15:32 UTC with 9 accounts; a restore into a scratch folder and a blank-VM rebuild from a snapshot were rehearsed (RUNBOOK).
