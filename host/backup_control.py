@@ -453,11 +453,20 @@ class BackupWorker:
         if original["kind"] != "restore":
             return False
         keys = json.loads(plan[0]) if plan else []
-        if self.merged_keys(keys):
+        if self.merged_keys(keys) if keys else self.merged_mailboxes(original):
             self.finish_import(original, keys)
             return True
         self.discard_staged(keys)
         return False
+
+    def merged_mailboxes(self, original: dict[str, Any]) -> bool:
+        """Without staged bodies (empty mailboxes only) the recreated accounts are the proof."""
+        missing = self.control.job(original["payload"]["previous"])["result"]["missing"]
+        with connect(self.live_data() / "imapsql.db") as live:
+            return any(
+                live.execute("SELECT 1 FROM users WHERE username=?", (email,)).fetchone()
+                for email in missing
+            )
 
     def merged_keys(self, keys: list[str]) -> bool:
         with connect(self.live_data() / "imapsql.db") as live:

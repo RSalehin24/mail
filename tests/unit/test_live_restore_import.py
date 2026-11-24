@@ -30,7 +30,12 @@ class LiveRestoreImportTests(unittest.TestCase):
         self.data = self.root / "data"
         (self.data / "messages").mkdir(parents=True)
         self.live = self.data / "imapsql.db"
-        execute(self.live, "PRAGMA journal_mode=WAL", "CREATE TABLE extKeys(id TEXT PRIMARY KEY)")
+        execute(
+            self.live,
+            "PRAGMA journal_mode=WAL",
+            "CREATE TABLE extKeys(id TEXT PRIMARY KEY)",
+            "CREATE TABLE users(id INTEGER PRIMARY KEY,username TEXT)",
+        )
         self.dashboard = self.root / "dashboard" / "admin_data.db"
         self.dashboard.parent.mkdir()
         execute(
@@ -152,6 +157,13 @@ class LiveRestoreImportTests(unittest.TestCase):
         self.assertEqual(self.count(self.control.path, "backup_imports"), 0)
         self.assertEqual(self.count(self.dashboard, "mailboxes"), 0)
         self.assertEqual(list((self.data / "messages").iterdir()), [unrelated])
+
+    def test_a_recreated_empty_mailbox_proves_the_merge_committed_without_any_body_keys(self):
+        self.plan([])
+        execute(self.live, f"INSERT INTO users(username) VALUES('{EMAIL}')")
+        self.assertTrue(self.worker.import_committed(self.original))
+        self.assertEqual(self.count(self.control.path, "backup_imports"), 1)
+        self.assertEqual(self.count(self.dashboard, "mailboxes"), 1)
 
     def test_a_restore_that_never_staged_anything_is_not_committed(self):
         self.assertFalse(self.worker.import_committed(self.original))
