@@ -1,10 +1,12 @@
-"""Restricted provider synchronization with durable rollback before restarting Maddy."""
+"""Restricted provider synchronization with durable rollback.
+
+Replacing the relay include is what makes Maddy reload: the container launcher watches /data and
+sends SIGUSR2, so there is no restart step; a failed reload keeps the old server running."""
 
 import hashlib
 import os
 import sqlite3
 import tempfile
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
@@ -33,10 +35,6 @@ class ConfigVerifier(Protocol):
     def verify(self) -> bool: ...
 
 
-class MaddyRestarter(Protocol):
-    def restart(self) -> None: ...
-
-
 class DockerVerifier:
     def verify(self) -> bool:
         return cli_succeeded(execute(Command((
@@ -44,42 +42,11 @@ class DockerVerifier:
             "-config", "/data/maddy.conf", "verify-config"), timeout=3)))
 
 
-class DockerRestarter:
-    """Reloads Maddy in place with SIGUSR2: it starts a new server on the new configuration and
-    stops the old one only afterwards, so mail keeps flowing and the container never restarts."""
-
-    RELOADED = "old server stopped"
-    RELOAD_WAIT_SECONDS = 10.0
-
-    def __init__(self, verifier: ConfigVerifier | None = None, container: str = "maddy") -> None:
-        self.verifier = verifier or DockerVerifier()
-        self.container = container
-
-    def restart(self) -> None:
-        started = int(time.time())
-        result = execute(Command(
-            ("/usr/bin/docker", "kill", "--signal", "USR2", self.container), timeout=15))
-        if result.code:
-            raise ServiceError("submission_restart_failed", 503)
-        deadline = time.monotonic() + self.RELOAD_WAIT_SECONDS
-        while time.monotonic() < deadline:
-            if self._reloaded(started) and self.verifier.verify():
-                return
-            time.sleep(0.2)
-        raise ServiceError("submission_restart_failed", 503)
-
-    def _reloaded(self, since: int) -> bool:
-        logs = execute(Command(
-            ("/usr/bin/docker", "logs", "--since", str(since), self.container), timeout=10))
-        return self.RELOADED in logs.output
-
-
 @dataclass(frozen=True)
 class RelayActions:
-    """The two actions that need the Maddy container; the root helper uses Docker for both."""
+    """The one action that needs the Maddy container; the root helper uses Docker for it."""
 
     verifier: ConfigVerifier = field(default_factory=DockerVerifier)
-    restarter: MaddyRestarter = field(default_factory=DockerRestarter)
 
 
 class SubmissionControl:
@@ -112,14 +79,18 @@ class SubmissionControl:
                              == pending["sha256"])
         if not committed:
             write_configuration(self.path, protected_bytes(self.rollback, self.owner))
-            self.restart()
         self.rollback.unlink()
         sync_directory(self.path.parent)
         self.pending.unlink(missing_ok=True)
         sync_directory(self.path.parent)
 
-    def restart(self) -> None:
-        self.actions.restarter.restart()
+    def _restore(self, previous: bytes) -> None:
+        # Writing the include makes Maddy reload on it; a rejected candidate never replaced the
+        # running server, so this only has to put the file back.
+        try:
+            write_configuration(self.path, previous)
+        except OSError as error:
+            raise ServiceError("submission_rollback_failed", 503) from error
 
     def synchronize(self, values: dict[str, Any]) -> dict[str, Any]:
         self.reconcile()
@@ -136,13 +107,8 @@ class SubmissionControl:
             write_configuration(self.path, candidate)
             if not self.actions.verifier.verify():
                 raise ServiceError("submission_configuration_invalid", 503)
-            self.restart()
         except (OSError, ServiceError) as error:
-            write_configuration(self.path, previous)
-            try:
-                self.restart()
-            except (OSError, ServiceError) as rollback_error:
-                raise ServiceError("submission_rollback_failed", 503) from rollback_error
+            self._restore(previous)
             self.pending.unlink(missing_ok=True)
             self.rollback.unlink()
             sync_directory(self.path.parent)

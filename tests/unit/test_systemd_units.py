@@ -13,22 +13,12 @@ def unit(name):
     return parser
 
 
-class MaddyRestartUnitTests(unittest.TestCase):
-    """The restart worker is request-file driven only; there is no fallback timer."""
+class MaddyReloadTests(unittest.TestCase):
+    """Maddy reloads itself from the container launcher; no host worker exists."""
 
-    def test_request_file_starts_a_hardened_oneshot_that_needs_docker(self):
-        path = unit("mail-admin-maddy-restart.path")
-        self.assertEqual(path["Path"]["PathChanged"], f"{HELPER_STATE}/maddy-restart.request.json")
-        self.assertEqual(path["Path"]["Unit"], "mail-admin-maddy-restart.service")
-        self.assertEqual(path["Install"]["WantedBy"], "paths.target")
-        service = unit("mail-admin-maddy-restart.service")
-        self.assertEqual(service["Service"]["Type"], "oneshot")
-        self.assertEqual(service["Unit"]["Requires"], "docker.service")
-        self.assertEqual(service["Service"]["ExecStart"],
-                         "/usr/bin/python3 -m host.maddy_restart")
-        self.assertIn(HELPER_STATE, service["Service"]["ReadWritePaths"].split())
-        self.assertEqual(service["Service"]["ProtectSystem"], "strict")
-        self.assertEqual(service["Service"]["NoNewPrivileges"], "true")
+    def test_the_restart_worker_units_are_gone(self):
+        for suffix in ("path", "service"):
+            self.assertFalse((UNITS / f"mail-admin-maddy-restart.{suffix}").exists(), suffix)
 
 
 class BackupUnitTests(unittest.TestCase):

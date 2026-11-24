@@ -32,7 +32,7 @@ class HostLocations:
     state: Path = Path("/var/lib/mail-admin-helper")
     lock: Path = Path("/run/lock/mail-admin-maddy.lock")
     owner: int = 0
-    relay: RelayActions | None = None  # None: the root helper's Docker verify and restart
+    relay: RelayActions | None = None  # None: the root helper's Docker verify
     deletion: DeletionPaths = field(default_factory=lambda: DeletionPaths(
         DEPLOYMENT_RECORD, Path("/etc/mail-admin/helper-policy.json"),
         Path("/var/lib/mail-admin-backup/manifest.json"),

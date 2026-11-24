@@ -1,9 +1,0 @@
-[Unit]
-Description=Start the Maddy restart worker when the dashboard files a request
-
-[Path]
-PathChanged=/var/lib/mail-admin-helper/maddy-restart.request.json
-Unit=mail-admin-maddy-restart.service
-
-[Install]
-WantedBy=paths.target

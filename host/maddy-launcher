@@ -1,4 +1,18 @@
 #!/bin/sh
 set -eu
 umask 0077
+
+# Handler mode: inotifyd runs this same script with EVENT DIR NAME for each event it watches.
+# Only the relay include being moved into place reloads Maddy; SIGUSR2 starts a new server on the
+# new configuration and stops the old one afterwards (SIGHUP would stop Maddy, never use it).
+if [ -n "${MAIL_ADMIN_RELOAD:-}" ]; then
+    [ "${3:-}" = submission-relay.conf ] && kill -USR2 1
+    exit 0
+fi
+
+# Watch the directory, not the file: the dashboard replaces the include with os.replace, which
+# would orphan a file watch. Event "y" (moved-to) only: Maddy's databases write in /data
+# constantly, so write/close events would reload it in a loop. The variable is set for the
+# watcher alone, so the exec'd Maddy never sees it.
+MAIL_ADMIN_RELOAD=1 inotifyd "$0" /data:y &
 exec /bin/maddy "$@"
