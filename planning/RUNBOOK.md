@@ -63,3 +63,6 @@ Stop the VM, `gcloud compute instances delete-access-config` then `add-access-co
 ## One state database (D-085)
 - `/var/lib/mail-admin-helper/state.db` holds the journal, recovery records and forwarding rules (it replaced `journal.db`, `recovery.db`, `forwarding.db`, kept as `*.migrated`). `backup-control.db` and the dashboard's `admin_data.db` are separate.
 - Rollback: `sudo /root/cutover-20261121/rollback-v20.sh` (stops the dashboard, moves `state.db` aside as `state.db.rolledback`, renames the `.migrated` files back, restores the previous library and units and starts image `stage18`; anything written to `state.db` after the upgrade is lost). Remove the `.migrated` copies by hand only after the new version has been stable for a while.
+
+## Relay changes and Maddy (D-087)
+- Saving the relay in the dashboard makes the root worker `mail-admin-maddy-restart` reload Maddy in place (`docker kill --signal USR2 maddy`); the container does not restart and mail keeps flowing. To reload by hand: `sudo docker kill --signal USR2 maddy`, then `docker logs --since 1m maddy | grep "old server stopped"`. SIGHUP stops Maddy: never use it for a reload.

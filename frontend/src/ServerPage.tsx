@@ -102,7 +102,6 @@ export function ServerPage() {
         {(['maddy', 'mail-admin'] as const).map(name => { const consumer = certificate?.consumers?.[name]; const expiry = consumer?.served_expiry ?? (consumer?.served_sha256 && consumer.served_sha256 === certificate?.served_sha256 ? certificate.expiry : undefined); return <Observation key={name} title={name === 'maddy' ? 'IMAP Certificate' : 'HTTPS Certificate'} value={expiry ? `Expires ${formatDate(expiry)}` : 'Certificate unavailable'} at={certificate?.observed_at} now={now} maxAge={600}>
           {consumer?.reason && <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 1 }}>Verify the endpoint and certificate chain: {consumer.reason.replaceAll('_', ' ')}.</Typography>}
         </Observation>; })}
-        <Observation title="Renewal Record" value={label(certificate?.outcome)} at={certificate?.renewal_observed_at} now={now}/>
         {!certificate?.consumers && <Alert severity="info">Run the certificate monitor to record served certificates.</Alert>}
       </Stack></Panel>
       <Panel title="Backup and Recovery"><Stack spacing={2}>
@@ -110,7 +109,6 @@ export function ServerPage() {
           {backup?.cutoff && <Box sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 1.5, mt: 1.5 }}><Typography variant="caption" color="text.secondary">Recovery cutoff</Typography><Typography variant="body2" sx={{ mt: .5 }}>{formatDateTime(backup.cutoff)}</Typography></Box>}
         </Observation>
         <Observation title="Archive Availability" value={backup?.available ? 'Last check passed' : 'Not available'} at={backup?.availability_observed_at} now={now} maxAge={host?.thresholds?.recovery_point_seconds ?? 300}/>
-        <Observation title="Full-Server Recovery Test" value={backup?.restore_passed ? 'Passed for this backup' : 'Not recorded for this backup'} now={now}/>
         {!backup?.verified && <Alert severity="info">Run backup verification to record a verified backup.</Alert>}
         {backup?.cutoff && host?.thresholds?.recovery_point_seconds !== undefined && now / 1000 - Date.parse(backup.cutoff) / 1000 > host.thresholds.recovery_point_seconds && <Alert severity="warning">The backup cutoff exceeds the configured limit. Run and verify a fresh backup.</Alert>}
       </Stack></Panel>

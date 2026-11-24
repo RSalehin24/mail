@@ -23,7 +23,7 @@ Updated 2026-11-21 (after the UI, notification mail, OS update and cleanup work)
 - Checks on main: lint, typecheck, reads, unit 413, integration 93, all 29 real-Maddy modules and the runtime suite, `make browser` (`MAIL_ADMIN_CHROME=/usr/bin/google-chrome-stable`).
 
 ## Also done 2026-11-23/24 (D-080 to D-085)
-- Forwarding applied by the dashboard (no 30 s timer), orphan-key backup fix, incident restore (D-081), live backup capture (D-083), backup and restore as VM commands (D-084), one state database (D-085). Image `mail-admin:stage20`; rollbacks `/root/cutover-20261121/rollback-v13.sh` to `-v20.sh`.
+- Forwarding applied by the dashboard (no 30 s timer), orphan-key backup fix, incident restore (D-081), live backup capture (D-083), backup and restore as VM commands (D-084), one state database (D-085). Image `mail-admin:stage21` (D-087: relay reload in place, stale Server cards removed); rollbacks `/root/cutover-20261121/rollback-v13.sh` to `-v21.sh`.
 - Checks on main: lint, typecheck, reads, unit 452, integration 94, all 27 real-Maddy modules and the runtime suite, `make browser` (`MAIL_ADMIN_CHROME=/usr/bin/google-chrome-stable`).
 - Remaining scheduled units: backup (daily), recovery expiry (daily), monitor, independent monitor, TLS observation. Nothing polls.
 

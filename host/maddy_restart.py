@@ -1,4 +1,4 @@
-"""Root worker: restart Maddy when the dashboard files a validated request."""
+"""Root worker: reload Maddy (no restart) when the dashboard files a validated request."""
 
 import logging
 import os
@@ -39,7 +39,7 @@ def restart_succeeded() -> bool:
     try:
         DockerRestarter().restart()
     except (OSError, ServiceError):
-        log.exception("Maddy restart failed")
+        log.exception("Maddy reload failed")
         return False
     return True
 

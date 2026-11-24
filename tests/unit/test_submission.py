@@ -95,3 +95,43 @@ class SubmissionControlTests(unittest.TestCase):
             self.assertEqual(control.path.read_bytes(), b'committed configuration')
             self.assertFalse(control.pending.exists())
             restart.assert_not_called()
+
+
+class DockerReloadTests(unittest.TestCase):
+    """Relay changes reload Maddy in place; the container is never restarted."""
+
+    def reload_with(self, logs, verified=True):
+        from helper.submission import DockerRestarter
+
+        calls = []
+
+        def execute(command):
+            calls.append(command.arguments[1:])
+            return CommandResult(0, logs if command.arguments[1] == "logs" else "")
+
+        verifier = type("Verifier", (), {"verify": lambda self: verified})()
+        restarter = DockerRestarter(verifier)
+        restarter.RELOAD_WAIT_SECONDS = 0.5
+        with patch("helper.submission.execute", side_effect=execute):
+            restarter.restart()
+        return calls
+
+    def test_the_signal_is_sent_and_success_needs_the_old_server_to_stop(self):
+        calls = self.reload_with("reloading server...\nold server stopped\n")
+        self.assertEqual(calls[0], ("kill", "--signal", "USR2", "maddy"))
+        self.assertNotIn("restart", [call[0] for call in calls])
+
+    def test_a_reload_that_never_finishes_is_a_failure(self):
+        with self.assertRaisesRegex(ServiceError, "submission_restart_failed"):
+            self.reload_with("reloading server...\n")
+
+    def test_a_configuration_that_does_not_verify_is_a_failure(self):
+        with self.assertRaisesRegex(ServiceError, "submission_restart_failed"):
+            self.reload_with("old server stopped\n", verified=False)
+
+    def test_a_failed_signal_is_a_failure(self):
+        from helper.submission import DockerRestarter
+
+        with patch("helper.submission.execute", return_value=CommandResult(1, "")), \
+                self.assertRaisesRegex(ServiceError, "submission_restart_failed"):
+            DockerRestarter().restart()

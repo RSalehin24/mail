@@ -45,22 +45,33 @@ class DockerVerifier:
 
 
 class DockerRestarter:
-    """Restarts the container, then waits until the configuration verifies again."""
+    """Reloads Maddy in place with SIGUSR2: it starts a new server on the new configuration and
+    stops the old one only afterwards, so mail keeps flowing and the container never restarts."""
 
-    def __init__(self, verifier: ConfigVerifier | None = None) -> None:
+    RELOADED = "old server stopped"
+    RELOAD_WAIT_SECONDS = 10.0
+
+    def __init__(self, verifier: ConfigVerifier | None = None, container: str = "maddy") -> None:
         self.verifier = verifier or DockerVerifier()
+        self.container = container
 
     def restart(self) -> None:
-        result = execute(Command(("/usr/bin/docker", "restart", "--time", "1", "maddy"),
-                                 timeout=15))
+        started = int(time.time())
+        result = execute(Command(
+            ("/usr/bin/docker", "kill", "--signal", "USR2", self.container), timeout=15))
         if result.code:
             raise ServiceError("submission_restart_failed", 503)
-        deadline = time.monotonic() + 5
+        deadline = time.monotonic() + self.RELOAD_WAIT_SECONDS
         while time.monotonic() < deadline:
-            if self.verifier.verify():
+            if self._reloaded(started) and self.verifier.verify():
                 return
-            time.sleep(0.1)
+            time.sleep(0.2)
         raise ServiceError("submission_restart_failed", 503)
+
+    def _reloaded(self, since: int) -> bool:
+        logs = execute(Command(
+            ("/usr/bin/docker", "logs", "--since", str(since), self.container), timeout=10))
+        return self.RELOADED in logs.output
 
 
 @dataclass(frozen=True)
