@@ -266,7 +266,7 @@ async function relayFlows(connection, fixture) {
   await connection.until(`[...document.querySelectorAll('dt')].some(term => term.textContent === 'Saved revision' && term.nextElementSibling?.textContent === '1')`);
   assert.equal(await connection.read(`document.querySelector('input[autocomplete="new-password"]').value`), '');
   await connection.click({ tag: 'button', name: 'Test connection' });
-  await connection.until(`document.body.textContent.includes('Connection only · no email sent')`);
+  await connection.until(`document.body.textContent.includes('Connection only') && document.querySelector('[aria-label*="No email was sent"]') !== null`);
   assert.equal(await connection.read(`document.body.textContent.includes('Administrator email delivery needs verification')`), true);
   await connection.click({ tag: 'button', name: 'Refresh provider credits' });
   await connection.until(`document.body.textContent.includes('No API key configured')`);
@@ -289,6 +289,7 @@ async function verificationFlows(connection) {
   await connection.click({ tag: 'button', name: 'Settings' });
   await connection.click({ tag: 'button', name: 'Outgoing mail provider' });
   await connection.until(`document.body.textContent.includes('Administrator email delivery needs verification')`);
+  await connection.until(`[...document.querySelectorAll('section h2')].some(heading => heading.textContent === 'Delivery tests')`);
 }
 
 async function securityAndServer(connection) {
@@ -441,6 +442,8 @@ async function forwardingAndEmailSettings(connection) {
   await connection.until(`[...document.querySelectorAll('button')].some(button => button.textContent === 'Send explicit delivery test' && !button.disabled && !button.closest('fieldset')?.disabled)`);
   await connection.click({tag:'button',name:'Send explicit delivery test'});
   await connection.until(`[...document.querySelectorAll('button')].some(button => button.textContent === 'I received this test')`);
+  assert.ok(await connection.read(`document.querySelectorAll('section .desktop-table tbody tr').length >= 1 && document.querySelectorAll('section .desktop-table tbody tr').length <= 3`), 'The delivery tests card shows at most the last three');
+  await connection.screenshot('delivery-tests');
   await connection.read(`[...document.querySelectorAll('button')].find(button => button.textContent === 'I received this test').click()`);
   await connection.click({tag:'button',name:'Security'});
   await connection.until(`document.body.textContent.includes('Email delivery verified')`);

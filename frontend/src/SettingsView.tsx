@@ -1,15 +1,18 @@
-import { formatDateTime } from './format';
+import { formatDate, formatTime } from './format';
 import { useEffect, useState } from 'react';
-import { Alert, Box, Button, Paper, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Paper, Stack, Tab, Tabs, TextField, Tooltip, Typography } from '@mui/material';
 import { api, cached, type Authorize, type Notify, type RelaySettings } from './api';
 import { SecuritySettings } from './SecuritySettings';
-import { InfoList, StatusDot } from './ui';
+import { AdminTable } from './AdminTable';
+import { InfoList, Section, StatusBadge, StatusDot } from './ui';
 
 interface Props { authorize: Authorize; notify: Notify; onRevoked: (codes: string[]) => void }
 
 import { useDeliveryHistory } from './DeliveryHistoryPagination';
 import { navigate } from './navigation';
 
+
+const RECENT_TESTS = 3;
 
 export function SettingsView({ authorize, notify, onRevoked }: Props) {
   const names = ['security', 'outgoing'];
@@ -44,6 +47,7 @@ function OutgoingSettings({ authorize, notify }: Pick<Props, 'authorize' | 'noti
   }
   useEffect(() => { void load(); }, []);
   const delivery = useDeliveryHistory('mail@rsalehin24.me', JSON.stringify(relay?.tests));
+  const recent = delivery.rows.slice(0, RECENT_TESTS);
   return <Stack spacing={3}>
     {error && <Alert severity="error">{error}</Alert>}
     {!relay && error && <Button onClick={() => { setError(''); void load(); }}>Retry relay settings</Button>}
@@ -81,17 +85,20 @@ function OutgoingSettings({ authorize, notify }: Pick<Props, 'authorize' | 'noti
           notify(result.smtp_accepted ? 'Test accepted by SMTP. Confirm the matching message below after receipt.' : 'SMTP delivery test failed.'); await load();
         })}>Send explicit delivery test</Button>
       </Stack>
-      {!!relay?.tests.filter(test => test.sender === 'mail@rsalehin24.me').length && <Typography variant="subtitle2">Administrator delivery history</Typography>}
-      {delivery.rows.map(test => <Box key={test.id} sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
-        <Typography variant="body2">From {test.sender} · {formatDateTime(test.created)}</Typography>
-        <Typography variant="caption" sx={{ overflowWrap: 'anywhere' }}>Test {test.id}</Typography>
-        <Typography variant="body2">{test.confirmed ? 'Receipt confirmed' : test.accepted ? 'SMTP accepted · receipt unconfirmed' : test.connection_ok ? 'Connection only · no email sent' : 'Failed'}</Typography>
-        {!!test.accepted && !test.confirmed && test.revision === relay?.revision && <Button onClick={() => authorize(async () => {
-          await api(`/relay-tests/${test.id}/confirm`, {}); await load(); notify('Matching delivery receipt recorded');
-        })}>I received this test</Button>}
-      </Box>)}
-      {delivery.error && <Alert severity="error">{delivery.error}</Alert>}
-      {delivery.controls}
     </Stack></Paper>
+    {delivery.error && <Alert severity="error">{delivery.error}</Alert>}
+    <Section title="Delivery tests">
+      <AdminTable widths={['22%', '22%', '56%']} columns={['Date', 'Time', 'Result']} empty="No tests yet." rows={recent.map(test => {
+        const outcome = test.confirmed ? { tone: 'success' as const, label: 'Receipt confirmed', hint: '' } : test.accepted ? { tone: 'warning' as const, label: 'Awaiting receipt', hint: '' }
+          : test.connection_ok ? { tone: 'neutral' as const, label: 'Connection only', hint: 'No email was sent.' } : { tone: 'error' as const, label: 'Failed', hint: '' };
+        return { key: test.id, cells: [formatDate(test.created), formatTime(test.created),
+          <Stack key="result" direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+            <Tooltip title={[outcome.hint, `Test ${test.id}`].filter(Boolean).join(' ')} placement="bottom"><Box tabIndex={0} sx={{ cursor: 'help' }}><StatusBadge tone={outcome.tone} label={outcome.label}/></Box></Tooltip>
+            {!!test.accepted && !test.confirmed && test.revision === relay?.revision && <Button size="small" variant="outlined" onClick={() => authorize(async () => {
+              await api(`/relay-tests/${test.id}/confirm`, {}); await load(); notify('Matching delivery receipt recorded');
+            })}>I received this test</Button>}
+          </Stack>] };
+      })}/>
+    </Section>
   </Stack>;
 }
