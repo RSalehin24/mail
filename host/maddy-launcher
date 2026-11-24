@@ -14,5 +14,9 @@ fi
 # would orphan a file watch. Event "y" (moved-to) only: Maddy's databases write in /data
 # constantly, so write/close events would reload it in a loop. The variable is set for the
 # watcher alone, so the exec'd Maddy never sees it.
-MAIL_ADMIN_RELOAD=1 inotifyd "$0" /data:y &
+# Only the container's main process starts it: the root tools run Maddy CLI commands through this
+# same script with "docker exec", and each of those would otherwise leave a watcher behind.
+if [ "$$" -eq 1 ]; then
+    MAIL_ADMIN_RELOAD=1 inotifyd "$0" /data:y &
+fi
 exec /bin/maddy "$@"

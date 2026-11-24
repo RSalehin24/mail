@@ -42,6 +42,12 @@ class MaddySelfReloadTests(unittest.TestCase):
             time.sleep(0.2)
         self.fail(f"Maddy did not reload {count} time(s) within {WAIT_SECONDS} s")
 
+    def test_maddy_cli_calls_do_not_leave_extra_watchers_behind(self):
+        for _ in range(3):
+            self.assertEqual(self.fixture.maddy.change(("version",)).code, 0)
+        listing = self.fixture.command(("exec", self.fixture.identifier, "ps", "-o", "args")).stdout
+        self.assertEqual(listing.count("inotifyd"), 1)
+
     def test_the_relay_include_reloads_maddy_without_restarting_the_container(self):
         before = self.started_at()
         self.replace("submission-relay.conf")
