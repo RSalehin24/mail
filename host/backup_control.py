@@ -37,11 +37,11 @@ from shared.validation import address
 
 STAGING = Path("/var/lib/mail-admin-backup/restore-ui")
 WORKER_LOCK_WAIT_SECONDS = 5
+LIVE_WRITE_WAIT_SECONDS = 5.0
 # After these phases the live data may already have changed, so a failure needs reconciling.
 UNCERTAIN_PHASES = {
     "backup_capture",
     "live_import",
-    "resuming_mail",
     "creating_logins",
     "post_restore_backup",
 }
@@ -244,13 +244,16 @@ class BackupWorker:
             if not cli_succeeded(maddy.change(("creds", "create", email), passwords[email])):
                 raise ServiceError("credentials_create_failed", 503)
 
+    def live_data(self) -> Path:
+        return Path(self.context.deployment["maddy_data_directory"])
+
+    def dashboard_database(self) -> Path:
+        return Path(self.context.deployment["backup_sources"]["dashboard"]) / "admin_data.db"
+
     def import_live(
         self, job: dict[str, Any], target: Path, safety: dict[str, Any]
     ) -> dict[str, Any]:
-        from host.backup_merge import merge_rows
-
-        data = Path(self.context.deployment["maddy_data_directory"])
-        bodies = data / "messages"
+        data = self.live_data()
         maddy = DockerMaddy(self.context.deployment)
         maddy.validate()
         inventory = maddy.inventories()
@@ -258,139 +261,28 @@ class BackupWorker:
         missing, needs_login = login_plan(set(prepared["mailboxes"]), inventory)
         if (missing, needs_login) != (set(prepared["missing"]), set(prepared["needs_login"])):
             raise ServiceError("mailbox_inventory_changed", 409)
-        journal = self.context.coordination.journal
-        journal.synchronize(inventory, time.time())
+        self.context.coordination.journal.synchronize(inventory, time.time())
         with connect(target / "maddy/imapsql.db") as source:
             original_keys = linked_body_keys(source)
         keys = {key: str(uuid.uuid5(uuid.UUID(job["id"]), key)) for key in original_keys}
         size = sum(
             body_path(target / "maddy/messages", key).stat().st_size for key in original_keys
         )
-        if shutil.disk_usage(bodies).free < size * 8 + 1024**3:
+        if shutil.disk_usage(data / "messages").free < size * 8 + 1024**3:
             raise ServiceError("insufficient_restore_space", 409)
-        writers = DockerSnapshots(
-            (Docker(timeout=30), maddy, self.context.intents), startup_timeout=30
-        )
-        with connect(data / "imapsql.db") as live:
-            live_keys = linked_body_keys(live)
-        live_size = sum(body_path(bodies, key).stat().st_size for key in live_keys)
-        database_bytes = sum(
-            path.stat().st_size
-            for path in (
-                data / "imapsql.db",
-                data / "credentials.db",
-                journal.path,
-                self.control.path,
-                Path(self.context.deployment["backup_sources"]["dashboard"]) / "admin_data.db",
-            )
-        )
-        if len(live_keys) + len(keys) > 2000 or live_size + size + database_bytes > 32 * 1024**2:
-            raise ServiceError("restore_maintenance_budget_exceeded", 409)
+        self.check_maintenance_budget(len(keys), size)
+        # Maddy keeps running: the mail rows join its WAL database in one ordinary write
+        # transaction, then the dashboard bookkeeping commits separately. A crash between the
+        # two is settled by reconcile(), which recognizes the merge by its staged body keys.
         signal.alarm(480)
         self.phase(job, "live_import")
         try:
-            writers.pause(["maddy"])
-            metadata = bodies.stat()
-            with connect(data / "imapsql.db") as connection:
-                validate(connection)
-                for new in keys.values():
-                    if (
-                        (bodies / new).exists()
-                        or (bodies / new).is_symlink()
-                        or connection.execute(
-                            "SELECT 1 FROM extKeys WHERE id=?",
-                            (new,),
-                        ).fetchone()
-                    ):
-                        raise ServiceError("mailbox_import_body_conflict", 409)
-                with self.control.connect() as ledger:
-                    ledger.execute(
-                        "INSERT INTO backup_plans VALUES(?,?)",
-                        (job["id"], json.dumps(list(keys.values()))),
-                    )
-                for old, new in keys.items():
-                    destination = bodies / new
-                    if (
-                        destination.exists()
-                        or destination.is_symlink()
-                        or connection.execute("SELECT 1 FROM extKeys WHERE id=?", (new,)).fetchone()
-                    ):
-                        raise ServiceError("mailbox_import_body_conflict", 409)
-                    with (
-                        body_path(target / "maddy/messages", old).open("rb") as reader,
-                        destination.open("xb") as writer,
-                    ):
-                        shutil.copyfileobj(reader, writer)
-                        writer.flush()
-                        os.fsync(writer.fileno())
-                    os.chown(destination, metadata.st_uid, metadata.st_gid)
-                    destination.chmod(0o600)
-                    with (
-                        destination.open("rb") as reader,
-                        body_path(target / "maddy/messages", old).open("rb") as original,
-                    ):
-                        if (
-                            hashlib.file_digest(reader, "sha256").digest()
-                            != hashlib.file_digest(original, "sha256").digest()
-                        ):
-                            raise ServiceError("mailbox_import_body_verification_failed", 503)
-                        os.fsync(reader.fileno())
-            sync_directory(bodies)
-            paths = {
-                "main": data / "imapsql.db",
-                "dashboard": Path(self.context.deployment["backup_sources"]["dashboard"])
-                / "admin_data.db",
-                "incarnations": journal.path,
-                "ledger": self.control.path,
-            }
-            with attached_transaction(paths) as connection:
-                count = merge_rows(
-                    connection, bodies, target / "maddy/imapsql.db", target / "maddy/messages", keys
-                )
-                with sqlite3.connect(
-                    (target / "dashboard/admin_data.db").as_uri() + "?mode=ro", uri=True
-                ) as source_metadata:
-                    source_metadata.row_factory = sqlite3.Row
-                    for email in sorted(missing):
-                        row = source_metadata.execute(
-                            "SELECT display_name,notes,created FROM mailboxes WHERE email=?",
-                            (email,),
-                        ).fetchone()
-                        if row is None:
-                            raise ServiceError("mailbox_metadata_missing", 409)
-                        connection.execute(
-                            "INSERT INTO dashboard.mailboxes"
-                            "(email,display_name,notes,created,updated,status) "
-                            "VALUES(?,?,?,?,?,'ready') ON CONFLICT(email) DO UPDATE SET "
-                            "display_name=excluded.display_name,notes=excluded.notes,"
-                            "created=excluded.created,updated=excluded.updated,status='ready'",
-                            (email, row["display_name"], row["notes"], row["created"], time.time()),
-                        )
-                        connection.execute(
-                            "INSERT INTO incarnations.incarnations VALUES(?,?,?,1) ON "
-                            "CONFLICT(email) DO UPDATE SET "
-                            "generation=excluded.generation,created=excluded.created,present=1",
-                            (email, job["id"], time.time()),
-                        )
-                connection.execute(
-                    "INSERT INTO ledger.backup_imports VALUES(?,?)", (job["id"], time.time())
-                )
-            # Only unreferenced files owned by this exact operation are disposable.
-            with connect(data / "imapsql.db") as connection:
-                for key in keys.values():
-                    if not connection.execute(
-                        "SELECT 1 FROM extKeys WHERE id=?", (key,)
-                    ).fetchone():
-                        (bodies / key).unlink()
-            sync_directory(bodies)
+            self.stage_bodies(job["id"], target, keys)
+            count = self.merge_live(target, keys)
+            self.record_import(job, missing, target)
+            self.remove_unreferenced(list(keys.values()))
         finally:
-            try:
-                self.phase(job, "resuming_mail")
-            finally:
-                try:
-                    writers.resume(["maddy"])
-                finally:
-                    signal.alarm(0)
+            signal.alarm(0)
         return {
             "messages_added": count,
             "recreated": sorted(missing),
@@ -398,61 +290,205 @@ class BackupWorker:
             "mode": "merge",
         }
 
+    def check_maintenance_budget(self, new_keys: int, new_size: int) -> None:
+        data = self.live_data()
+        with connect(data / "imapsql.db") as live:
+            live_keys = linked_body_keys(live)
+        live_size = sum(body_path(data / "messages", key).stat().st_size for key in live_keys)
+        database_bytes = sum(
+            path.stat().st_size
+            for path in (
+                data / "imapsql.db",
+                data / "credentials.db",
+                self.context.coordination.journal.path,
+                self.control.path,
+                self.dashboard_database(),
+            )
+        )
+        if len(live_keys) + new_keys > 2000 or live_size + new_size + database_bytes > 32 * 1024**2:
+            raise ServiceError("restore_maintenance_budget_exceeded", 409)
+
+    @staticmethod
+    def require_free_key(connection: sqlite3.Connection, bodies: Path, key: str) -> None:
+        if (
+            (bodies / key).exists()
+            or (bodies / key).is_symlink()
+            or connection.execute("SELECT 1 FROM extKeys WHERE id=?", (key,)).fetchone()
+        ):
+            raise ServiceError("mailbox_import_body_conflict", 409)
+
+    def stage_bodies(self, job_id: str, target: Path, keys: dict[str, str]) -> None:
+        """Copy the new body files durably; their planned names are recorded before any exists."""
+        data = self.live_data()
+        bodies = data / "messages"
+        metadata = bodies.stat()
+        with connect(data / "imapsql.db") as connection:
+            validate(connection)
+            for new in keys.values():
+                self.require_free_key(connection, bodies, new)
+            with self.control.connect() as ledger:
+                ledger.execute(
+                    "INSERT INTO backup_plans VALUES(?,?)",
+                    (job_id, json.dumps(list(keys.values()))),
+                )
+            for old, new in keys.items():
+                self.require_free_key(connection, bodies, new)
+                self.copy_body(body_path(target / "maddy/messages", old), bodies / new, metadata)
+        sync_directory(bodies)
+
+    @staticmethod
+    def copy_body(source: Path, destination: Path, metadata: os.stat_result) -> None:
+        with source.open("rb") as reader, destination.open("xb") as writer:
+            shutil.copyfileobj(reader, writer)
+            writer.flush()
+            os.fsync(writer.fileno())
+        os.chown(destination, metadata.st_uid, metadata.st_gid)
+        destination.chmod(0o600)
+        with destination.open("rb") as copied, source.open("rb") as original:
+            if (
+                hashlib.file_digest(copied, "sha256").digest()
+                != hashlib.file_digest(original, "sha256").digest()
+            ):
+                raise ServiceError("mailbox_import_body_verification_failed", 503)
+            os.fsync(copied.fileno())
+
+    def merge_live(self, target: Path, keys: dict[str, str]) -> int:
+        """Merge the backed-up mail into Maddy's live WAL store in one write transaction."""
+        from host.backup_merge import merge_rows
+
+        data = self.live_data()
+        with connect(data / "imapsql.db", LIVE_WRITE_WAIT_SECONDS) as live:
+            live.execute("BEGIN IMMEDIATE")
+            source = target / "maddy"
+            return merge_rows(
+                live, data / "messages", source / "imapsql.db", source / "messages", keys
+            )
+
+    def record_import(self, job: dict[str, Any], missing: set[str], target: Path) -> None:
+        """Commit the marker with the dashboard and incarnation rows; safe to repeat."""
+        paths = {
+            "main": self.control.path,
+            "dashboard": self.dashboard_database(),
+            "state": self.context.coordination.journal.path,
+        }
+        with attached_transaction(paths) as connection:
+            with sqlite3.connect(
+                (target / "dashboard/admin_data.db").as_uri() + "?mode=ro", uri=True
+            ) as source_metadata:
+                source_metadata.row_factory = sqlite3.Row
+                for email in sorted(missing):
+                    self.restore_mailbox_rows(connection, source_metadata, email, job["id"])
+            connection.execute(
+                "INSERT OR IGNORE INTO backup_imports VALUES(?,?)", (job["id"], time.time())
+            )
+
+    @staticmethod
+    def restore_mailbox_rows(
+        connection: sqlite3.Connection, source: sqlite3.Connection, email: str, generation: str
+    ) -> None:
+        row = source.execute(
+            "SELECT display_name,notes,created FROM mailboxes WHERE email=?", (email,)
+        ).fetchone()
+        if row is None:
+            raise ServiceError("mailbox_metadata_missing", 409)
+        connection.execute(
+            "INSERT INTO dashboard.mailboxes(email,display_name,notes,created,updated,status) "
+            "VALUES(?,?,?,?,?,'ready') ON CONFLICT(email) DO UPDATE SET "
+            "display_name=excluded.display_name,notes=excluded.notes,"
+            "created=excluded.created,updated=excluded.updated,status='ready'",
+            (email, row["display_name"], row["notes"], row["created"], time.time()),
+        )
+        connection.execute(
+            "INSERT INTO state.incarnations VALUES(?,?,?,1) ON "
+            "CONFLICT(email) DO UPDATE SET "
+            "generation=excluded.generation,created=excluded.created,present=1",
+            (email, generation, time.time()),
+        )
+
+    def remove_unreferenced(self, keys: list[str]) -> None:
+        """Only unreferenced files owned by this exact operation are disposable."""
+        bodies = self.live_data() / "messages"
+        with connect(self.live_data() / "imapsql.db") as live:
+            for key in keys:
+                if (bodies / key).is_symlink():
+                    raise ServiceError("mailbox_import_body_conflict", 409)
+                if not live.execute("SELECT 1 FROM extKeys WHERE id=?", (key,)).fetchone():
+                    (bodies / key).unlink(missing_ok=True)
+        sync_directory(bodies)
+
+    def resume_capture_consumers(self) -> None:
+        """A crashed safety backup can leave Maddy stopped for its capture; start it again."""
+        maddy = DockerMaddy(self.context.deployment)
+        writers = DockerSnapshots(
+            (Docker(timeout=30), maddy, self.context.intents), startup_timeout=30
+        )
+        state = self.context.intents.read()
+        for name, consumer in state["consumers"].items():
+            if consumer.get("reason") == "backup_capture":
+                if name == "maddy":
+                    observed = self.context.docker.inspect(name)
+                    if observed["Image"] != self.context.deployment["inputs"]["maddy_image_id"]:
+                        raise ServiceError("maddy_identity_mismatch", 503)
+                    mounts = {
+                        entry["Destination"]: entry["Source"] for entry in observed["Mounts"]
+                    }
+                    if mounts != maddy.expected_mounts():
+                        raise ServiceError("maddy_mount_mismatch", 503)
+                writers._start_existing(name)
+                writers._verify_resumed(name, consumer["served_sha256"])
+                consumer.update(intent="expected_running", state="active")
+                consumer.pop("reason", None)
+        self.context.intents.write(state)
+
+    def import_committed(self, original: dict[str, Any]) -> bool:
+        """Committed means the marker exists, or the merge reached Maddy's store (its body keys)."""
+        with self.control.connect() as ledger:
+            if ledger.execute(
+                "SELECT 1 FROM backup_imports WHERE id=?", (original["id"],)
+            ).fetchone():
+                return True
+            plan = ledger.execute(
+                "SELECT keys FROM backup_plans WHERE id=?", (original["id"],)
+            ).fetchone()
+        if original["kind"] != "restore":
+            return False
+        keys = json.loads(plan[0]) if plan else []
+        if self.merged_keys(keys):
+            self.finish_import(original, keys)
+            return True
+        self.discard_staged(keys)
+        return False
+
+    def merged_keys(self, keys: list[str]) -> bool:
+        with connect(self.live_data() / "imapsql.db") as live:
+            return any(
+                live.execute("SELECT 1 FROM extKeys WHERE id=?", (key,)).fetchone()
+                for key in keys
+            )
+
+    def finish_import(self, original: dict[str, Any], keys: list[str]) -> None:
+        """The mail merge committed but its marker did not: complete the bookkeeping."""
+        identifier = original["payload"]["previous"]
+        missing = set(self.control.job(identifier)["result"]["missing"])
+        self.record_import(original, missing, self.staging / identifier)
+        self.remove_unreferenced(keys)
+
+    def discard_staged(self, keys: list[str]) -> None:
+        """Nothing merged, so the staged files are unreferenced leftovers of this operation."""
+        bodies = self.live_data() / "messages"
+        for key in keys:
+            if (bodies / key).is_symlink():
+                raise ServiceError("mailbox_import_body_conflict", 409)
+            (bodies / key).unlink(missing_ok=True)
+        sync_directory(bodies)
+
     def reconcile(self, job: dict[str, Any]) -> dict[str, Any]:
         original = self.control.job(job["payload"]["previous"], private=True)
         with HostLock(BACKUP_LOCK, self.context.coordination.locks.policy):
             self.repository.process.reconcile()
             with self.context.coordination.consistent():
-                maddy = DockerMaddy(self.context.deployment)
-                writers = DockerSnapshots(
-                    (Docker(timeout=30), maddy, self.context.intents), startup_timeout=30
-                )
-                state = self.context.intents.read()
-                for name, consumer in state["consumers"].items():
-                    if consumer.get("reason") == "backup_capture":
-                        if name == "maddy":
-                            observed = self.context.docker.inspect(name)
-                            if (
-                                observed["Image"]
-                                != self.context.deployment["inputs"]["maddy_image_id"]
-                            ):
-                                raise ServiceError("maddy_identity_mismatch", 503)
-                            mounts = {
-                                entry["Destination"]: entry["Source"]
-                                for entry in observed["Mounts"]
-                            }
-                            if mounts != maddy.expected_mounts():
-                                raise ServiceError("maddy_mount_mismatch", 503)
-                        writers._start_existing(name)
-                        writers._verify_resumed(name, consumer["served_sha256"])
-                        consumer.update(intent="expected_running", state="active")
-                        consumer.pop("reason", None)
-                self.context.intents.write(state)
-                with self.control.connect() as connection:
-                    committed = (
-                        connection.execute(
-                            "SELECT 1 FROM backup_imports WHERE id=?", (original["id"],)
-                        ).fetchone()
-                        is not None
-                    )
-                if original["kind"] == "restore" and not committed:
-                    data = Path(self.context.deployment["maddy_data_directory"])
-                    with self.control.connect() as ledger:
-                        plan = ledger.execute(
-                            "SELECT keys FROM backup_plans WHERE id=?", (original["id"],)
-                        ).fetchone()
-                    keys = json.loads(plan[0]) if plan else []
-                    with connect(data / "imapsql.db") as live:
-                        for key in keys:
-                            if live.execute(
-                                "SELECT 1 FROM extKeys WHERE id=?", (key,)
-                            ).fetchone():
-                                raise ServiceError("backup_restore_checkpoint_conflict", 409)
-                            path = data / "messages" / key
-                            if path.is_symlink():
-                                raise ServiceError("mailbox_import_body_conflict", 409)
-                            path.unlink(missing_ok=True)
-                    sync_directory(data / "messages")
+                self.resume_capture_consumers()
+                committed = self.import_committed(original)
         if committed:
             self.phase(job, "post_restore_backup")
             BackupOperations(self.context.backup(), self.context.deployment).run()
